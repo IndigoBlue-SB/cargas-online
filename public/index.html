@@ -1,0 +1,1400 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cargas</title>
+  <meta name="theme-color" content="#0f766e">
+  <meta name="application-name" content="Cargas">
+  <meta name="apple-mobile-web-app-title" content="Cargas">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./cargas-icon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --bg: #f4f6f2;
+      --panel: #ffffff;
+      --ink: #202426;
+      --muted: #667078;
+      --membrete-color: #202426;
+      --line: #d9ded6;
+      --brand: #0f766e;
+      --brand-dark: #115e59;
+      --button-bg: #0f766e;
+      --nav-button-bg: #2b7bbb;
+      --nav-button-active-bg: #0f766e;
+      --nav-button-color: #ffffff;
+      --button-font-size: 15px;
+      --total-font-size: 22px;
+      --main-logo-size: 180px;
+      --event-info-color: #667078;
+      --event-info-font-family: Arial, Helvetica, sans-serif;
+      --splash: #123f8c;
+      --side: #18312d;
+      --soft: #e8f3ef;
+      --warn: #fff2d9;
+      --danger: #b42318;
+      --shadow: 0 16px 40px rgba(27, 36, 33, 0.09);
+      --radius: 8px;
+      --font-size: 15px;
+      --font-family: Arial, Helvetica, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-family);
+      font-size: var(--font-size);
+    }
+
+    button, input, select, textarea { font: inherit; }
+    button { border: 0; border-radius: 6px; padding: 7px 10px; min-height: 34px; cursor: pointer; color: #fff; background: var(--button-bg); font-size: var(--button-font-size); }
+    button:hover { filter: brightness(.92); }
+    button:disabled { opacity: .48; cursor: not-allowed; }
+    input, select, textarea { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; background: #fbfcfa; color: var(--ink); outline: none; }
+    input:focus, select:focus, textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(15, 118, 110, .12); }
+    label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+
+    .app { min-height: 100vh; display: grid; grid-template-columns: 210px minmax(0, 1fr); }
+    .sidebar { background: var(--side); color: #fff; padding: 14px; display: grid; align-content: start; gap: 12px; }
+    .brand h1 { margin: 0; font-size: 20px; line-height: 1.1; letter-spacing: 0; }
+    .brand p { margin: 5px 0 0; color: rgba(255,255,255,.72); line-height: 1.3; font-size: 12px; }
+    .nav { display: grid; gap: 6px; }
+    .nav button, .ghost { background: var(--nav-button-bg); color: var(--nav-button-color); text-align: left; }
+    .nav button:hover, .ghost:hover { filter: brightness(1.08); }
+    .nav button.active { background: var(--nav-button-active-bg); }
+    .main { padding: 12px; display: grid; gap: 10px; align-content: start; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .topbar h2 { margin: 0; font-size: 24px; letter-spacing: 0; }
+    .muted { color: var(--muted); }
+    .panel, .stat, .table-wrap { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .panel { padding: 10px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .form-grid { display: grid; gap: 8px; }
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .table-actions { display: flex; gap: 4px; justify-content: flex-end; }
+    .secondary { background: #36413f; }
+    .secondary:hover { background: #28312f; }
+    .danger { background: var(--danger); }
+    .danger:hover { background: #8f1d14; }
+    .light { background: #eef2ed; color: #26312f; }
+    .light:hover { background: #dfe7df; }
+
+    .cards { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); gap: 8px; }
+    .stat { padding: 10px; min-width: 0; }
+    .stat span { display: block; color: var(--muted); font-size: 11px; margin-bottom: 5px; }
+    .stat strong { display: block; font-size: var(--total-font-size); line-height: 1.1; overflow-wrap: anywhere; }
+    .event-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+    .event-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; background: #fbfcfa; display: grid; gap: 8px; }
+    .event-card h3 { margin: 0; font-size: 16px; }
+    .event-meta { display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
+    .login-screen { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: var(--bg); }
+    .login-card { width: min(460px, 100%); display: grid; gap: 16px; }
+    .login-card h1 { margin: 0; font-size: 28px; letter-spacing: 0; }
+    .splash-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 50% 28%, rgba(255,255,255,.24), transparent 28%), var(--splash); color: #fff; overflow: hidden; }
+    .splash-card { display: grid; gap: 24px; justify-items: center; text-align: center; animation: splashIn .8s ease both; }
+    .indigo-logo { display: grid; gap: 8px; justify-items: center; animation: logoFloat 3.6s ease-in-out infinite; }
+    .indigo-mark { width: var(--main-logo-size); height: var(--main-logo-size); border-radius: 22px; display: grid; place-items: center; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.32); box-shadow: 0 18px 48px rgba(0,0,0,.18); font-size: calc(var(--main-logo-size) * .4); font-weight: 700; }
+    .splash-logo-img { width: var(--main-logo-size); max-width: 82vw; max-height: 55vh; object-fit: contain; filter: drop-shadow(0 18px 38px rgba(0,0,0,.22)); }
+    .splash-enter { min-height: 34px; padding: 7px 12px; font-size: 13px; background: rgba(255,255,255,.16); }
+    .splash-enter:hover { background: rgba(255,255,255,.24); }
+    @keyframes splashIn { from { opacity: 0; transform: translateY(18px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes logoFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    .user-strip { display: grid; gap: 8px; padding: 12px; border-radius: var(--radius); background: rgba(255,255,255,.08); color: rgba(255,255,255,.84); }
+
+    .hidden { display: none !important; }
+    .event-layout { display: grid; grid-template-columns: 285px minmax(0, 1fr); gap: 10px; align-items: start; }
+    .range-preview { display: grid; gap: 6px; border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; background: #fbfcfa; }
+    .preview-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .preview-list { display: grid; gap: 4px; max-height: 140px; overflow-y: auto; }
+    .preview-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; width: 100%; min-height: 30px; border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; background: #fff; color: var(--ink); text-align: left; }
+    .preview-row.selected { border-color: var(--brand); background: var(--soft); }
+    .preview-row small { color: var(--muted); }
+    .draft-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .draft-summary .stat { box-shadow: none; padding: 12px; }
+    .toolbar { display: grid; grid-template-columns: 1.2fr .9fr .9fr .9fr auto; gap: 6px; align-items: end; }
+    .views { display: flex; gap: 8px; flex-wrap: wrap; }
+    .views button.active { background: var(--brand); }
+    .table-wrap { overflow: hidden; }
+    .table-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+    .table-head h3 { margin: 0; font-size: 16px; }
+    .scroll { overflow-x: auto; }
+    table { width: 100%; min-width: 960px; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 7px 6px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    th { background: #eef2ed; color: #36413f; font-size: 10px; text-transform: uppercase; letter-spacing: 0; }
+    tbody tr:hover { background: #fbfcfa; }
+    .money, .number { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .badge { display: inline-flex; align-items: center; min-height: 26px; padding: 4px 8px; border-radius: 999px; background: var(--soft); color: #14564f; font-size: 12px; }
+    .cash { background: var(--warn); color: #7a3d06; }
+    .empty { padding: 26px 16px; color: var(--muted); text-align: center; }
+    #page-settings { padding-top: 8px; }
+    #page-settings .topbar { margin-bottom: 6px; }
+    #page-settings .panel { padding: 8px; gap: 6px; }
+    #page-settings h3 { margin: 2px 0 0; font-size: 14px; }
+    #page-settings hr { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid var(--line); }
+    #page-settings label { gap: 2px; font-size: 11px; }
+    #page-settings input, #page-settings select { padding: 5px 6px; min-height: 28px; font-size: 12px; }
+    #page-settings input[type="file"] { padding: 3px; font-size: 11px; }
+    .settings-grid { display: grid; grid-template-columns: repeat(6, minmax(95px, 1fr)); gap: 5px; }
+    .settings-users { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(120px, 1fr) auto minmax(220px, 2fr); gap: 6px; align-items: end; }
+    .user-list { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 1px; }
+    .user-row { display: inline-flex; justify-content: space-between; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: var(--radius); padding: 5px 6px; background: #fbfcfa; white-space: nowrap; }
+    .event-user-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius); background: #fbfcfa; }
+    .event-user-option { display: flex; align-items: center; gap: 7px; min-height: 32px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); font-size: 13px; }
+    .event-user-option input { width: auto; }
+    .logo-field { align-content: start; }
+    .logo-preview { max-width: 100%; max-height: 36px; object-fit: contain; justify-self: start; border: 1px solid var(--line); border-radius: 6px; background: #fff; padding: 2px; }
+    .event-title-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; }
+    #activeEventTitle { color: var(--membrete-color); }
+    #activeEventInfo { color: var(--event-info-color); font-family: var(--event-info-font-family); }
+    .event-logo { object-fit: contain; max-width: 220px; }
+
+    @media print {
+      body * { visibility: hidden; }
+      #printArea, #printArea * { visibility: visible; }
+      #printArea { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
+    }
+
+    @media (max-width: 1120px) {
+      .app, .event-layout { grid-template-columns: 1fr; }
+      .cards, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .toolbar { grid-template-columns: 1fr 1fr; }
+      .settings-grid { grid-template-columns: repeat(3, 1fr); }
+      .settings-users { grid-template-columns: 1fr 1fr auto; }
+      .user-list { grid-column: 1 / -1; }
+    }
+
+    @media (max-width: 680px) {
+      .main, .sidebar { padding: 16px; }
+      .cards, .grid-2, .grid-3, .grid-4, .toolbar, .settings-grid, .preview-meta { grid-template-columns: 1fr; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <section id="splashScreen" class="splash-screen">
+    <div class="splash-card">
+      <div class="indigo-logo">
+        <img id="splashLogoImage" class="splash-logo-img hidden" alt="Logo principal">
+        <div id="splashLogoFallback" class="indigo-mark">IB</div>
+      </div>
+      <button type="button" id="enterApp" class="splash-enter">Ingresar</button>
+    </div>
+  </section>
+
+  <section id="loginScreen" class="login-screen hidden">
+    <form id="loginForm" class="panel login-card">
+      <div>
+        <h1>Ingreso</h1>
+        <p class="muted">EntrÃ¡ como administrador o usuario asignado a un evento.</p>
+      </div>
+      <label>Acceso
+        <select id="loginAccount">
+          <option value="admin:Administrador">Administrador</option>
+        </select>
+      </label>
+      <label>Clave<input id="loginPassword" type="password" autocomplete="current-password" placeholder="Clave"></label>
+      <button type="submit">Ingresar</button>
+    </form>
+  </section>
+
+  <div class="app hidden" id="appShell">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>Cargas</h1>
+        <p>Eventos, ventas, estadisticas y exportaciones.</p>
+        <div class="user-strip">
+          <strong id="sessionName">Sin sesion</strong>
+          <button type="button" class="ghost" id="logoutButton">Cerrar sesion</button>
+        </div>
+      </div>
+      <nav class="nav">
+        <button type="button" data-page="home" class="active">INICIO</button>
+        <button type="button" data-page="create" data-admin-only>CREAR EVENTO</button>
+        <button type="button" data-page="stats" data-admin-only>ESTADISTICAS</button>
+        <button type="button" data-page="delete" data-admin-only>ELIMINAR EVENTO</button>
+        <button type="button" data-page="events">EVENTOS</button>
+        <button type="button" data-page="settings" data-admin-only>CONFIGURACIONES</button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <section id="page-home" data-screen>
+        <div class="topbar">
+          <div>
+            <h2>Inicio</h2>
+            <p class="muted">ElegÃ­ un acceso para trabajar con eventos y ventas.</p>
+          </div>
+        </div>
+        <div class="event-list">
+          <button type="button" class="event-card" data-page-shortcut="create" data-admin-only><h3>CREAR EVENTO</h3><span class="muted">Configurar nombre, importes, porcentajes y ubicacion.</span></button>
+          <button type="button" class="event-card" data-page-shortcut="stats" data-admin-only><h3>ESTADISTICAS</h3><span class="muted">Ver totales generales y por evento.</span></button>
+          <button type="button" class="event-card" data-page-shortcut="delete" data-admin-only><h3>ELIMINAR EVENTO</h3><span class="muted">Borrar eventos que ya no se necesiten.</span></button>
+          <button type="button" class="event-card" data-page-shortcut="events"><h3>EVENTOS</h3><span class="muted">Entrar a eventos creados para cargar ventas.</span></button>
+        </div>
+      </section>
+
+      <section id="page-create" data-screen class="hidden">
+        <div class="topbar"><h2>Crear evento</h2></div>
+        <form id="eventForm" class="panel form-grid">
+          <div class="grid-2">
+            <label>Nombre del evento<input id="eventName" required placeholder="Ej: Bingo aniversario"></label>
+            <label>Fecha del evento<input id="eventDate" required type="date"></label>
+          </div>
+          <div class="grid-3">
+            <label>Importe de la tira<input id="eventPrice" required type="number" min="0" step="0.01" placeholder="0.00"></label>
+            <label>Comision vendedor %<input id="eventSellerPercent" required type="number" min="0" max="100" step="0.01" placeholder="0"></label>
+            <label>Administrador %<input id="eventAdminPercent" required type="number" min="0" max="100" step="0.01" placeholder="0"></label>
+          </div>
+          <div class="grid-3">
+            <label>Administrador<input id="eventAdmin" required placeholder="Nombre"></label>
+            <label>Localidad principal<input id="eventTown" required placeholder="Localidad"></label>
+            <label>Provincia<input id="eventProvince" required placeholder="Provincia"></label>
+          </div>
+          <label>Usuarios habilitados
+            <div id="eventUsers" class="event-user-list"></div>
+            <small class="muted">Solo los usuarios seleccionados podran ver y cargar este evento. Si no seleccionas ninguno, queda solo para administrador.</small>
+          </label>
+          <div class="grid-2">
+            <label>Fuente inicial
+              <select id="eventFont">
+                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                <option value="'Segoe UI', Arial, sans-serif">Segoe UI</option>
+                <option value="Georgia, serif">Georgia</option>
+              </select>
+            </label>
+            <label>Color principal<input id="eventColor" type="color" value="#0f766e"></label>
+          </div>
+          <div class="grid-4">
+            <label class="logo-field">Logo izquierdo del evento
+              <input id="eventLogoLeftInput" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,image/*">
+              <img id="eventLogoLeftPreview" class="logo-preview hidden" alt="Vista logo izquierdo">
+            </label>
+            <label>Tamaño logo izquierdo<input id="eventLogoLeftSize" type="number" min="30" max="320" step="1" value="86"></label>
+            <label class="logo-field">Logo derecho del evento
+              <input id="eventLogoRightInput" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,image/*">
+              <img id="eventLogoRightPreview" class="logo-preview hidden" alt="Vista logo derecho">
+            </label>
+            <label>Tamaño logo derecho<input id="eventLogoRightSize" type="number" min="30" max="320" step="1" value="86"></label>
+          </div>
+          <label>Observaciones<textarea id="eventNotes" rows="3" placeholder="Datos internos del evento"></textarea></label>
+          <div class="actions">
+            <button type="submit" id="saveEventButton">Crear evento</button>
+            <button type="button" class="light" id="clearEventForm">Limpiar</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="page-events" data-screen class="hidden">
+        <div class="topbar">
+          <div><h2>Eventos</h2><p class="muted">EntrÃ¡ a un evento para cargar ventas.</p></div>
+        </div>
+        <div id="eventsList" class="event-list"></div>
+      </section>
+
+      <section id="page-stats" data-screen class="hidden">
+        <div class="topbar"><h2>Estadisticas</h2></div>
+        <div class="cards">
+          <div class="stat"><span>Eventos</span><strong id="statsEvents">0</strong></div>
+          <div class="stat"><span>Total vendido</span><strong id="statsSales">$0</strong></div>
+          <div class="stat"><span>Bingos vendidos</span><strong id="statsUnits">0</strong></div>
+          <div class="stat"><span>Comisiones</span><strong id="statsCommissions">$0</strong></div>
+        </div>
+        <section class="table-wrap">
+          <div class="table-head"><h3>Estadisticas por evento</h3><span id="statsCount" class="muted">0 eventos</span></div>
+          <div class="scroll"><table><thead id="statsHead"></thead><tbody id="statsTable"></tbody></table></div>
+        </section>
+      </section>
+
+      <section id="page-delete" data-screen class="hidden">
+        <div class="topbar"><h2>Eliminar evento</h2></div>
+        <div id="deleteList" class="event-list"></div>
+      </section>
+
+      <section id="page-settings" data-screen class="hidden">
+        <div class="topbar"><h2>Configuraciones</h2></div>
+        <section class="panel form-grid">
+          <div class="settings-grid">
+            <label>Clave administrador<input id="settingAdminPassword" type="password" placeholder="Nueva clave"></label>
+            <label>Fuente
+              <select id="settingFont">
+                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                <option value="'Segoe UI', Arial, sans-serif">Segoe UI</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="'Trebuchet MS', Arial, sans-serif">Trebuchet</option>
+              </select>
+            </label>
+            <label>TamaÃ±o de letra general<input id="settingSize" type="number" min="12" max="24" step="1"></label>
+            <label>TamaÃ±o letra botones<input id="settingButtonSize" type="number" min="11" max="24" step="1"></label>
+            <label>TamaÃ±o letra totales<input id="settingTotalSize" type="number" min="16" max="42" step="1"></label>
+            <label>Color principal<input id="settingBrand" type="color"></label>
+            <label>Color botones<input id="settingButtonBg" type="color"></label>
+            <label>Botones inicio<input id="settingNavButtonBg" type="color"></label>
+            <label>Inicio activo<input id="settingNavButtonActiveBg" type="color"></label>
+            <label>Texto inicio<input id="settingNavButtonColor" type="color"></label>
+            <label>Color membrete<input id="settingMembreteColor" type="color"></label>
+            <label>Color debajo membrete<input id="settingEventInfoColor" type="color"></label>
+            <label>Fuente debajo membrete
+              <select id="settingEventInfoFont">
+                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                <option value="'Segoe UI', Arial, sans-serif">Segoe UI</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="'Trebuchet MS', Arial, sans-serif">Trebuchet</option>
+              </select>
+            </label>
+            <label>Fondo general<input id="settingBg" type="color"></label>
+            <label>Fondo de paneles<input id="settingPanel" type="color"></label>
+            <label>Color presentacion<input id="settingSplash" type="color"></label>
+            <label>Color lateral<input id="settingSide" type="color"></label>
+            <label class="logo-field">Logo pagina principal
+              <input id="settingMainLogo" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,image/*">
+              <img id="previewMainLogo" class="logo-preview hidden" alt="Vista logo principal">
+            </label>
+            <label>TamaÃ±o logo principal<input id="settingMainLogoSize" type="number" min="60" max="420" step="1"></label>
+
+            <label>Bordes
+              <select id="settingRadius">
+                <option value="4px">Recto</option>
+                <option value="8px">Medio</option>
+                <option value="14px">Redondeado</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button type="button" id="applySettingsButton">Aplicar</button>
+            <button type="button" class="light" id="resetSettings">Restablecer</button>
+          </div>
+          <hr>
+          <h3>Usuarios</h3>
+          <div class="settings-users">
+            <label>Nuevo usuario<input id="newUserName" placeholder="Nombre de usuario"></label>
+            <label>Clave<input id="newUserPassword" type="password" placeholder="Clave del usuario"></label>
+            <button type="button" id="createUser">Crear usuario</button>
+            <div id="usersList" class="user-list"></div>
+          </div>
+        </section>
+      </section>
+
+      <section id="page-event" data-screen class="hidden">
+        <div class="topbar">
+          <div class="event-title-row">
+            <img id="eventLogoLeft" class="event-logo hidden" alt="Logo izquierdo">
+            <div><h2 id="activeEventTitle">Evento</h2><p id="activeEventInfo" class="muted"></p></div>
+            <img id="eventLogoRight" class="event-logo hidden" alt="Logo derecho">
+          </div>
+          <button type="button" class="secondary" data-page-shortcut="events">Volver a eventos</button>
+        </div>
+
+        <div class="event-layout">
+          <form id="saleForm" class="panel form-grid">
+            <div class="grid-2">
+              <label>Desde<input id="desde" inputmode="numeric" type="number" min="1" step="1" placeholder="100"></label>
+              <label>Hasta<input id="hasta" inputmode="numeric" type="number" min="1" step="1" placeholder="150"></label>
+            </div>
+            <div class="grid-2">
+              <label>Vendedor<input id="vendedor" required autocomplete="off" placeholder="Nombre"></label>
+              <label>Sin Cargos<input id="sinCargos" type="number" min="0" step="1" value="0"></label>
+            </div>
+            <div class="grid-2">
+              <label>Efectivo<input id="pagoEfectivo" inputmode="decimal" autocomplete="off" value="0"></label>
+              <label>Transferencia<input id="pagoTransferencia" inputmode="decimal" autocomplete="off" value="0"></label>
+            </div>
+            <div class="grid-2">
+              <label>Localidad<input id="localidad" required autocomplete="off" placeholder="Localidad"></label>
+              <label>Provincia<input id="provincia" required autocomplete="off" placeholder="Provincia"></label>
+            </div>
+            <div class="range-preview">
+              <div class="preview-list" id="draftList"></div>
+              <div class="grid-2">
+                <button type="button" class="light" id="deleteSelectedRange">Eliminar rango</button>
+                <button type="button" class="light" id="clearDraftRanges">Eliminar lista completa</button>
+              </div>
+            </div>
+            <div class="draft-summary">
+              <div class="stat"><span>Bingos/series en lista</span><strong id="draftUnits">0</strong></div>
+              <div class="stat"><span>Total previo</span><strong id="draftTotal">$0</strong></div>
+            </div>
+            <div class="actions">
+              <button type="submit" id="saveSaleButton">Guardar carga del vendedor</button>
+              <button type="button" class="light" id="clearSaleForm">Limpiar carga</button>
+            </div>
+          </form>
+
+          <div class="form-grid">
+            <div class="cards">
+              <div class="stat"><span>Total vendido</span><strong id="eventTotal">$0</strong></div>
+              <div class="stat"><span>Bingos vendidos</span><strong id="eventUnits">0</strong></div>
+              <div class="stat"><span>Vendedores</span><strong id="eventSellers">0</strong></div>
+              <div class="stat"><span>Efectivo / Transferencia</span><strong id="eventPayments">$0 / $0</strong></div>
+            </div>
+            <section class="panel form-grid">
+              <div class="toolbar">
+                <label>Buscar<input id="search" placeholder="Vendedor, localidad, provincia o rango"></label>
+                <label>Localidad<select id="filterLocalidad"><option value="">Todas</option></select></label>
+                <label>Provincia<select id="filterProvincia"><option value="">Todas</option></select></label>
+                <label>Vendedor<select id="filterVendedor"><option value="">Todos</option></select></label>
+                <button type="button" class="secondary" id="openExport">Exportar</button>
+              </div>
+              <div class="grid-3">
+                <label>Exportar por
+                  <select id="exportGroup"><option value="general">General</option><option value="vendedor">Vendedor</option><option value="localidad">Localidad</option><option value="provincia">Provincia</option></select>
+                </label>
+                <label>Formato
+                  <select id="exportFormat"><option value="pdf">PDF</option><option value="excel">Excel</option><option value="txt">Block de notas</option></select>
+                </label>
+                <label>Dato especifico<select id="exportValue"><option value="">Todo</option></select></label>
+              </div>
+            </section>
+            <div class="views">
+              <button type="button" class="active" data-view="detalle">Ventas cargadas</button>
+              <button type="button" data-view="vendedores">Ver por vendedor</button>
+              <button type="button" data-view="localidades">Ver por localidad</button>
+              <button type="button" data-view="provincias">Ver por provincia</button>
+            </div>
+            <section class="table-wrap">
+              <div class="table-head"><h3 id="tableTitle">Ventas cargadas</h3><span id="visibleCount" class="muted">0 cargas</span></div>
+              <div class="scroll"><table><thead id="tableHead"></thead><tbody id="salesTable"></tbody></table><div id="emptyState" class="empty">Todavia no hay ventas cargadas.</div></div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div id="printArea" class="hidden"></div>
+
+  <script>
+    const defaultSettings = { font: 'Arial, Helvetica, sans-serif', size: 15, buttonSize: 15, totalSize: 22, brand: '#0f766e', buttonBg: '#0f766e', navButtonBg: '#2b7bbb', navButtonActiveBg: '#0f766e', navButtonColor: '#ffffff', membreteColor: '#202426', eventInfoColor: '#667078', eventInfoFont: 'Arial, Helvetica, sans-serif', bg: '#f4f6f2', panel: '#ffffff', splash: '#123f8c', side: '#18312d', radius: '8px', mainLogo: '', mainLogoSize: 180, eventLogoLeft: '', eventLogoRight: '', eventLogoLeftSize: 86, eventLogoRightSize: 86, adminPassword: 'admin123' };
+    let events = [];
+    let settings = { ...defaultSettings };
+    if (!settings.adminPassword) settings.adminPassword = defaultSettings.adminPassword;
+    let appUsers = [];
+    let currentUser = null;
+    let activePage = 'home';
+    let activeEventId = null;
+    let currentView = 'detalle';
+    let draftRanges = [];
+    let selectedDraftId = null;
+    let editingLoadId = null;
+    let editingEventId = null;
+    let splashDone = false;
+    let lastPaymentSource = 'cash';
+    const pendingLogos = { mainLogo: null, eventLogoLeft: null, eventLogoRight: null };
+
+    const $ = id => document.getElementById(id);
+    const screens = document.querySelectorAll('[data-screen]');
+    const navButtons = document.querySelectorAll('[data-page]');
+    const viewButtons = document.querySelectorAll('[data-view]');
+    const fields = { desde: $('desde'), hasta: $('hasta'), vendedor: $('vendedor'), sinCargos: $('sinCargos'), pagoEfectivo: $('pagoEfectivo'), pagoTransferencia: $('pagoTransferencia'), localidad: $('localidad'), provincia: $('provincia') };
+
+    async function api(path, options = {}) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      try {
+        const response = await fetch(path, {
+          headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+          credentials: 'same-origin',
+          signal: controller.signal,
+          ...options
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Error de servidor');
+        return data;
+      } catch (error) {
+        if (error.name === 'AbortError') throw new Error('La app tardÃ³ demasiado en responder. CerrÃ¡ Cargas y abrila nuevamente.');
+        if (error instanceof TypeError) throw new Error('No se pudo conectar con la app. CerrÃ¡ Cargas y abrila nuevamente.');
+        throw error;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    function saveEvents() {
+      api('/api/events', { method: 'PUT', body: JSON.stringify({ events }) }).catch(error => alert(error.message));
+    }
+    function saveSettingsData() {
+      try {
+        api('/api/settings', { method: 'PUT', body: JSON.stringify({ settings }) }).catch(error => alert(error.message));
+        return true;
+      } catch (error) {
+        alert('No se pudo guardar el logo. Probablemente la imagen es demasiado pesada. ProbÃ¡ con una imagen mÃ¡s chica.');
+        return false;
+      }
+    }
+    function saveUsers() {
+      api('/api/users', { method: 'PUT', body: JSON.stringify({ users: appUsers }) }).catch(error => alert(error.message));
+    }
+    async function loadAccounts() {
+      const data = await api('/api/accounts');
+      appUsers = data.users || [];
+      renderUsers();
+    }
+    async function loadState() {
+      const data = await api('/api/state');
+      events = data.events || [];
+      appUsers = data.users || appUsers;
+      settings = { ...defaultSettings, ...(data.settings || {}) };
+      applySettings();
+      renderAll();
+    }
+    function money(value) { return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(Number(value) || 0); }
+    function num(value) { return new Intl.NumberFormat('es-AR').format(Number(value) || 0); }
+    function normalize(value) { return String(value || '').trim().toLowerCase(); }
+    function parseAmount(value) {
+      const clean = String(value || '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+      return Number(clean) || 0;
+    }
+    function formatPlainAmount(value) {
+      const rounded = Math.max(Number(value) || 0, 0);
+      return rounded.toFixed(2).replace('.', ',');
+    }
+    function isAdmin() { return currentUser?.role === 'admin'; }
+    function selectedUsers() { return [...document.querySelectorAll('[data-event-user]:checked')].map(option => option.value); }
+    function canAccessEvent(event) {
+      if (isAdmin()) return true;
+      const allowed = event.allowedUsers || [];
+      return allowed.map(normalize).includes(normalize(currentUser?.name));
+    }
+    function visibleEvents() { return events.filter(canAccessEvent); }
+    function activeEvent() { return events.find(event => event.id === activeEventId); }
+    function rangeCount(item) { const d = Number(item.desde) || 0; const h = Number(item.hasta) || 0; return h >= d ? h - d + 1 : 0; }
+    function saleTotal(item, event = activeEvent()) { return rangeCount(item) * (Number(event?.price) || 0); }
+    function pct(amount, percent) { return (Number(amount) || 0) * (Number(percent) || 0) / 100; }
+    function saleCash(sale, event) {
+      if (sale.cashAmount !== undefined) return Number(sale.cashAmount) || 0;
+      return sale.payment === 'Efectivo' ? saleTotal(sale, event) : 0;
+    }
+    function saleTransfer(sale, event) {
+      if (sale.transferAmount !== undefined) return Number(sale.transferAmount) || 0;
+      return sale.payment === 'Transferencia' ? saleTotal(sale, event) : 0;
+    }
+    function paymentLabel(load) {
+      const parts = [];
+      if (load.cashAmount) parts.push(`Efectivo ${money(load.cashAmount)}`);
+      if (load.transferAmount) parts.push(`Transferencia ${money(load.transferAmount)}`);
+      return parts.join(' / ') || load.payment || 'Sin pago';
+    }
+    function setImage(image, value) {
+      image.classList.toggle('hidden', !value);
+      if (value) image.src = value;
+      if (!value) image.removeAttribute('src');
+    }
+    function readImageFile(input, maxSize = 700) {
+      return new Promise(resolve => {
+        const file = input.files?.[0];
+        if (!file) return resolve(null);
+        if (!file.type.startsWith('image/')) {
+          alert('El archivo elegido no parece ser una imagen.');
+          return resolve(null);
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const original = reader.result;
+          const image = new Image();
+          image.onload = () => {
+            const keepsTransparency = file.type === 'image/png' || file.type === 'image/webp';
+            const targetSize = keepsTransparency ? Math.min(maxSize, 520) : maxSize;
+            const scale = Math.min(1, targetSize / Math.max(image.width, image.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(image.width * scale));
+            canvas.height = Math.max(1, Math.round(image.height * scale));
+            const context = canvas.getContext('2d');
+            if (!keepsTransparency) {
+              context.fillStyle = '#ffffff';
+              context.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            resolve(keepsTransparency ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.82));
+          };
+          image.onerror = () => resolve(original);
+          image.src = original;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    function payableDraftTotal() {
+      const eventData = activeEvent();
+      const totals = draftTotals();
+      const freeUnits = Number(fields.sinCargos.value) || 0;
+      return Math.max(totals.units - freeUnits, 0) * (Number(eventData?.price) || 0);
+    }
+    function syncPaymentFrom(source) {
+      const total = payableDraftTotal();
+      if (source === 'cash') {
+        fields.pagoTransferencia.value = formatPlainAmount(total - parseAmount(fields.pagoEfectivo.value));
+      }
+      if (source === 'transfer') {
+        fields.pagoEfectivo.value = formatPlainAmount(total - parseAmount(fields.pagoTransferencia.value));
+      }
+    }
+
+    function applySettings() {
+      document.documentElement.style.setProperty('--font-family', settings.font);
+      document.documentElement.style.setProperty('--font-size', `${settings.size}px`);
+      document.documentElement.style.setProperty('--button-font-size', `${settings.buttonSize || defaultSettings.buttonSize}px`);
+      document.documentElement.style.setProperty('--total-font-size', `${settings.totalSize || defaultSettings.totalSize}px`);
+      document.documentElement.style.setProperty('--main-logo-size', `${settings.mainLogoSize || defaultSettings.mainLogoSize}px`);
+      document.documentElement.style.setProperty('--brand', settings.brand);
+      document.documentElement.style.setProperty('--brand-dark', settings.brand);
+      document.documentElement.style.setProperty('--button-bg', settings.buttonBg || settings.brand);
+      document.documentElement.style.setProperty('--nav-button-bg', settings.navButtonBg || defaultSettings.navButtonBg);
+      document.documentElement.style.setProperty('--nav-button-active-bg', settings.navButtonActiveBg || settings.brand);
+      document.documentElement.style.setProperty('--nav-button-color', settings.navButtonColor || defaultSettings.navButtonColor);
+      document.documentElement.style.setProperty('--membrete-color', settings.membreteColor || defaultSettings.membreteColor);
+      document.documentElement.style.setProperty('--event-info-color', settings.eventInfoColor || defaultSettings.eventInfoColor);
+      document.documentElement.style.setProperty('--event-info-font-family', settings.eventInfoFont || settings.font);
+      document.documentElement.style.setProperty('--bg', settings.bg);
+      document.documentElement.style.setProperty('--panel', settings.panel || defaultSettings.panel);
+      document.documentElement.style.setProperty('--splash', settings.splash || defaultSettings.splash);
+      document.documentElement.style.setProperty('--side', settings.side);
+      document.documentElement.style.setProperty('--radius', settings.radius);
+      $('settingFont').value = settings.font;
+      $('settingSize').value = settings.size;
+      $('settingButtonSize').value = settings.buttonSize || defaultSettings.buttonSize;
+      $('settingTotalSize').value = settings.totalSize || defaultSettings.totalSize;
+      $('settingMainLogoSize').value = settings.mainLogoSize || defaultSettings.mainLogoSize;
+      $('settingBrand').value = settings.brand;
+      $('settingButtonBg').value = settings.buttonBg || settings.brand;
+      $('settingNavButtonBg').value = settings.navButtonBg || defaultSettings.navButtonBg;
+      $('settingNavButtonActiveBg').value = settings.navButtonActiveBg || settings.brand;
+      $('settingNavButtonColor').value = settings.navButtonColor || defaultSettings.navButtonColor;
+      $('settingMembreteColor').value = settings.membreteColor || defaultSettings.membreteColor;
+      $('settingEventInfoColor').value = settings.eventInfoColor || defaultSettings.eventInfoColor;
+      $('settingEventInfoFont').value = settings.eventInfoFont || settings.font;
+      $('settingBg').value = settings.bg;
+      $('settingPanel').value = settings.panel || defaultSettings.panel;
+      $('settingSplash').value = settings.splash || defaultSettings.splash;
+      $('settingSide').value = settings.side;
+      $('settingRadius').value = settings.radius;
+      $('settingAdminPassword').value = '';
+      setImage($('splashLogoImage'), settings.mainLogo);
+      $('splashLogoFallback').classList.toggle('hidden', Boolean(settings.mainLogo));
+      setImage($('previewMainLogo'), settings.mainLogo);
+    }
+
+    function renderUsers() {
+      const sortedUsers = appUsers.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+      const loginCurrent = $('loginAccount').value;
+      $('loginAccount').innerHTML = '<option value="admin:Administrador">Administrador</option>'
+        + sortedUsers.map(user => `<option value="user:${user.name}">${user.name}</option>`).join('');
+      $('loginAccount').value = [...$('loginAccount').options].some(option => option.value === loginCurrent) ? loginCurrent : 'admin:Administrador';
+      $('eventUsers').innerHTML = sortedUsers.length
+        ? sortedUsers.map(user => `<label class="event-user-option"><input type="checkbox" data-event-user value="${user.name}"><span>${user.name}</span></label>`).join('')
+        : '<div class="empty">Primero crea usuarios en Configuraciones.</div>';
+      $('usersList').innerHTML = appUsers.length
+        ? appUsers.map(user => `<div class="user-row"><strong>${user.name}</strong><button type="button" class="danger" data-delete-user="${user.id}">Eliminar</button></div>`).join('')
+        : '<div class="empty">Todavia no hay usuarios creados.</div>';
+    }
+
+    function go(page) {
+      if (!isAdmin() && ['create', 'stats', 'delete', 'settings'].includes(page)) page = 'events';
+      activePage = page;
+      screens.forEach(screen => screen.classList.toggle('hidden', screen.id !== `page-${page}`));
+      navButtons.forEach(button => button.classList.toggle('active', button.dataset.page === page));
+      renderAll();
+    }
+
+    function applySession() {
+      const logged = Boolean(currentUser);
+      renderUsers();
+      $('splashScreen').classList.toggle('hidden', splashDone);
+      $('loginScreen').classList.toggle('hidden', !splashDone || logged);
+      $('appShell').classList.toggle('hidden', !splashDone || !logged);
+      if (!logged) return;
+      $('sessionName').textContent = `${currentUser.name} (${isAdmin() ? 'Administrador' : 'Usuario'})`;
+      document.querySelectorAll('[data-admin-only]').forEach(item => item.classList.toggle('hidden', !isAdmin()));
+      if (!isAdmin() && ['create', 'stats', 'delete', 'settings'].includes(activePage)) activePage = 'events';
+      go(activePage);
+    }
+
+    function totalsFor(sales, event) {
+      return sales.reduce((acc, sale) => {
+        const total = saleTotal(sale, event);
+        acc.sales += total;
+        acc.units += rangeCount(sale);
+        acc.seller += pct(total, event.sellerPercent);
+        acc.admin += pct(total, event.adminPercent);
+        acc.cash += saleCash(sale, event);
+        acc.transfer += saleTransfer(sale, event);
+        acc.sellers.add(sale.seller);
+        return acc;
+      }, { sales: 0, units: 0, seller: 0, admin: 0, cash: 0, transfer: 0, sellers: new Set() });
+    }
+
+    function renderEventCards() {
+      const list = $('eventsList');
+      const availableEvents = visibleEvents();
+      list.innerHTML = '';
+      if (!availableEvents.length) { list.innerHTML = '<div class="empty">No hay eventos disponibles para este usuario.</div>'; return; }
+      availableEvents.forEach(event => {
+        const totals = totalsFor(event.sales || [], event);
+        const card = document.createElement('article');
+        card.className = 'event-card';
+        card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${event.town}, ${event.province}</span><span>${num(totals.units)} bingos - ${money(totals.sales)}</span></div><div class="actions"><button type="button" data-open-event="${event.id}">Entrar al evento</button>${isAdmin() ? `<button type="button" class="light" data-edit-event="${event.id}">Editar evento</button>` : ''}</div>`;
+        list.appendChild(card);
+      });
+    }
+
+    function resetEventForm() {
+      editingEventId = null;
+      $('eventForm').reset();
+      $('eventColor').value = '#0f766e';
+      $('eventLogoLeftInput').value = '';
+      $('eventLogoRightInput').value = '';
+      $('eventLogoLeftSize').value = defaultSettings.eventLogoLeftSize;
+      $('eventLogoRightSize').value = defaultSettings.eventLogoRightSize;
+      setImage($('eventLogoLeftPreview'), '');
+      setImage($('eventLogoRightPreview'), '');
+      pendingLogos.eventLogoLeft = null;
+      pendingLogos.eventLogoRight = null;
+      $('saveEventButton').textContent = 'Crear evento';
+      $('eventDate').valueAsDate = new Date();
+      document.querySelectorAll('[data-event-user]').forEach(option => { option.checked = false; });
+    }
+
+    function editEvent(eventId) {
+      const eventData = events.find(eventItem => eventItem.id === eventId);
+      if (!eventData || !isAdmin()) return;
+      editingEventId = eventId;
+      $('eventName').value = eventData.name || '';
+      $('eventDate').value = eventData.date || '';
+      $('eventPrice').value = eventData.price || 0;
+      $('eventSellerPercent').value = eventData.sellerPercent || 0;
+      $('eventAdminPercent').value = eventData.adminPercent || 0;
+      $('eventAdmin').value = eventData.admin || '';
+      $('eventTown').value = eventData.town || '';
+      $('eventProvince').value = eventData.province || '';
+      $('eventFont').value = eventData.font || 'Arial, Helvetica, sans-serif';
+      $('eventColor').value = eventData.color || '#0f766e';
+      $('eventLogoLeftInput').value = '';
+      $('eventLogoRightInput').value = '';
+      $('eventLogoLeftSize').value = eventData.eventLogoLeftSize || defaultSettings.eventLogoLeftSize;
+      $('eventLogoRightSize').value = eventData.eventLogoRightSize || defaultSettings.eventLogoRightSize;
+      setImage($('eventLogoLeftPreview'), eventData.eventLogoLeft || '');
+      setImage($('eventLogoRightPreview'), eventData.eventLogoRight || '');
+      pendingLogos.eventLogoLeft = null;
+      pendingLogos.eventLogoRight = null;
+      $('eventNotes').value = eventData.notes || '';
+      const allowed = (eventData.allowedUsers || []).map(normalize);
+      document.querySelectorAll('[data-event-user]').forEach(option => { option.checked = allowed.includes(normalize(option.value)); });
+      $('saveEventButton').textContent = 'Actualizar evento';
+      go('create');
+    }
+
+    function renderDeleteList() {
+      const list = $('deleteList');
+      list.innerHTML = '';
+      if (!isAdmin()) { list.innerHTML = '<div class="empty">Solo el administrador puede eliminar eventos.</div>'; return; }
+      if (!events.length) { list.innerHTML = '<div class="empty">No hay eventos para eliminar.</div>'; return; }
+      events.forEach(event => {
+        const card = document.createElement('article');
+        card.className = 'event-card';
+        card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${event.sales?.length || 0} cargas guardadas</span></div><button type="button" class="danger" data-delete-event="${event.id}">Eliminar evento</button>`;
+        list.appendChild(card);
+      });
+    }
+
+    function renderStats() {
+      if (!isAdmin()) return;
+      const allSales = events.flatMap(event => (event.sales || []).map(sale => ({ sale, event })));
+      const totalSales = allSales.reduce((sum, item) => sum + saleTotal(item.sale, item.event), 0);
+      const units = allSales.reduce((sum, item) => sum + rangeCount(item.sale), 0);
+      const commissions = allSales.reduce((sum, item) => sum + pct(saleTotal(item.sale, item.event), item.event.sellerPercent) + pct(saleTotal(item.sale, item.event), item.event.adminPercent), 0);
+      $('statsEvents').textContent = num(events.length);
+      $('statsSales').textContent = money(totalSales);
+      $('statsUnits').textContent = num(units);
+      $('statsCommissions').textContent = money(commissions);
+      $('statsCount').textContent = `${events.length} eventos`;
+      $('statsHead').innerHTML = '<tr><th>Evento</th><th>Fecha</th><th>Localidad</th><th>Provincia</th><th>Cargas</th><th>Bingos</th><th>Total</th><th>Comisiones</th></tr>';
+      $('statsTable').innerHTML = events.map(event => {
+        const totals = totalsFor(event.sales || [], event);
+        return `<tr><td><strong>${event.name}</strong></td><td>${event.date}</td><td>${event.town}</td><td>${event.province}</td><td>${event.sales?.length || 0}</td><td>${num(totals.units)}</td><td>${money(totals.sales)}</td><td>${money(totals.seller + totals.admin)}</td></tr>`;
+      }).join('');
+    }
+
+    function eventSales() {
+      const event = activeEvent();
+      return event?.sales || [];
+    }
+
+    function uniqueSales(key) {
+      return [...new Set(eventSales().map(sale => sale[key]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+    }
+
+    function fillSelect(select, values, allText) {
+      const current = select.value;
+      select.innerHTML = `<option value="">${allText}</option>` + values.map(value => `<option value="${value}">${value}</option>`).join('');
+      select.value = values.includes(current) ? current : '';
+    }
+
+    function filteredSales() {
+      const query = normalize($('search').value);
+      return eventSales().filter(sale => {
+        const range = `${sale.desde}-${sale.hasta}`;
+        return (!query || [range, sale.seller, sale.town, sale.province].some(value => normalize(value).includes(query)))
+          && (!$('filterLocalidad').value || sale.town === $('filterLocalidad').value)
+          && (!$('filterProvincia').value || sale.province === $('filterProvincia').value)
+          && (!$('filterVendedor').value || sale.seller === $('filterVendedor').value);
+      });
+    }
+
+    function groupSales(sales, key) {
+      const event = activeEvent();
+      const groups = new Map();
+      sales.forEach(sale => {
+        const name = sale[key] || 'Sin dato';
+        if (!groups.has(name)) groups.set(name, { name, loadIds: new Set(), units: 0, sales: 0, seller: 0, admin: 0, cash: 0, transfer: 0 });
+        const group = groups.get(name);
+        const total = saleTotal(sale, event);
+        group.loadIds.add(sale.batchId || sale.id); group.units += rangeCount(sale); group.sales += total; group.seller += pct(total, event.sellerPercent); group.admin += pct(total, event.adminPercent);
+        group.cash += saleCash(sale, event);
+        group.transfer += saleTransfer(sale, event);
+      });
+      return [...groups.values()].map(group => ({ ...group, loads: group.loadIds.size })).sort((a, b) => b.sales - a.sales);
+    }
+
+    function groupLoads(sales) {
+      const event = activeEvent();
+      const groups = new Map();
+      sales.forEach(sale => {
+        const key = sale.batchId || sale.id;
+        if (!groups.has(key)) {
+          groups.set(key, {
+            id: key,
+            date: sale.date,
+            createdAt: sale.createdAt || 0,
+            seller: sale.seller,
+            freeUnits: Number(sale.freeUnits) || 0,
+            payment: sale.payment,
+            cashAmount: 0,
+            transferAmount: 0,
+            town: sale.town,
+            province: sale.province,
+            ranges: [],
+            units: 0,
+            total: 0
+          });
+        }
+        const group = groups.get(key);
+        group.ranges.push(`${sale.desde} - ${sale.hasta}`);
+        group.units += rangeCount(sale);
+        group.total += saleTotal(sale, event);
+        group.cashAmount += saleCash(sale, event);
+        group.transferAmount += saleTransfer(sale, event);
+      });
+      return [...groups.values()].sort((a, b) => b.createdAt - a.createdAt);
+    }
+
+    function renderActiveEvent() {
+      const event = activeEvent();
+      if (!event) return;
+      if (!canAccessEvent(event)) {
+        activeEventId = null;
+        go('events');
+        return;
+      }
+      $('activeEventTitle').textContent = event.name;
+      $('activeEventInfo').textContent = `${event.date} - ${event.town}, ${event.province} - Tira ${money(event.price)}`;
+      setImage($('eventLogoLeft'), event.eventLogoLeft || '');
+      setImage($('eventLogoRight'), event.eventLogoRight || '');
+      $('eventLogoLeft').style.width = `${event.eventLogoLeftSize || defaultSettings.eventLogoLeftSize}px`;
+      $('eventLogoRight').style.width = `${event.eventLogoRightSize || defaultSettings.eventLogoRightSize}px`;
+      fields.localidad.placeholder = event.town;
+      fields.provincia.placeholder = event.province;
+      fields.vendedor.readOnly = !isAdmin();
+      if (!isAdmin()) fields.vendedor.value = currentUser.name;
+      if (!fields.localidad.value) fields.localidad.value = event.town;
+      if (!fields.provincia.value) fields.provincia.value = event.province;
+      fillSelect($('filterLocalidad'), uniqueSales('town'), 'Todas');
+      fillSelect($('filterProvincia'), uniqueSales('province'), 'Todas');
+      fillSelect($('filterVendedor'), uniqueSales('seller'), 'Todos');
+      updateExportValues();
+      const items = filteredSales();
+      const totals = totalsFor(items, event);
+      $('eventTotal').textContent = money(totals.sales);
+      $('eventUnits').textContent = num(totals.units);
+      $('eventSellers').textContent = num(totals.sellers.size);
+      $('eventPayments').textContent = `${money(totals.cash)} / ${money(totals.transfer)}`;
+      renderSalesTable(items);
+    }
+
+    function renderSalesTable(items) {
+      $('salesTable').innerHTML = '';
+      if (currentView === 'detalle') {
+        const loads = groupLoads(items);
+        const event = activeEvent();
+        $('emptyState').classList.toggle('hidden', loads.length > 0);
+        $('visibleCount').textContent = `${loads.length} ${loads.length === 1 ? 'carga' : 'cargas'}`;
+        $('tableTitle').textContent = 'Ventas cargadas';
+        $('tableHead').innerHTML = `<tr><th>Vendedor/a</th><th>Cant.</th><th>Sin cargo</th><th>Ingresos</th><th>Com. venta</th><th>Admin.</th><th>Importe</th><th>Pago</th><th>Localidad</th><th>Provincia</th>${isAdmin() ? '<th></th>' : ''}</tr>`;
+        $('salesTable').innerHTML = loads.map(load => {
+          const paidUnits = Math.max(load.units - load.freeUnits, 0);
+          const income = paidUnits * (Number(event.price) || 0);
+          const sellerCommission = pct(income, event.sellerPercent);
+          const adminCommission = pct(income, event.adminPercent);
+          const netAmount = income - sellerCommission - adminCommission;
+          return `<tr><td><strong>${load.seller}</strong></td><td>${num(load.units)}</td><td>${num(load.freeUnits)}</td><td>${money(income)}</td><td>${money(sellerCommission)}</td><td>${money(adminCommission)}</td><td>${money(netAmount)}</td><td>${paymentLabel(load)}</td><td>${load.town}</td><td>${load.province}</td>${isAdmin() ? `<td><div class="table-actions"><button type="button" class="light" data-edit-load="${load.id}">Editar</button><button type="button" class="danger" data-delete-load="${load.id}">Eliminar</button></div></td>` : ''}</tr>`;
+        }).join('');
+        return;
+      }
+      $('emptyState').classList.toggle('hidden', items.length > 0);
+      const key = currentView === 'vendedores' ? 'seller' : currentView === 'localidades' ? 'town' : 'province';
+      const title = currentView === 'vendedores' ? 'Ventas por vendedor' : currentView === 'localidades' ? 'Ventas por localidad' : 'Ventas por provincia';
+      const grouped = groupSales(items, key);
+      $('visibleCount').textContent = `${grouped.length} ${grouped.length === 1 ? 'grupo' : 'grupos'}`;
+      $('tableTitle').textContent = title;
+      $('tableHead').innerHTML = '<tr><th>Grupo</th><th>Cargas</th><th>Bingos</th><th>Total</th><th>Comision vendedor</th><th>Administrador</th><th>Efectivo</th><th>Transferencia</th></tr>';
+      $('salesTable').innerHTML = grouped.map(g => `<tr><td><strong>${g.name}</strong></td><td>${num(g.loads)}</td><td>${num(g.units)}</td><td>${money(g.sales)}</td><td>${money(g.seller)}</td><td>${money(g.admin)}</td><td>${money(g.cash)}</td><td>${money(g.transfer)}</td></tr>`).join('');
+    }
+
+    function draftTotals() { return draftRanges.reduce((acc, r) => ({ units: acc.units + rangeCount(r), total: acc.total + saleTotal(r) }), { units: 0, total: 0 }); }
+    function renderDraft() {
+      const totals = draftTotals();
+      $('draftUnits').textContent = num(totals.units);
+      $('draftTotal').textContent = money(totals.total);
+      $('deleteSelectedRange').disabled = !selectedDraftId;
+      $('clearDraftRanges').disabled = !draftRanges.length;
+      $('draftList').innerHTML = draftRanges.length ? draftRanges.map(r => `<button type="button" class="preview-row ${r.id === selectedDraftId ? 'selected' : ''}" data-draft-id="${r.id}"><strong>${r.desde} - ${r.hasta}</strong><small>${num(rangeCount(r))}</small></button>`).join('') : '<div class="empty">Sin rangos en la lista previa.</div>';
+      syncPaymentFrom(lastPaymentSource);
+    }
+
+    function updatePreview() {
+      const preview = { desde: fields.desde.value, hasta: fields.hasta.value };
+      renderDraft();
+    }
+
+    function addDraftRange() {
+      const range = { id: crypto.randomUUID(), desde: Number(fields.desde.value), hasta: Number(fields.hasta.value) };
+      if (!range.desde) { fields.desde.focus(); return false; }
+      if (!range.hasta) { fields.hasta.value = range.desde; updatePreview(); fields.hasta.focus(); fields.hasta.select(); return false; }
+      if (range.hasta < range.desde) { alert('El campo Hasta no puede ser menor que Desde.'); fields.hasta.focus(); return false; }
+      draftRanges.push(range);
+      selectedDraftId = range.id;
+      fields.desde.value = '';
+      fields.hasta.value = '';
+      updatePreview();
+      fields.desde.focus();
+      return true;
+    }
+
+    function resetSaleForm() {
+      const eventData = activeEvent();
+      editingLoadId = null;
+      draftRanges = [];
+      selectedDraftId = null;
+      $('saleForm').reset();
+      fields.localidad.value = eventData?.town || '';
+      fields.provincia.value = eventData?.province || '';
+      fields.sinCargos.value = 0;
+      fields.pagoEfectivo.value = 0;
+      fields.pagoTransferencia.value = 0;
+      fields.vendedor.readOnly = !isAdmin();
+      fields.vendedor.value = isAdmin() ? '' : currentUser?.name || '';
+      $('saveSaleButton').textContent = 'Guardar carga del vendedor';
+      updatePreview();
+      fields.desde.focus();
+    }
+
+    function editLoad(loadId) {
+      const eventData = activeEvent();
+      if (!eventData) return;
+      const loadSales = eventData.sales.filter(sale => (sale.batchId || sale.id) === loadId);
+      if (!loadSales.length) return;
+      const first = loadSales[0];
+      editingLoadId = loadId;
+      fields.vendedor.value = first.seller;
+      fields.sinCargos.value = Number(first.freeUnits) || 0;
+      fields.pagoEfectivo.value = loadSales.reduce((sum, sale) => sum + saleCash(sale, eventData), 0).toFixed(2);
+      fields.pagoTransferencia.value = loadSales.reduce((sum, sale) => sum + saleTransfer(sale, eventData), 0).toFixed(2);
+      fields.localidad.value = first.town;
+      fields.provincia.value = first.province;
+      fields.desde.value = '';
+      fields.hasta.value = '';
+      draftRanges = loadSales.map(sale => ({
+        id: crypto.randomUUID(),
+        desde: sale.desde,
+        hasta: sale.hasta
+      }));
+      selectedDraftId = draftRanges[0]?.id || null;
+      $('saveSaleButton').textContent = 'Actualizar carga';
+      updatePreview();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      fields.desde.focus();
+    }
+
+    function deleteLoad(loadId) {
+      const eventData = activeEvent();
+      if (!eventData) return;
+      if (!confirm('Eliminar esta carga?')) return;
+      eventData.sales = eventData.sales.filter(sale => (sale.batchId || sale.id) !== loadId);
+      if (editingLoadId === loadId) resetSaleForm();
+      saveEvents();
+      renderActiveEvent();
+      renderStats();
+      renderEventCards();
+    }
+
+    function updateExportValues() {
+      const group = $('exportGroup').value;
+      const key = group === 'vendedor' ? 'seller' : group === 'localidad' ? 'town' : group === 'provincia' ? 'province' : '';
+      const values = key ? uniqueSales(key) : [];
+      fillSelect($('exportValue'), values, 'Todo');
+      $('exportValue').disabled = !key;
+    }
+
+    function rowsForExport() {
+      const group = $('exportGroup').value;
+      const value = $('exportValue').value;
+      const key = group === 'vendedor' ? 'seller' : group === 'localidad' ? 'town' : group === 'provincia' ? 'province' : '';
+      return eventSales().filter(sale => !key || !value || sale[key] === value);
+    }
+
+    function rangeRowsForExport(rows) {
+      return rows
+        .map(sale => ({
+          desde: Number(sale.desde) || 0,
+          hasta: Number(sale.hasta) || 0
+        }))
+        .filter(row => row.desde > 0 && row.hasta >= row.desde)
+        .sort((a, b) => a.desde - b.desde || a.hasta - b.hasta)
+        .map(row => [`${row.desde}-${row.hasta}`]);
+    }
+
+    function exportRows() {
+      const event = activeEvent();
+      const rows = rowsForExport();
+      const rangeRows = rangeRowsForExport(rows);
+      const group = $('exportGroup').value;
+      const format = $('exportFormat').value;
+      const title = `${event.name} - ${group}`;
+      const headers = ['Rango'];
+      const data = rangeRows;
+      if (format === 'pdf') {
+        $('printArea').classList.remove('hidden');
+        $('printArea').innerHTML = `<h1>${title}</h1><table><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${data.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+        window.print();
+        $('printArea').classList.add('hidden');
+        return;
+      }
+      const ext = format === 'excel' ? 'xls' : 'txt';
+      const content = format === 'excel'
+        ? `<table><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${data.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+        : [title, headers.join('\t'), ...data.map(row => row.join('\t'))].join('\n');
+      const type = format === 'excel' ? 'application/vnd.ms-excel;charset=utf-8' : 'text/plain;charset=utf-8';
+      const blob = new Blob([content], { type });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${title.replaceAll(' ', '-')}.${ext}`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    function renderAll() {
+      renderUsers();
+      renderEventCards();
+      renderDeleteList();
+      renderStats();
+      if (activeEventId) renderActiveEvent();
+    }
+
+    navButtons.forEach(button => button.addEventListener('click', () => go(button.dataset.page)));
+    $('enterApp').addEventListener('click', () => {
+      splashDone = true;
+      applySession();
+    });
+    $('loginForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+      const [role, selectedName] = $('loginAccount').value.split(':');
+      const name = selectedName || 'Administrador';
+      const password = $('loginPassword').value.trim();
+      try {
+        if (submitButton) {
+          submitButton.disabled = true;
+          submitButton.textContent = 'Ingresando...';
+        }
+        const data = await api('/api/login', {
+          method: 'POST',
+          body: JSON.stringify({ role, name, password })
+        });
+        currentUser = data.session;
+        await loadState();
+        activePage = role === 'admin' ? 'home' : 'events';
+        applySession();
+      } catch (error) {
+        alert(error.message);
+        $('loginPassword').focus();
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = 'Ingresar';
+        }
+      }
+    });
+    $('logoutButton').addEventListener('click', async () => {
+      await api('/api/logout', { method: 'POST', body: '{}' }).catch(() => {});
+      currentUser = null;
+      activeEventId = null;
+      $('loginForm').reset();
+      await loadAccounts().catch(() => {});
+      applySession();
+    });
+    document.addEventListener('click', event => {
+      const shortcut = event.target.closest('[data-page-shortcut]');
+      if (shortcut) go(shortcut.dataset.pageShortcut);
+      const open = event.target.closest('[data-open-event]');
+      if (open) {
+        const eventData = events.find(eventItem => eventItem.id === open.dataset.openEvent);
+        if (!eventData || !canAccessEvent(eventData)) return;
+        activeEventId = open.dataset.openEvent; currentView = 'detalle'; go('event');
+      }
+      const editEventButton = event.target.closest('[data-edit-event]');
+      if (editEventButton && isAdmin()) editEvent(editEventButton.dataset.editEvent);
+      const del = event.target.closest('[data-delete-event]');
+      if (del && isAdmin() && confirm('Eliminar este evento y todas sus ventas?')) { events = events.filter(e => e.id !== del.dataset.deleteEvent); saveEvents(); renderAll(); }
+      const editLoadButton = event.target.closest('[data-edit-load]');
+      if (editLoadButton && isAdmin()) editLoad(editLoadButton.dataset.editLoad);
+      const deleteLoadButton = event.target.closest('[data-delete-load]');
+      if (deleteLoadButton && isAdmin()) deleteLoad(deleteLoadButton.dataset.deleteLoad);
+      const deleteUserButton = event.target.closest('[data-delete-user]');
+      if (deleteUserButton && isAdmin() && confirm('Eliminar este usuario?')) {
+        const user = appUsers.find(item => item.id === deleteUserButton.dataset.deleteUser);
+        appUsers = appUsers.filter(item => item.id !== deleteUserButton.dataset.deleteUser);
+        if (user) {
+          events = events.map(eventItem => ({
+            ...eventItem,
+            allowedUsers: (eventItem.allowedUsers || []).filter(name => normalize(name) !== normalize(user.name))
+          }));
+          saveEvents();
+        }
+        saveUsers();
+        renderAll();
+      }
+      const draft = event.target.closest('[data-draft-id]');
+      if (draft) { selectedDraftId = draft.dataset.draftId; renderDraft(); }
+    });
+
+    $('eventForm').addEventListener('submit', event => {
+      event.preventDefault();
+      if (!isAdmin()) return;
+      const currentEvent = editingEventId ? events.find(eventItem => eventItem.id === editingEventId) : null;
+      const eventPayload = {
+        name: $('eventName').value.trim(),
+        date: $('eventDate').value,
+        price: Number($('eventPrice').value),
+        sellerPercent: Number($('eventSellerPercent').value),
+        adminPercent: Number($('eventAdminPercent').value),
+        admin: $('eventAdmin').value.trim(),
+        town: $('eventTown').value.trim(),
+        province: $('eventProvince').value.trim(),
+        allowedUsers: selectedUsers(),
+        font: $('eventFont').value,
+        color: $('eventColor').value,
+        eventLogoLeft: pendingLogos.eventLogoLeft || currentEvent?.eventLogoLeft || '',
+        eventLogoRight: pendingLogos.eventLogoRight || currentEvent?.eventLogoRight || '',
+        eventLogoLeftSize: Number($('eventLogoLeftSize').value) || defaultSettings.eventLogoLeftSize,
+        eventLogoRightSize: Number($('eventLogoRightSize').value) || defaultSettings.eventLogoRightSize,
+        notes: $('eventNotes').value.trim(),
+      };
+      if (editingEventId) {
+        events = events.map(eventItem => eventItem.id === editingEventId ? { ...eventItem, ...eventPayload } : eventItem);
+        activeEventId = editingEventId;
+      } else {
+        const newEvent = {
+          id: crypto.randomUUID(),
+          createdAt: Date.now(),
+          ...eventPayload,
+          sales: []
+        };
+        events.push(newEvent);
+        activeEventId = newEvent.id;
+      }
+      saveEvents();
+      resetEventForm();
+      go('event');
+    });
+
+    $('createUser').addEventListener('click', () => {
+      if (!isAdmin()) return;
+      const name = $('newUserName').value.trim();
+      const password = $('newUserPassword').value.trim();
+      if (!name || !password) {
+        alert('Cargue usuario y clave.');
+        return;
+      }
+      if (appUsers.some(user => normalize(user.name) === normalize(name))) {
+        alert('Ese usuario ya existe.');
+        return;
+      }
+      appUsers.push({ id: crypto.randomUUID(), name, password });
+      saveUsers();
+      $('newUserName').value = '';
+      $('newUserPassword').value = '';
+      renderUsers();
+    });
+
+    $('saleForm').addEventListener('submit', event => {
+      event.preventDefault();
+      const eventData = activeEvent();
+      if (!eventData) return;
+      if ((fields.desde.value || fields.hasta.value) && !addDraftRange()) return;
+      if (!draftRanges.length) { alert('Agregue al menos un rango a la lista previa.'); fields.desde.focus(); return; }
+      const previousLoad = editingLoadId ? eventData.sales.find(sale => (sale.batchId || sale.id) === editingLoadId) : null;
+      const batchId = editingLoadId || crypto.randomUUID();
+      const createdAt = previousLoad?.createdAt || Date.now();
+      const date = previousLoad?.date || new Date().toISOString().slice(0, 10);
+      const totalDraftUnits = draftRanges.reduce((sum, range) => sum + rangeCount(range), 0) || 1;
+      const cashTotal = parseAmount(fields.pagoEfectivo.value);
+      const transferTotal = parseAmount(fields.pagoTransferencia.value);
+      if (editingLoadId) {
+        eventData.sales = eventData.sales.filter(sale => (sale.batchId || sale.id) !== editingLoadId);
+      }
+      eventData.sales.push(...draftRanges.map(range => ({
+        ...range,
+        id: crypto.randomUUID(),
+        batchId,
+        createdAt,
+        date,
+        seller: fields.vendedor.value.trim(),
+        freeUnits: Number(fields.sinCargos.value) || 0,
+        payment: cashTotal > 0 && transferTotal > 0 ? 'Mixto' : cashTotal > 0 ? 'Efectivo' : transferTotal > 0 ? 'Transferencia' : 'Sin pago',
+        cashAmount: cashTotal * rangeCount(range) / totalDraftUnits,
+        transferAmount: transferTotal * rangeCount(range) / totalDraftUnits,
+        town: fields.localidad.value.trim() || eventData.town,
+        province: fields.provincia.value.trim() || eventData.province
+      })));
+      saveEvents();
+      resetSaleForm();
+      renderActiveEvent();
+    });
+
+    $('saleForm').addEventListener('keydown', event => {
+      if (event.key !== 'Enter' || (event.target !== fields.desde && event.target !== fields.hasta)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.target === fields.desde && fields.desde.value && !fields.hasta.value) {
+        fields.hasta.value = fields.desde.value;
+        updatePreview();
+        fields.hasta.focus();
+        fields.hasta.select();
+        return;
+      }
+      addDraftRange();
+    }, true);
+
+    [fields.desde, fields.hasta].forEach(input => input.addEventListener('input', updatePreview));
+    fields.sinCargos.addEventListener('input', () => syncPaymentFrom(lastPaymentSource));
+    fields.pagoEfectivo.addEventListener('input', () => {
+      lastPaymentSource = 'cash';
+      syncPaymentFrom('cash');
+    });
+    fields.pagoTransferencia.addEventListener('input', () => {
+      lastPaymentSource = 'transfer';
+      syncPaymentFrom('transfer');
+    });
+    [$('search'), $('filterLocalidad'), $('filterProvincia'), $('filterVendedor')].forEach(input => input.addEventListener('input', renderActiveEvent));
+    viewButtons.forEach(button => button.addEventListener('click', () => { currentView = button.dataset.view; viewButtons.forEach(item => item.classList.toggle('active', item === button)); renderActiveEvent(); }));
+    document.addEventListener('dblclick', event => {
+      const stat = event.target.closest('.stat');
+      if (!stat || !isAdmin()) return;
+      const current = Number(settings.totalSize || defaultSettings.totalSize);
+      const value = prompt('TamaÃ±o de letra para totales', current);
+      if (value === null) return;
+      const next = Number(value);
+      if (!Number.isFinite(next) || next < 16 || next > 42) {
+        alert('Ingrese un nÃºmero entre 16 y 42.');
+        return;
+      }
+      settings = { ...settings, totalSize: next };
+      saveSettingsData();
+      applySettings();
+    });
+    $('deleteSelectedRange').addEventListener('click', () => { draftRanges = draftRanges.filter(r => r.id !== selectedDraftId); selectedDraftId = draftRanges.at(-1)?.id || null; renderDraft(); });
+    $('clearDraftRanges').addEventListener('click', () => { if (draftRanges.length && confirm('Eliminar toda la lista previa?')) { draftRanges = []; selectedDraftId = null; renderDraft(); } });
+    $('clearSaleForm').addEventListener('click', resetSaleForm);
+    $('clearEventForm').addEventListener('click', resetEventForm);
+    $('exportGroup').addEventListener('input', updateExportValues);
+    $('openExport').addEventListener('click', exportRows);
+    $('applySettingsButton').addEventListener('click', async () => {
+      settings = {
+        font: $('settingFont').value,
+        size: Number($('settingSize').value),
+        buttonSize: Number($('settingButtonSize').value),
+        totalSize: Number($('settingTotalSize').value),
+        brand: $('settingBrand').value,
+        buttonBg: $('settingButtonBg').value,
+        navButtonBg: $('settingNavButtonBg').value,
+        navButtonActiveBg: $('settingNavButtonActiveBg').value,
+        navButtonColor: $('settingNavButtonColor').value,
+        membreteColor: $('settingMembreteColor').value,
+        eventInfoColor: $('settingEventInfoColor').value,
+        eventInfoFont: $('settingEventInfoFont').value,
+        bg: $('settingBg').value,
+        panel: $('settingPanel').value,
+        splash: $('settingSplash').value,
+        side: $('settingSide').value,
+        mainLogo: pendingLogos.mainLogo || settings.mainLogo || '',
+        mainLogoSize: Number($('settingMainLogoSize').value) || defaultSettings.mainLogoSize,
+        radius: $('settingRadius').value,
+        adminPassword: $('settingAdminPassword').value || settings.adminPassword
+      };
+      if (!saveSettingsData()) return;
+      applySettings();
+      pendingLogos.mainLogo = null;
+      $('settingMainLogo').value = '';
+    });
+    $('resetSettings').addEventListener('click', () => {
+      $('settingFont').value = defaultSettings.font;
+      $('settingSize').value = defaultSettings.size;
+      $('settingButtonSize').value = defaultSettings.buttonSize;
+      $('settingTotalSize').value = defaultSettings.totalSize;
+      $('settingMainLogoSize').value = defaultSettings.mainLogoSize;
+      $('settingBrand').value = defaultSettings.brand;
+      $('settingButtonBg').value = defaultSettings.buttonBg;
+      $('settingNavButtonBg').value = defaultSettings.navButtonBg;
+      $('settingNavButtonActiveBg').value = defaultSettings.navButtonActiveBg;
+      $('settingNavButtonColor').value = defaultSettings.navButtonColor;
+      $('settingMembreteColor').value = defaultSettings.membreteColor;
+      $('settingEventInfoColor').value = defaultSettings.eventInfoColor;
+      $('settingEventInfoFont').value = defaultSettings.eventInfoFont;
+      $('settingBg').value = defaultSettings.bg;
+      $('settingPanel').value = defaultSettings.panel;
+      $('settingSplash').value = defaultSettings.splash;
+      $('settingSide').value = defaultSettings.side;
+      $('settingRadius').value = defaultSettings.radius;
+      $('settingAdminPassword').value = '';
+    });
+    [
+      ['settingMainLogo', 'previewMainLogo', 'mainLogo'],
+      ['eventLogoLeftInput', 'eventLogoLeftPreview', 'eventLogoLeft'],
+      ['eventLogoRightInput', 'eventLogoRightPreview', 'eventLogoRight']
+    ].forEach(([inputId, previewId, logoKey]) => {
+      $(inputId).addEventListener('change', async () => {
+        const value = await readImageFile($(inputId));
+        if (!value) return;
+        pendingLogos[logoKey] = value;
+        setImage($(previewId), value);
+      });
+    });
+
+    async function bootstrap() {
+      $('eventDate').valueAsDate = new Date();
+      await loadAccounts().catch(() => {});
+      const sessionData = await api('/api/session').catch(() => ({ session: null }));
+      currentUser = sessionData.session;
+      if (currentUser) await loadState().catch(error => alert(error.message));
+      applySettings();
+      updatePreview();
+      applySession();
+    }
+    bootstrap();
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
+
