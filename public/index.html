@@ -401,6 +401,10 @@
               <label>Sin Cargos<input id="sinCargos" type="number" min="0" step="1" value="0"></label>
             </div>
             <div class="grid-2">
+              <label>Administrador<input id="saleAdmin" autocomplete="off" placeholder="Nombre"></label>
+              <label>% Administrador<input id="saleAdminPercent" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+            </div>
+            <div class="grid-2">
               <label>Efectivo<input id="pagoEfectivo" inputmode="decimal" autocomplete="off" value="0"></label>
               <label>Transferencia<input id="pagoTransferencia" inputmode="decimal" autocomplete="off" value="0"></label>
             </div>
@@ -489,7 +493,7 @@
     const screens = document.querySelectorAll('[data-screen]');
     const navButtons = document.querySelectorAll('[data-page]');
     const viewButtons = document.querySelectorAll('[data-view]');
-    const fields = { desde: $('desde'), hasta: $('hasta'), vendedor: $('vendedor'), sinCargos: $('sinCargos'), pagoEfectivo: $('pagoEfectivo'), pagoTransferencia: $('pagoTransferencia'), localidad: $('localidad'), provincia: $('provincia') };
+    const fields = { desde: $('desde'), hasta: $('hasta'), vendedor: $('vendedor'), sinCargos: $('sinCargos'), saleAdmin: $('saleAdmin'), saleAdminPercent: $('saleAdminPercent'), pagoEfectivo: $('pagoEfectivo'), pagoTransferencia: $('pagoTransferencia'), localidad: $('localidad'), provincia: $('provincia') };
 
     async function api(path, options = {}) {
       const controller = new AbortController();
@@ -563,6 +567,12 @@
     function rangeCount(item) { const d = Number(item.desde) || 0; const h = Number(item.hasta) || 0; return h >= d ? h - d + 1 : 0; }
     function saleTotal(item, event = activeEvent()) { return rangeCount(item) * (Number(event?.price) || 0); }
     function pct(amount, percent) { return (Number(amount) || 0) * (Number(percent) || 0) / 100; }
+    function saleAdminName(sale, event = activeEvent()) { return sale.adminName || event?.admin || ''; }
+    function saleAdminPercent(sale, event = activeEvent()) {
+      return sale.adminPercent !== undefined && sale.adminPercent !== null ? Number(sale.adminPercent) || 0 : Number(event?.adminPercent) || 0;
+    }
+    function adminCommissionForAmount(amount, sale, event = activeEvent()) { return pct(amount, saleAdminPercent(sale, event)); }
+    function adminCellText(name, amount) { return name ? `${name} - ${money(amount)}` : money(amount); }
     function saleCash(sale, event) {
       if (sale.cashAmount !== undefined) return Number(sale.cashAmount) || 0;
       return sale.payment === 'Efectivo' ? saleTotal(sale, event) : 0;
@@ -716,7 +726,7 @@
         acc.sales += total;
         acc.units += rangeCount(sale);
         acc.seller += pct(total, event.sellerPercent);
-        acc.admin += pct(total, event.adminPercent);
+        acc.admin += adminCommissionForAmount(total, sale, event);
         acc.cash += saleCash(sale, event);
         acc.transfer += saleTransfer(sale, event);
         acc.sellers.add(sale.seller);
@@ -849,7 +859,7 @@
         if (!groups.has(name)) groups.set(name, { name, loadIds: new Set(), units: 0, sales: 0, seller: 0, admin: 0, cash: 0, transfer: 0 });
         const group = groups.get(name);
         const total = saleTotal(sale, event);
-        group.loadIds.add(sale.batchId || sale.id); group.units += rangeCount(sale); group.sales += total; group.seller += pct(total, event.sellerPercent); group.admin += pct(total, event.adminPercent);
+        group.loadIds.add(sale.batchId || sale.id); group.units += rangeCount(sale); group.sales += total; group.seller += pct(total, event.sellerPercent); group.admin += adminCommissionForAmount(total, sale, event);
         group.cash += saleCash(sale, event);
         group.transfer += saleTransfer(sale, event);
       });
@@ -867,6 +877,8 @@
             date: sale.date,
             createdAt: sale.createdAt || 0,
             seller: sale.seller,
+            adminName: saleAdminName(sale, event),
+            adminPercent: saleAdminPercent(sale, event),
             freeUnits: Number(sale.freeUnits) || 0,
             payment: sale.payment,
             cashAmount: 0,
@@ -934,9 +946,9 @@
           const paidUnits = Math.max(load.units - load.freeUnits, 0);
           const income = paidUnits * (Number(event.price) || 0);
           const sellerCommission = pct(income, event.sellerPercent);
-          const adminCommission = pct(income, event.adminPercent);
+          const adminCommission = pct(income, load.adminPercent);
           const netAmount = income - sellerCommission - adminCommission;
-          return `<tr><td><strong>${load.seller}</strong></td><td>${num(load.units)}</td><td>${num(load.freeUnits)}</td><td>${money(income)}</td><td>${money(sellerCommission)}</td><td>${money(adminCommission)}</td><td>${money(netAmount)}</td><td>${paymentLabel(load)}</td><td>${load.town}</td><td>${load.province}</td>${isAdmin() ? `<td><div class="table-actions"><button type="button" class="light" data-edit-load="${load.id}">Editar</button><button type="button" class="danger" data-delete-load="${load.id}">Eliminar</button></div></td>` : ''}</tr>`;
+          return `<tr><td><strong>${load.seller}</strong></td><td>${num(load.units)}</td><td>${num(load.freeUnits)}</td><td>${money(income)}</td><td>${money(sellerCommission)}</td><td>${adminCellText(load.adminName, adminCommission)}</td><td>${money(netAmount)}</td><td>${paymentLabel(load)}</td><td>${load.town}</td><td>${load.province}</td>${isAdmin() ? `<td><div class="table-actions"><button type="button" class="light" data-edit-load="${load.id}">Editar</button><button type="button" class="danger" data-delete-load="${load.id}">Eliminar</button></div></td>` : ''}</tr>`;
         }).join('');
         return;
       }
@@ -989,6 +1001,8 @@
       fields.localidad.value = eventData?.town || '';
       fields.provincia.value = eventData?.province || '';
       fields.sinCargos.value = 0;
+      fields.saleAdmin.value = eventData?.admin || '';
+      fields.saleAdminPercent.value = Number(eventData?.adminPercent) || 0;
       fields.pagoEfectivo.value = 0;
       fields.pagoTransferencia.value = 0;
       fields.vendedor.readOnly = !isAdmin();
@@ -1007,6 +1021,8 @@
       editingLoadId = loadId;
       fields.vendedor.value = first.seller;
       fields.sinCargos.value = Number(first.freeUnits) || 0;
+      fields.saleAdmin.value = saleAdminName(first, eventData);
+      fields.saleAdminPercent.value = saleAdminPercent(first, eventData);
       fields.pagoEfectivo.value = loadSales.reduce((sum, sale) => sum + saleCash(sale, eventData), 0).toFixed(2);
       fields.pagoTransferencia.value = loadSales.reduce((sum, sale) => sum + saleTransfer(sale, eventData), 0).toFixed(2);
       fields.localidad.value = first.town;
@@ -1080,7 +1096,7 @@
         const paidUnits = Math.max(load.units - load.freeUnits, 0);
         const income = paidUnits * (Number(event.price) || 0);
         const sellerCommission = pct(income, event.sellerPercent);
-        const adminCommission = pct(income, event.adminPercent);
+        const adminCommission = pct(income, load.adminPercent);
         const netAmount = income - sellerCommission - adminCommission;
         return [
           load.seller,
@@ -1088,7 +1104,7 @@
           num(load.freeUnits),
           money(income),
           money(sellerCommission),
-          money(adminCommission),
+          adminCellText(load.adminName, adminCommission),
           money(netAmount),
           paymentLabel(load),
           load.town,
@@ -1294,6 +1310,8 @@
       const totalDraftUnits = draftRanges.reduce((sum, range) => sum + rangeCount(range), 0) || 1;
       const cashTotal = parseAmount(fields.pagoEfectivo.value);
       const transferTotal = parseAmount(fields.pagoTransferencia.value);
+      const adminName = fields.saleAdmin.value.trim();
+      const adminPercent = parseAmount(fields.saleAdminPercent.value);
       if (editingLoadId) {
         eventData.sales = eventData.sales.filter(sale => (sale.batchId || sale.id) !== editingLoadId);
       }
@@ -1304,6 +1322,8 @@
         createdAt,
         date,
         seller: fields.vendedor.value.trim(),
+        adminName,
+        adminPercent,
         freeUnits: Number(fields.sinCargos.value) || 0,
         payment: cashTotal > 0 && transferTotal > 0 ? 'Mixto' : cashTotal > 0 ? 'Efectivo' : transferTotal > 0 ? 'Transferencia' : 'Sin pago',
         cashAmount: cashTotal * rangeCount(range) / totalDraftUnits,
