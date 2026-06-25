@@ -449,7 +449,7 @@
                   <select id="exportGroup"><option value="general">General</option><option value="vendedor">Vendedor</option><option value="localidad">Localidad</option><option value="provincia">Provincia</option></select>
                 </label>
                 <label>Formato
-                  <select id="exportFormat"><option value="pdf">PDF</option><option value="excel">Excel</option><option value="txt">Block de notas</option></select>
+                  <select id="exportFormat"><option value="pdf">PDF</option><option value="excel">Excel</option><option value="txt">Block de notas (.DAT)</option></select>
                 </label>
                 <label>Dato especifico<select id="exportValue"><option value="">Todo</option></select></label>
               </div>
@@ -1135,15 +1135,16 @@
       }
       let headers = ['Rango'];
       let data = rangeRowsForExport(rows);
+      let content;
+      let ext = format === 'excel' ? 'xls' : 'dat';
       if (format === 'txt') {
         const mode = confirm('Exportar en block de notas de forma individual?\n\nAceptar: numeros individuales.\nCancelar: por rangos.');
-        headers = [mode ? 'Numero' : 'Rango'];
         data = mode ? individualRowsForExport(rows) : rangeRowsForExport(rows);
+        content = data.map(row => ` ${row[0]} `).join('\r\n');
       }
-      const ext = format === 'excel' ? 'xls' : 'txt';
-      const content = format === 'excel'
-        ? `<table><thead><tr>${headers.map(h => htmlCell(h, 'th')).join('')}</tr></thead><tbody>${data.map(row => `<tr>${row.map(cell => htmlCell(cell)).join('')}</tr>`).join('')}</tbody></table>`
-        : [title, headers.join('\t'), ...data.map(row => row.join('\t'))].join('\n');
+      if (format === 'excel') {
+        content = `<table><thead><tr>${headers.map(h => htmlCell(h, 'th')).join('')}</tr></thead><tbody>${data.map(row => `<tr>${row.map(cell => htmlCell(cell)).join('')}</tr>`).join('')}</tbody></table>`;
+      }
       const type = format === 'excel' ? 'application/vnd.ms-excel;charset=utf-8' : 'text/plain;charset=utf-8';
       const blob = new Blob([content], { type });
       const link = document.createElement('a');
