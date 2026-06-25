@@ -1063,25 +1063,70 @@
         .map(row => [`${row.desde}-${row.hasta}`]);
     }
 
+    function individualRowsForExport(rows) {
+      return rows
+        .flatMap(sale => {
+          const desde = Number(sale.desde) || 0;
+          const hasta = Number(sale.hasta) || 0;
+          if (desde <= 0 || hasta < desde) return [];
+          return Array.from({ length: hasta - desde + 1 }, (_, index) => [desde + index]);
+        })
+        .sort((a, b) => a[0] - b[0]);
+    }
+
+    function loadSummaryRowsForExport(rows) {
+      const event = activeEvent();
+      return groupLoads(rows).map(load => {
+        const paidUnits = Math.max(load.units - load.freeUnits, 0);
+        const income = paidUnits * (Number(event.price) || 0);
+        const sellerCommission = pct(income, event.sellerPercent);
+        const adminCommission = pct(income, event.adminPercent);
+        const netAmount = income - sellerCommission - adminCommission;
+        return [
+          load.seller,
+          num(load.units),
+          num(load.freeUnits),
+          money(income),
+          money(sellerCommission),
+          money(adminCommission),
+          money(netAmount),
+          paymentLabel(load),
+          load.town,
+          load.province
+        ];
+      });
+    }
+
+    function htmlCell(value, tag = 'td') {
+      const text = String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+      return `<${tag}>${text}</${tag}>`;
+    }
+
     function exportRows() {
       const event = activeEvent();
       const rows = rowsForExport();
-      const rangeRows = rangeRowsForExport(rows);
       const group = $('exportGroup').value;
       const format = $('exportFormat').value;
       const title = `${event.name} - ${group}`;
-      const headers = ['Rango'];
-      const data = rangeRows;
       if (format === 'pdf') {
+        const headers = ['Vendedor/a', 'Cantidad', 'Sin Cargos', 'Ingresos', 'Comision Venta', 'Administrador/a', 'Importe', 'Forma de pago', 'Localidad', 'Provincia'];
+        const data = loadSummaryRowsForExport(rows);
         $('printArea').classList.remove('hidden');
-        $('printArea').innerHTML = `<h1>${title}</h1><table><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${data.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+        $('printArea').innerHTML = `<h1>${title}</h1><table><thead><tr>${headers.map(h => htmlCell(h, 'th')).join('')}</tr></thead><tbody>${data.map(row => `<tr>${row.map(cell => htmlCell(cell)).join('')}</tr>`).join('')}</tbody></table>`;
         window.print();
         $('printArea').classList.add('hidden');
         return;
       }
+      let headers = ['Rango'];
+      let data = rangeRowsForExport(rows);
+      if (format === 'txt') {
+        const mode = confirm('Exportar en block de notas de forma individual?\n\nAceptar: numeros individuales.\nCancelar: por rangos.');
+        headers = [mode ? 'Numero' : 'Rango'];
+        data = mode ? individualRowsForExport(rows) : rangeRowsForExport(rows);
+      }
       const ext = format === 'excel' ? 'xls' : 'txt';
       const content = format === 'excel'
-        ? `<table><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${data.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+        ? `<table><thead><tr>${headers.map(h => htmlCell(h, 'th')).join('')}</tr></thead><tbody>${data.map(row => `<tr>${row.map(cell => htmlCell(cell)).join('')}</tr>`).join('')}</tbody></table>`
         : [title, headers.join('\t'), ...data.map(row => row.join('\t'))].join('\n');
       const type = format === 'excel' ? 'application/vnd.ms-excel;charset=utf-8' : 'text/plain;charset=utf-8';
       const blob = new Blob([content], { type });
