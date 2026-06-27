@@ -551,7 +551,7 @@
       applySettings();
       renderAll();
     }
-    function money(value) { return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(Number(value) || 0); }
+    function money(value) { return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Math.round(Number(value) || 0)); }
     function num(value) { return new Intl.NumberFormat('es-AR').format(Number(value) || 0); }
     function normalize(value) { return String(value || '').trim().toLowerCase(); }
     function parseAmount(value) {
@@ -560,7 +560,7 @@
     }
     function formatPlainAmount(value) {
       const rounded = Math.max(Number(value) || 0, 0);
-      return rounded.toFixed(2).replace('.', ',');
+      return String(Math.round(rounded));
     }
     function isAdmin() { return currentUser?.role === 'admin'; }
     function selectedUsers() { return [...document.querySelectorAll('[data-event-user]:checked')].map(option => option.value); }
@@ -1051,8 +1051,8 @@
       fields.saleSellerPercent.value = saleSellerPercent(first, eventData);
       fields.saleAdmin.value = saleAdminName(first, eventData);
       fields.saleAdminPercent.value = saleAdminPercent(first, eventData);
-      fields.pagoEfectivo.value = loadSales.reduce((sum, sale) => sum + saleCash(sale, eventData), 0).toFixed(2);
-      fields.pagoTransferencia.value = loadSales.reduce((sum, sale) => sum + saleTransfer(sale, eventData), 0).toFixed(2);
+      fields.pagoEfectivo.value = Math.round(loadSales.reduce((sum, sale) => sum + saleCash(sale, eventData), 0));
+      fields.pagoTransferencia.value = Math.round(loadSales.reduce((sum, sale) => sum + saleTransfer(sale, eventData), 0));
       fields.localidad.value = first.town;
       fields.provincia.value = first.province;
       fields.desde.value = '';
