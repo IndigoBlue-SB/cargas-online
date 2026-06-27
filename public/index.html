@@ -192,7 +192,7 @@
     <form id="loginForm" class="panel login-card">
       <div>
         <h1>Ingreso</h1>
-        <p class="muted">EntrÃ¡ como administrador o usuario asignado a un evento.</p>
+        <p class="muted">Entra como administrador o usuario asignado a un evento.</p>
       </div>
       <label>Acceso
         <select id="loginAccount">
@@ -276,12 +276,12 @@
               <input id="eventLogoLeftInput" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,image/*">
               <img id="eventLogoLeftPreview" class="logo-preview hidden" alt="Vista logo izquierdo">
             </label>
-            <label>Tamaño logo izquierdo<input id="eventLogoLeftSize" type="number" min="30" max="320" step="1" value="86"></label>
+            <label>Tamano logo izquierdo<input id="eventLogoLeftSize" type="number" min="30" max="320" step="1" value="86"></label>
             <label class="logo-field">Logo derecho del evento
               <input id="eventLogoRightInput" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,image/*">
               <img id="eventLogoRightPreview" class="logo-preview hidden" alt="Vista logo derecho">
             </label>
-            <label>Tamaño logo derecho<input id="eventLogoRightSize" type="number" min="30" max="320" step="1" value="86"></label>
+            <label>Tamano logo derecho<input id="eventLogoRightSize" type="number" min="30" max="320" step="1" value="86"></label>
           </div>
           <label>Observaciones<textarea id="eventNotes" rows="3" placeholder="Datos internos del evento"></textarea></label>
           <div class="actions">
@@ -293,7 +293,7 @@
 
       <section id="page-events" data-screen class="hidden">
         <div class="topbar">
-          <div><h2>Eventos</h2><p class="muted">EntrÃ¡ a un evento para cargar ventas.</p></div>
+          <div><h2>Eventos</h2><p class="muted">Entra a un evento para cargar ventas.</p></div>
         </div>
         <div id="eventsList" class="event-list"></div>
       </section>
@@ -330,9 +330,9 @@
                 <option value="'Trebuchet MS', Arial, sans-serif">Trebuchet</option>
               </select>
             </label>
-            <label>TamaÃ±o de letra general<input id="settingSize" type="number" min="12" max="24" step="1"></label>
-            <label>TamaÃ±o letra botones<input id="settingButtonSize" type="number" min="11" max="24" step="1"></label>
-            <label>TamaÃ±o letra totales<input id="settingTotalSize" type="number" min="16" max="42" step="1"></label>
+            <label>Tamano de letra general<input id="settingSize" type="number" min="12" max="24" step="1"></label>
+            <label>Tamano letra botones<input id="settingButtonSize" type="number" min="11" max="24" step="1"></label>
+            <label>Tamano letra totales<input id="settingTotalSize" type="number" min="16" max="42" step="1"></label>
             <label>Color principal<input id="settingBrand" type="color"></label>
             <label>Color botones<input id="settingButtonBg" type="color"></label>
             <label>Botones inicio<input id="settingNavButtonBg" type="color"></label>
@@ -357,7 +357,7 @@
               <input id="settingMainLogo" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,image/*">
               <img id="previewMainLogo" class="logo-preview hidden" alt="Vista logo principal">
             </label>
-            <label>TamaÃ±o logo principal<input id="settingMainLogoSize" type="number" min="60" max="420" step="1"></label>
+            <label>Tamano logo principal<input id="settingMainLogoSize" type="number" min="60" max="420" step="1"></label>
 
             <label>Bordes
               <select id="settingRadius">
@@ -516,8 +516,8 @@
         if (!response.ok) throw new Error(data.error || 'Error de servidor');
         return data;
       } catch (error) {
-        if (error.name === 'AbortError') throw new Error('La app tardÃ³ demasiado en responder. CerrÃ¡ Cargas y abrila nuevamente.');
-        if (error instanceof TypeError) throw new Error('No se pudo conectar con la app. CerrÃ¡ Cargas y abrila nuevamente.');
+        if (error.name === 'AbortError') throw new Error('La app tardo demasiado en responder. Cerra Cargas y abrila nuevamente.');
+        if (error instanceof TypeError) throw new Error('No se pudo conectar con la app. Cerra Cargas y abrila nuevamente.');
         throw error;
       } finally {
         clearTimeout(timer);
@@ -531,7 +531,7 @@
         api('/api/settings', { method: 'PUT', body: JSON.stringify({ settings }) }).catch(error => alert(error.message));
         return true;
       } catch (error) {
-        alert('No se pudo guardar el logo. Probablemente la imagen es demasiado pesada. ProbÃ¡ con una imagen mÃ¡s chica.');
+        alert('No se pudo guardar el logo. Probablemente la imagen es demasiado pesada. Proba con una imagen mas chica.');
         return false;
       }
     }
@@ -1395,11 +1395,11 @@
       const stat = event.target.closest('.stat');
       if (!stat || !isAdmin()) return;
       const current = Number(settings.totalSize || defaultSettings.totalSize);
-      const value = prompt('TamaÃ±o de letra para totales', current);
+      const value = prompt('Tamano de letra para totales', current);
       if (value === null) return;
       const next = Number(value);
       if (!Number.isFinite(next) || next < 16 || next > 42) {
-        alert('Ingrese un nÃºmero entre 16 y 42.');
+        alert('Ingrese un numero entre 16 y 42.');
         return;
       }
       settings = { ...settings, totalSize: next };
