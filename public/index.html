@@ -24,6 +24,7 @@
       --nav-button-bg: #2b7bbb;
       --nav-button-active-bg: #0f766e;
       --nav-button-color: #ffffff;
+      --home-card-title-color: #0f766e;
       --button-font-size: 15px;
       --total-font-size: 22px;
       --main-logo-size: 180px;
@@ -85,13 +86,13 @@
     .light { background: #eef2ed; color: #26312f; }
     .light:hover { background: #dfe7df; }
 
-    .cards { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); gap: 8px; }
+    .cards { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 8px; }
     .stat { padding: 10px; min-width: 0; }
     .stat span { display: block; color: var(--muted); font-size: 11px; margin-bottom: 5px; }
     .stat strong { display: block; font-size: var(--total-font-size); line-height: 1.1; overflow-wrap: anywhere; }
     .event-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
-    .event-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; background: #fbfcfa; display: grid; gap: 8px; }
-    .event-card h3 { margin: 0; font-size: 16px; }
+    .event-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; background: #fbfcfa; color: var(--ink); display: grid; gap: 8px; }
+    .event-card h3 { margin: 0; color: var(--home-card-title-color); font-size: 16px; }
     .event-meta { display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
     .login-screen { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: var(--bg); }
     .login-card { width: min(460px, 100%); display: grid; gap: 16px; }
@@ -228,7 +229,7 @@
         <div class="topbar">
           <div>
             <h2>Inicio</h2>
-            <p class="muted">ElegÃ­ un acceso para trabajar con eventos y ventas.</p>
+            <p class="muted">Elegi un acceso para trabajar con eventos y ventas.</p>
           </div>
         </div>
         <div class="event-list">
@@ -337,6 +338,7 @@
             <label>Botones inicio<input id="settingNavButtonBg" type="color"></label>
             <label>Inicio activo<input id="settingNavButtonActiveBg" type="color"></label>
             <label>Texto inicio<input id="settingNavButtonColor" type="color"></label>
+            <label>Texto accesos<input id="settingHomeCardTitleColor" type="color"></label>
             <label>Color membrete<input id="settingMembreteColor" type="color"></label>
             <label>Color debajo membrete<input id="settingEventInfoColor" type="color"></label>
             <label>Fuente debajo membrete
@@ -401,8 +403,12 @@
               <label>Sin Cargos<input id="sinCargos" type="number" min="0" step="1" value="0"></label>
             </div>
             <div class="grid-2">
+              <label>% Vendedor<input id="saleSellerPercent" inputmode="decimal" autocomplete="off" placeholder="0"></label>
               <label>Administrador<input id="saleAdmin" autocomplete="off" placeholder="Nombre"></label>
+            </div>
+            <div class="grid-2">
               <label>% Administrador<input id="saleAdminPercent" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+              <span></span>
             </div>
             <div class="grid-2">
               <label>Efectivo<input id="pagoEfectivo" inputmode="decimal" autocomplete="off" value="0"></label>
@@ -421,7 +427,7 @@
             </div>
             <div class="draft-summary">
               <div class="stat"><span>Bingos/series en lista</span><strong id="draftUnits">0</strong></div>
-              <div class="stat"><span>Total previo</span><strong id="draftTotal">$0</strong></div>
+              <div class="stat"><span>A rendir previo</span><strong id="draftTotal">$0</strong></div>
             </div>
             <div class="actions">
               <button type="submit" id="saveSaleButton">Guardar carga del vendedor</button>
@@ -432,6 +438,7 @@
           <div class="form-grid">
             <div class="cards">
               <div class="stat"><span>Total vendido</span><strong id="eventTotal">$0</strong></div>
+              <div class="stat"><span>A rendir</span><strong id="eventNetTotal">$0</strong></div>
               <div class="stat"><span>Bingos vendidos</span><strong id="eventUnits">0</strong></div>
               <div class="stat"><span>Vendedores</span><strong id="eventSellers">0</strong></div>
               <div class="stat"><span>Efectivo / Transferencia</span><strong id="eventPayments">$0 / $0</strong></div>
@@ -472,7 +479,7 @@
   <div id="printArea" class="hidden"></div>
 
   <script>
-    const defaultSettings = { font: 'Arial, Helvetica, sans-serif', size: 15, buttonSize: 15, totalSize: 22, brand: '#0f766e', buttonBg: '#0f766e', navButtonBg: '#2b7bbb', navButtonActiveBg: '#0f766e', navButtonColor: '#ffffff', membreteColor: '#202426', eventInfoColor: '#667078', eventInfoFont: 'Arial, Helvetica, sans-serif', bg: '#f4f6f2', panel: '#ffffff', splash: '#123f8c', side: '#18312d', radius: '8px', mainLogo: '', mainLogoSize: 180, eventLogoLeft: '', eventLogoRight: '', eventLogoLeftSize: 86, eventLogoRightSize: 86, adminPassword: 'admin123' };
+    const defaultSettings = { font: 'Arial, Helvetica, sans-serif', size: 15, buttonSize: 15, totalSize: 22, brand: '#0f766e', buttonBg: '#0f766e', navButtonBg: '#2b7bbb', navButtonActiveBg: '#0f766e', navButtonColor: '#ffffff', homeCardTitleColor: '#0f766e', membreteColor: '#202426', eventInfoColor: '#667078', eventInfoFont: 'Arial, Helvetica, sans-serif', bg: '#f4f6f2', panel: '#ffffff', splash: '#123f8c', side: '#18312d', radius: '8px', mainLogo: '', mainLogoSize: 180, eventLogoLeft: '', eventLogoRight: '', eventLogoLeftSize: 86, eventLogoRightSize: 86, adminPassword: 'admin123' };
     let events = [];
     let settings = { ...defaultSettings };
     if (!settings.adminPassword) settings.adminPassword = defaultSettings.adminPassword;
@@ -493,7 +500,7 @@
     const screens = document.querySelectorAll('[data-screen]');
     const navButtons = document.querySelectorAll('[data-page]');
     const viewButtons = document.querySelectorAll('[data-view]');
-    const fields = { desde: $('desde'), hasta: $('hasta'), vendedor: $('vendedor'), sinCargos: $('sinCargos'), saleAdmin: $('saleAdmin'), saleAdminPercent: $('saleAdminPercent'), pagoEfectivo: $('pagoEfectivo'), pagoTransferencia: $('pagoTransferencia'), localidad: $('localidad'), provincia: $('provincia') };
+    const fields = { desde: $('desde'), hasta: $('hasta'), vendedor: $('vendedor'), sinCargos: $('sinCargos'), saleSellerPercent: $('saleSellerPercent'), saleAdmin: $('saleAdmin'), saleAdminPercent: $('saleAdminPercent'), pagoEfectivo: $('pagoEfectivo'), pagoTransferencia: $('pagoTransferencia'), localidad: $('localidad'), provincia: $('provincia') };
 
     async function api(path, options = {}) {
       const controller = new AbortController();
@@ -567,12 +574,23 @@
     function rangeCount(item) { const d = Number(item.desde) || 0; const h = Number(item.hasta) || 0; return h >= d ? h - d + 1 : 0; }
     function saleTotal(item, event = activeEvent()) { return rangeCount(item) * (Number(event?.price) || 0); }
     function pct(amount, percent) { return (Number(amount) || 0) * (Number(percent) || 0) / 100; }
+    function saleSellerPercent(sale, event = activeEvent()) {
+      return sale.sellerPercent !== undefined && sale.sellerPercent !== null ? Number(sale.sellerPercent) || 0 : Number(event?.sellerPercent) || 0;
+    }
+    function sellerCommissionForAmount(amount, sale, event = activeEvent()) { return pct(amount, saleSellerPercent(sale, event)); }
     function saleAdminName(sale, event = activeEvent()) { return sale.adminName || event?.admin || ''; }
     function saleAdminPercent(sale, event = activeEvent()) {
       return sale.adminPercent !== undefined && sale.adminPercent !== null ? Number(sale.adminPercent) || 0 : Number(event?.adminPercent) || 0;
     }
     function adminCommissionForAmount(amount, sale, event = activeEvent()) { return pct(amount, saleAdminPercent(sale, event)); }
     function adminCellText(name, amount) { return name ? `${name} - ${money(amount)}` : money(amount); }
+    function loadFinancials(load, event = activeEvent()) {
+      const paidUnits = Math.max(load.units - load.freeUnits, 0);
+      const income = paidUnits * (Number(event?.price) || 0);
+      const sellerCommission = pct(income, load.sellerPercent);
+      const adminCommission = pct(income, load.adminPercent);
+      return { paidUnits, income, sellerCommission, adminCommission, netAmount: income - sellerCommission - adminCommission };
+    }
     function saleCash(sale, event) {
       if (sale.cashAmount !== undefined) return Number(sale.cashAmount) || 0;
       return sale.payment === 'Efectivo' ? saleTotal(sale, event) : 0;
@@ -629,7 +647,10 @@
       const eventData = activeEvent();
       const totals = draftTotals();
       const freeUnits = Number(fields.sinCargos.value) || 0;
-      return Math.max(totals.units - freeUnits, 0) * (Number(eventData?.price) || 0);
+      const income = Math.max(totals.units - freeUnits, 0) * (Number(eventData?.price) || 0);
+      const sellerCommission = pct(income, parseAmount(fields.saleSellerPercent.value));
+      const adminCommission = pct(income, parseAmount(fields.saleAdminPercent.value));
+      return income - sellerCommission - adminCommission;
     }
     function syncPaymentFrom(source) {
       const total = payableDraftTotal();
@@ -653,6 +674,7 @@
       document.documentElement.style.setProperty('--nav-button-bg', settings.navButtonBg || defaultSettings.navButtonBg);
       document.documentElement.style.setProperty('--nav-button-active-bg', settings.navButtonActiveBg || settings.brand);
       document.documentElement.style.setProperty('--nav-button-color', settings.navButtonColor || defaultSettings.navButtonColor);
+      document.documentElement.style.setProperty('--home-card-title-color', settings.homeCardTitleColor || settings.brand || defaultSettings.homeCardTitleColor);
       document.documentElement.style.setProperty('--membrete-color', settings.membreteColor || defaultSettings.membreteColor);
       document.documentElement.style.setProperty('--event-info-color', settings.eventInfoColor || defaultSettings.eventInfoColor);
       document.documentElement.style.setProperty('--event-info-font-family', settings.eventInfoFont || settings.font);
@@ -671,6 +693,7 @@
       $('settingNavButtonBg').value = settings.navButtonBg || defaultSettings.navButtonBg;
       $('settingNavButtonActiveBg').value = settings.navButtonActiveBg || settings.brand;
       $('settingNavButtonColor').value = settings.navButtonColor || defaultSettings.navButtonColor;
+      $('settingHomeCardTitleColor').value = settings.homeCardTitleColor || settings.brand || defaultSettings.homeCardTitleColor;
       $('settingMembreteColor').value = settings.membreteColor || defaultSettings.membreteColor;
       $('settingEventInfoColor').value = settings.eventInfoColor || defaultSettings.eventInfoColor;
       $('settingEventInfoFont').value = settings.eventInfoFont || settings.font;
@@ -725,7 +748,7 @@
         const total = saleTotal(sale, event);
         acc.sales += total;
         acc.units += rangeCount(sale);
-        acc.seller += pct(total, event.sellerPercent);
+        acc.seller += sellerCommissionForAmount(total, sale, event);
         acc.admin += adminCommissionForAmount(total, sale, event);
         acc.cash += saleCash(sale, event);
         acc.transfer += saleTransfer(sale, event);
@@ -854,14 +877,18 @@
     function groupSales(sales, key) {
       const event = activeEvent();
       const groups = new Map();
-      sales.forEach(sale => {
-        const name = sale[key] || 'Sin dato';
+      groupLoads(sales).forEach(load => {
+        const name = load[key] || 'Sin dato';
         if (!groups.has(name)) groups.set(name, { name, loadIds: new Set(), units: 0, sales: 0, seller: 0, admin: 0, cash: 0, transfer: 0 });
         const group = groups.get(name);
-        const total = saleTotal(sale, event);
-        group.loadIds.add(sale.batchId || sale.id); group.units += rangeCount(sale); group.sales += total; group.seller += pct(total, event.sellerPercent); group.admin += adminCommissionForAmount(total, sale, event);
-        group.cash += saleCash(sale, event);
-        group.transfer += saleTransfer(sale, event);
+        const financials = loadFinancials(load, event);
+        group.loadIds.add(load.id);
+        group.units += load.units;
+        group.sales += financials.income;
+        group.seller += financials.sellerCommission;
+        group.admin += financials.adminCommission;
+        group.cash += load.cashAmount;
+        group.transfer += load.transferAmount;
       });
       return [...groups.values()].map(group => ({ ...group, loads: group.loadIds.size })).sort((a, b) => b.sales - a.sales);
     }
@@ -877,6 +904,7 @@
             date: sale.date,
             createdAt: sale.createdAt || 0,
             seller: sale.seller,
+            sellerPercent: saleSellerPercent(sale, event),
             adminName: saleAdminName(sale, event),
             adminPercent: saleAdminPercent(sale, event),
             freeUnits: Number(sale.freeUnits) || 0,
@@ -916,8 +944,7 @@
       $('eventLogoRight').style.width = `${event.eventLogoRightSize || defaultSettings.eventLogoRightSize}px`;
       fields.localidad.placeholder = event.town;
       fields.provincia.placeholder = event.province;
-      fields.vendedor.readOnly = !isAdmin();
-      if (!isAdmin()) fields.vendedor.value = currentUser.name;
+      fields.vendedor.readOnly = false;
       if (!fields.localidad.value) fields.localidad.value = event.town;
       if (!fields.provincia.value) fields.provincia.value = event.province;
       fillSelect($('filterLocalidad'), uniqueSales('town'), 'Todas');
@@ -926,7 +953,10 @@
       updateExportValues();
       const items = filteredSales();
       const totals = totalsFor(items, event);
+      const loads = groupLoads(items);
+      const netTotal = loads.reduce((sum, load) => sum + loadFinancials(load, event).netAmount, 0);
       $('eventTotal').textContent = money(totals.sales);
+      $('eventNetTotal').textContent = money(netTotal);
       $('eventUnits').textContent = num(totals.units);
       $('eventSellers').textContent = num(totals.sellers.size);
       $('eventPayments').textContent = `${money(totals.cash)} / ${money(totals.transfer)}`;
@@ -943,11 +973,7 @@
         $('tableTitle').textContent = 'Ventas cargadas';
         $('tableHead').innerHTML = `<tr><th>Vendedor/a</th><th>Cant.</th><th>Sin cargo</th><th>Ingresos</th><th>Com. venta</th><th>Admin.</th><th>Importe</th><th>Pago</th><th>Localidad</th><th>Provincia</th>${isAdmin() ? '<th></th>' : ''}</tr>`;
         $('salesTable').innerHTML = loads.map(load => {
-          const paidUnits = Math.max(load.units - load.freeUnits, 0);
-          const income = paidUnits * (Number(event.price) || 0);
-          const sellerCommission = pct(income, event.sellerPercent);
-          const adminCommission = pct(income, load.adminPercent);
-          const netAmount = income - sellerCommission - adminCommission;
+          const { income, sellerCommission, adminCommission, netAmount } = loadFinancials(load, event);
           return `<tr><td><strong>${load.seller}</strong></td><td>${num(load.units)}</td><td>${num(load.freeUnits)}</td><td>${money(income)}</td><td>${money(sellerCommission)}</td><td>${adminCellText(load.adminName, adminCommission)}</td><td>${money(netAmount)}</td><td>${paymentLabel(load)}</td><td>${load.town}</td><td>${load.province}</td>${isAdmin() ? `<td><div class="table-actions"><button type="button" class="light" data-edit-load="${load.id}">Editar</button><button type="button" class="danger" data-delete-load="${load.id}">Eliminar</button></div></td>` : ''}</tr>`;
         }).join('');
         return;
@@ -966,7 +992,7 @@
     function renderDraft() {
       const totals = draftTotals();
       $('draftUnits').textContent = num(totals.units);
-      $('draftTotal').textContent = money(totals.total);
+      $('draftTotal').textContent = money(payableDraftTotal());
       $('deleteSelectedRange').disabled = !selectedDraftId;
       $('clearDraftRanges').disabled = !draftRanges.length;
       $('draftList').innerHTML = draftRanges.length ? draftRanges.map(r => `<button type="button" class="preview-row ${r.id === selectedDraftId ? 'selected' : ''}" data-draft-id="${r.id}"><strong>${r.desde} - ${r.hasta}</strong><small>${num(rangeCount(r))}</small></button>`).join('') : '<div class="empty">Sin rangos en la lista previa.</div>';
@@ -1001,12 +1027,13 @@
       fields.localidad.value = eventData?.town || '';
       fields.provincia.value = eventData?.province || '';
       fields.sinCargos.value = 0;
+      fields.saleSellerPercent.value = Number(eventData?.sellerPercent) || 0;
       fields.saleAdmin.value = eventData?.admin || '';
       fields.saleAdminPercent.value = Number(eventData?.adminPercent) || 0;
       fields.pagoEfectivo.value = 0;
       fields.pagoTransferencia.value = 0;
-      fields.vendedor.readOnly = !isAdmin();
-      fields.vendedor.value = isAdmin() ? '' : currentUser?.name || '';
+      fields.vendedor.readOnly = false;
+      fields.vendedor.value = '';
       $('saveSaleButton').textContent = 'Guardar carga del vendedor';
       updatePreview();
       fields.desde.focus();
@@ -1021,6 +1048,7 @@
       editingLoadId = loadId;
       fields.vendedor.value = first.seller;
       fields.sinCargos.value = Number(first.freeUnits) || 0;
+      fields.saleSellerPercent.value = saleSellerPercent(first, eventData);
       fields.saleAdmin.value = saleAdminName(first, eventData);
       fields.saleAdminPercent.value = saleAdminPercent(first, eventData);
       fields.pagoEfectivo.value = loadSales.reduce((sum, sale) => sum + saleCash(sale, eventData), 0).toFixed(2);
@@ -1093,11 +1121,7 @@
     function loadSummaryRowsForExport(rows) {
       const event = activeEvent();
       return groupLoads(rows).map(load => {
-        const paidUnits = Math.max(load.units - load.freeUnits, 0);
-        const income = paidUnits * (Number(event.price) || 0);
-        const sellerCommission = pct(income, event.sellerPercent);
-        const adminCommission = pct(income, load.adminPercent);
-        const netAmount = income - sellerCommission - adminCommission;
+        const { income, sellerCommission, adminCommission, netAmount } = loadFinancials(load, event);
         return [
           load.seller,
           num(load.units),
@@ -1311,6 +1335,7 @@
       const totalDraftUnits = draftRanges.reduce((sum, range) => sum + rangeCount(range), 0) || 1;
       const cashTotal = parseAmount(fields.pagoEfectivo.value);
       const transferTotal = parseAmount(fields.pagoTransferencia.value);
+      const sellerPercent = parseAmount(fields.saleSellerPercent.value);
       const adminName = fields.saleAdmin.value.trim();
       const adminPercent = parseAmount(fields.saleAdminPercent.value);
       if (editingLoadId) {
@@ -1323,6 +1348,7 @@
         createdAt,
         date,
         seller: fields.vendedor.value.trim(),
+        sellerPercent,
         adminName,
         adminPercent,
         freeUnits: Number(fields.sinCargos.value) || 0,
@@ -1353,6 +1379,8 @@
 
     [fields.desde, fields.hasta].forEach(input => input.addEventListener('input', updatePreview));
     fields.sinCargos.addEventListener('input', () => syncPaymentFrom(lastPaymentSource));
+    fields.saleSellerPercent.addEventListener('input', () => syncPaymentFrom(lastPaymentSource));
+    fields.saleAdminPercent.addEventListener('input', () => syncPaymentFrom(lastPaymentSource));
     fields.pagoEfectivo.addEventListener('input', () => {
       lastPaymentSource = 'cash';
       syncPaymentFrom('cash');
@@ -1395,6 +1423,7 @@
         navButtonBg: $('settingNavButtonBg').value,
         navButtonActiveBg: $('settingNavButtonActiveBg').value,
         navButtonColor: $('settingNavButtonColor').value,
+        homeCardTitleColor: $('settingHomeCardTitleColor').value,
         membreteColor: $('settingMembreteColor').value,
         eventInfoColor: $('settingEventInfoColor').value,
         eventInfoFont: $('settingEventInfoFont').value,
@@ -1423,6 +1452,7 @@
       $('settingNavButtonBg').value = defaultSettings.navButtonBg;
       $('settingNavButtonActiveBg').value = defaultSettings.navButtonActiveBg;
       $('settingNavButtonColor').value = defaultSettings.navButtonColor;
+      $('settingHomeCardTitleColor').value = defaultSettings.homeCardTitleColor;
       $('settingMembreteColor').value = defaultSettings.membreteColor;
       $('settingEventInfoColor').value = defaultSettings.eventInfoColor;
       $('settingEventInfoFont').value = defaultSettings.eventInfoFont;
