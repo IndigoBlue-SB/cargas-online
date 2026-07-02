@@ -1137,9 +1137,82 @@
       });
     }
 
+    function localityReportForExport(rows) {
+      const event = activeEvent();
+      const headers = ['Localidad', 'Provincia', 'Vendedor/a', 'Rangos', 'Cantidad', 'Sin Cargos', 'Ingresos', 'Comision Venta', 'Administrador/a', 'Importe', 'Efectivo', 'Transferencia'];
+      const groups = new Map();
+      groupLoads(rows)
+        .sort((a, b) => (a.town || '').localeCompare(b.town || '', 'es') || (a.province || '').localeCompare(b.province || '', 'es') || (a.seller || '').localeCompare(b.seller || '', 'es'))
+        .forEach(load => {
+          const key = `${load.town || 'Sin localidad'}|${load.province || 'Sin provincia'}`;
+          if (!groups.has(key)) {
+            groups.set(key, {
+              town: load.town || 'Sin localidad',
+              province: load.province || 'Sin provincia',
+              rows: [],
+              units: 0,
+              freeUnits: 0,
+              income: 0,
+              sellerCommission: 0,
+              adminCommission: 0,
+              netAmount: 0,
+              cash: 0,
+              transfer: 0
+            });
+          }
+          const group = groups.get(key);
+          const financials = loadFinancials(load, event);
+          group.units += load.units;
+          group.freeUnits += load.freeUnits;
+          group.income += financials.income;
+          group.sellerCommission += financials.sellerCommission;
+          group.adminCommission += financials.adminCommission;
+          group.netAmount += financials.netAmount;
+          group.cash += load.cashAmount;
+          group.transfer += load.transferAmount;
+          group.rows.push([
+            group.town,
+            group.province,
+            load.seller,
+            load.ranges.join(' / '),
+            num(load.units),
+            num(load.freeUnits),
+            money(financials.income),
+            money(financials.sellerCommission),
+            adminCellText(load.adminName, financials.adminCommission),
+            money(financials.netAmount),
+            money(load.cashAmount),
+            money(load.transferAmount)
+          ]);
+        });
+      const data = [];
+      [...groups.values()].forEach(group => {
+        data.push(...group.rows);
+        data.push([
+          `TOTAL ${group.town}`,
+          group.province,
+          '',
+          '',
+          num(group.units),
+          num(group.freeUnits),
+          money(group.income),
+          money(group.sellerCommission),
+          money(group.adminCommission),
+          money(group.netAmount),
+          money(group.cash),
+          money(group.transfer)
+        ]);
+      });
+      return { headers, data };
+    }
+
     function htmlCell(value, tag = 'td') {
       const text = String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
       return `<${tag}>${text}</${tag}>`;
+    }
+
+    function exportTableHtml(headers, data) {
+      return `<table><thead><tr>${headers.map(h => htmlCell(h, 'th')).join('')}</tr></thead><tbody>${data.map(row => `<tr>${row.map(cell => htmlCell(cell)).join('')}</tr>`).join('')}</tbody></table>`;
     }
 
     function exportRows() {
@@ -1148,11 +1221,21 @@
       const group = $('exportGroup').value;
       const format = $('exportFormat').value;
       const title = `${event.name} - ${group}`;
-      if (format === 'pdf') {
-        const headers = ['Vendedor/a', 'Cantidad', 'Sin Cargos', 'Ingresos', 'Comision Venta', 'Administrador/a', 'Importe', 'Forma de pago', 'Localidad', 'Provincia'];
-        const data = loadSummaryRowsForExport(rows);
+      if (format === 'pdf' || format === 'excel') {
+        const report = localityReportForExport(rows);
+        const reportTitle = `${event.name} - resumen por localidad`;
+        const table = exportTableHtml(report.headers, report.data);
+        if (format === 'excel') {
+          const blob = new Blob([`<h1>${htmlCell(reportTitle).replace(/^<td>|<\/td>$/g, '')}</h1>${table}`], { type: 'application/vnd.ms-excel;charset=utf-8' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `${reportTitle.replaceAll(' ', '-')}.xls`;
+          link.click();
+          URL.revokeObjectURL(link.href);
+          return;
+        }
         $('printArea').classList.remove('hidden');
-        $('printArea').innerHTML = `<h1>${title}</h1><table><thead><tr>${headers.map(h => htmlCell(h, 'th')).join('')}</tr></thead><tbody>${data.map(row => `<tr>${row.map(cell => htmlCell(cell)).join('')}</tr>`).join('')}</tbody></table>`;
+        $('printArea').innerHTML = `<style>@page { size: landscape; } #printArea table { font-size: 10px; } #printArea th, #printArea td { padding: 4px; }</style><h1>${reportTitle}</h1>${table}`;
         window.print();
         $('printArea').classList.add('hidden');
         return;
