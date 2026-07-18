@@ -170,6 +170,7 @@
     #page-balance-detail input { min-height: 28px; padding: 5px 6px; font-size: 13px; }
     #page-balance-detail button { min-height: 30px; padding: 5px 8px; font-size: 13px; }
     #page-balance-detail .form-grid { gap: 5px; }
+    #page-balance-detail .balance-add-button { margin-top: 8px; }
     .balance-line { display: grid; grid-template-columns: minmax(70px, 1fr) 82px 64px; gap: 4px; align-items: end; }
     .balance-admin-line { display: grid; grid-template-columns: minmax(86px, 1fr) 54px 38px 74px 56px; gap: 4px; align-items: end; }
     .balance-accounts { display: grid; gap: 5px; }
@@ -370,6 +371,7 @@
             <button type="button" class="secondary" data-page-shortcut="settings" data-admin-only>Configuraciones</button>
             <button type="button" class="danger" data-logout-top>Cerrar sesion</button>
             <button type="button" class="light" id="openBalanceConfig">Conf. balance</button>
+            <button type="button" class="light" id="exportBalancePdf">Guardar PDF</button>
             <button type="button" class="secondary" data-page-shortcut="balance">Volver a balances</button>
           </div>
         </div>
@@ -406,7 +408,7 @@
             <div class="balance-main">
               <h3>Gastos</h3>
               <div id="balanceExpenses" class="form-grid"></div>
-              <button type="button" class="light" id="addBalanceExpense">Agregar gasto especial</button>
+              <button type="button" class="light balance-add-button" id="addBalanceExpense">Agregar gasto especial</button>
             </div>
             <aside class="balance-side">
               <h3>PREMIOS</h3>
@@ -1702,6 +1704,80 @@
       return `<table><thead><tr>${headers.map(h => htmlCell(h, 'th')).join('')}</tr></thead><tbody>${data.map(row => `<tr>${row.map(cell => htmlCell(cell)).join('')}</tr>`).join('')}</tbody></table>`;
     }
 
+    function balanceReportRows(balance, totals) {
+      const rows = [
+        ['Bingos vendidos', num(balance.units)],
+        ['Valor del bingo', money(balance.price)],
+        ['Vendedores', money(totals.sellerCommission)],
+        ['Administrador Gral', money(totals.adminGeneralCommission)],
+        ['Administradores', money(totals.adminsCommission)],
+        ['Total de premios', money(totals.prizes)],
+        ['Total de gastos', money(totals.expenses)],
+        ['Sub-Total', money(totals.subtotal)]
+      ];
+      if (canSeePrivateBalance(activeBalanceEvent())) {
+        rows.push(
+          [`Noe ${num(balance.noePercent)}%`, money(totals.noeAmount)],
+          ['Base Gise/Laureano', money(totals.afterNoe)],
+          [`Gise ${num(balance.gisePercent)}%`, money(totals.giseAmount)],
+          [`Laureano ${num(balance.laureanoPercent)}%`, money(totals.laureanoAmount)],
+          ['Resultado', money(totals.result)]
+        );
+      } else {
+        rows.push(['Resultado', money(totals.subtotal)]);
+      }
+      return rows;
+    }
+
+    function exportBalancePdf() {
+      const eventData = activeBalanceEvent();
+      if (!eventData) return;
+      const balance = balanceFromForm();
+      const totals = balanceTotals(balance);
+      const title = `Balance - ${eventData.name}`;
+      const subtitle = `${eventData.date} - ${eventData.town}, ${eventData.province}`;
+      const summary = [
+        ['Recaudacion', money(totals.gross)],
+        ['Comisiones', money(totals.commissions)],
+        ['Premios', money(totals.prizes)],
+        ['Gastos', money(totals.expenses)],
+        ['Resultado', money(canSeePrivateBalance(eventData) ? totals.result : totals.subtotal)]
+      ];
+      const adminRows = (balance.admins || []).map(item => [
+        item.name,
+        num(item.units),
+        `${num(item.percent)}%`,
+        money(balanceCartonPercentAmount(balance, item.percent, item.units))
+      ]);
+      const expenseRows = (balance.expenses || []).map(item => [item.name, money(item.amount)]);
+      const prizeRows = (balance.prizesList || []).map(item => [item.name, money(item.amount)]);
+      $('printArea').classList.remove('hidden');
+      $('printArea').innerHTML = `
+        <style>
+          @page { size: A4 landscape; margin: 10mm; }
+          #printArea { font-family: Arial, sans-serif; color: #111; }
+          #printArea h1 { margin: 0 0 4px; font-size: 22px; }
+          #printArea h2 { margin: 14px 0 6px; font-size: 15px; }
+          #printArea p { margin: 0 0 10px; color: #555; }
+          #printArea table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px; }
+          #printArea th, #printArea td { border: 1px solid #ccc; padding: 5px; text-align: left; }
+          #printArea th { background: #eef2ed; }
+          #printArea .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        </style>
+        <h1>${htmlCell(title).replace(/^<td>|<\/td>$/g, '')}</h1>
+        <p>${htmlCell(subtitle).replace(/^<td>|<\/td>$/g, '')}</p>
+        <h2>Resumen</h2>
+        ${exportTableHtml(['Concepto', 'Importe'], summary)}
+        <div class="cols">
+          <section><h2>Cuentas</h2>${exportTableHtml(['Concepto', 'Importe'], balanceReportRows(balance, totals))}</section>
+          <section><h2>Administradores</h2>${exportTableHtml(['Administrador', 'Cantidad', '% carton', 'Importe'], adminRows.length ? adminRows : [['Sin administradores', '', '', money(0)]])}</section>
+          <section><h2>Gastos</h2>${exportTableHtml(['Detalle', 'Importe'], expenseRows.length ? expenseRows : [['Sin gastos', money(0)]])}<h2>Premios</h2>${exportTableHtml(['Premio', 'Importe'], prizeRows.length ? prizeRows : [['Sin premios', money(0)]])}</section>
+        </div>
+      `;
+      window.print();
+      $('printArea').classList.add('hidden');
+    }
+
     function exportRows() {
       const event = activeEvent();
       const rows = rowsForExport();
@@ -2086,6 +2162,7 @@
     });
     $('exportGroup').addEventListener('input', updateExportValues);
     $('openExport').addEventListener('click', exportRows);
+    $('exportBalancePdf').addEventListener('click', exportBalancePdf);
     $('applySettingsButton').addEventListener('click', async () => {
       settings = {
         font: $('settingFont').value,
