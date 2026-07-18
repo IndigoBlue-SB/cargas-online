@@ -154,6 +154,13 @@
     #activeEventTitle { color: var(--membrete-color); }
     #activeEventInfo { color: var(--event-info-color); font-family: var(--event-info-font-family); }
     .event-logo { object-fit: contain; max-width: 220px; }
+    .balance-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: 12px; align-items: start; }
+    .balance-side { border-left: 1px solid var(--line); padding-left: 12px; display: grid; gap: 8px; }
+    .balance-side h3, .balance-main h3 { margin: 2px 0 0; color: var(--balance-heading-color, var(--ink)); font-size: var(--balance-heading-size, 22px); }
+    #page-balance-detail { color: var(--balance-text-color, var(--ink)); font-size: var(--balance-font-size, var(--font-size)); }
+    .balance-line { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(90px, 130px) auto; gap: 6px; align-items: end; }
+    .floating-modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; z-index: 30; padding: 20px; }
+    .floating-modal .modal-card { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; display: grid; gap: 10px; }
 
     @media print {
       body * { visibility: hidden; }
@@ -165,6 +172,8 @@
       .app, .event-layout { grid-template-columns: 1fr; }
       .cards, .grid-4 { grid-template-columns: repeat(2, 1fr); }
       .toolbar { grid-template-columns: 1fr 1fr; }
+      .balance-grid { grid-template-columns: 1fr; }
+      .balance-side { border-left: 0; padding-left: 0; }
       .settings-grid { grid-template-columns: repeat(3, 1fr); }
       .settings-users { grid-template-columns: 1fr 1fr auto; }
       .user-list { grid-column: 1 / -1; }
@@ -173,6 +182,7 @@
     @media (max-width: 680px) {
       .main, .sidebar { padding: 16px; }
       .cards, .grid-2, .grid-3, .grid-4, .toolbar, .settings-grid, .preview-meta { grid-template-columns: 1fr; }
+      .balance-line { grid-template-columns: 1fr; }
       .topbar { align-items: flex-start; flex-direction: column; }
     }
   </style>
@@ -329,7 +339,10 @@
       <section id="page-balance-detail" data-screen class="hidden">
         <div class="topbar">
           <div><h2 id="balanceTitle">Balance</h2><p id="balanceInfo" class="muted"></p></div>
-          <button type="button" class="secondary" data-page-shortcut="balance">Volver a balances</button>
+          <div class="actions">
+            <button type="button" class="light" id="openBalanceConfig">Conf. balance</button>
+            <button type="button" class="secondary" data-page-shortcut="balance">Volver a balances</button>
+          </div>
         </div>
         <div class="cards">
           <div class="stat"><span>Recaudacion</span><strong id="balanceGross">$0</strong></div>
@@ -340,25 +353,48 @@
         </div>
         <form id="balanceForm" class="panel form-grid">
           <div class="grid-4">
-            <label>Premios del evento<input id="balancePrizes" inputmode="decimal" autocomplete="off" value="0"></label>
             <label>Bingos vendidos<input id="balanceUnits" type="number" min="0" step="1" value="0"></label>
             <label>Valor del bingo<input id="balancePrice" inputmode="decimal" autocomplete="off" value="0"></label>
             <label>Comision vendedores %<input id="balanceSellerPercent" inputmode="decimal" autocomplete="off" value="0"></label>
-          </div>
-          <div class="grid-4">
             <label>Comision administradores %<input id="balanceAdminPercent" inputmode="decimal" autocomplete="off" value="0"></label>
-            <span></span>
-            <span></span>
-            <span></span>
           </div>
-          <h3>Gastos</h3>
-          <div id="balanceExpenses" class="form-grid"></div>
+          <div class="balance-grid">
+            <div class="balance-main">
+              <h3>Gastos</h3>
+              <div id="balanceExpenses" class="form-grid"></div>
+            </div>
+            <aside class="balance-side">
+              <h3>PREMIOS</h3>
+              <div id="balancePrizesList" class="form-grid"></div>
+              <button type="button" class="light" id="addBalancePrize">Agregar premio</button>
+            </aside>
+          </div>
           <div class="actions">
             <button type="button" class="light" id="addBalanceExpense">Agregar otro gasto</button>
             <button type="submit">Guardar balance</button>
           </div>
         </form>
       </section>
+
+      <div id="balanceConfigModal" class="floating-modal hidden">
+        <section class="modal-card">
+          <div class="topbar">
+            <h2>Configuracion balance</h2>
+            <button type="button" class="light" id="closeBalanceConfig">Cerrar</button>
+          </div>
+          <div class="grid-2">
+            <label>Color texto<input id="balanceConfigTextColor" type="color"></label>
+            <label>Color titulos<input id="balanceConfigHeadingColor" type="color"></label>
+          </div>
+          <div class="grid-2">
+            <label>Tamano texto<input id="balanceConfigFontSize" type="number" min="11" max="26" step="1"></label>
+            <label>Tamano titulos<input id="balanceConfigHeadingSize" type="number" min="14" max="34" step="1"></label>
+          </div>
+          <div class="actions">
+            <button type="button" id="applyBalanceConfig">Aplicar</button>
+          </div>
+        </section>
+      </div>
 
       <section id="page-settings" data-screen class="hidden">
         <div class="topbar"><h2>Configuraciones</h2></div>
@@ -658,6 +694,21 @@
         { id: crypto.randomUUID(), name: 'Viaticos', amount: 0 }
       ];
     }
+    function defaultBalancePrizes() {
+      return [
+        { id: crypto.randomUUID(), name: 'Cuaterno', amount: 0 },
+        { id: crypto.randomUUID(), name: '1 linea', amount: 0 },
+        { id: crypto.randomUUID(), name: '2 linea', amount: 0 },
+        { id: crypto.randomUUID(), name: 'Inicio pozo', amount: 0 },
+        { id: crypto.randomUUID(), name: 'Incremento', amount: 0 },
+        { id: crypto.randomUUID(), name: 'Tradicional', amount: 0 },
+        { id: crypto.randomUUID(), name: 'Extra', amount: 0 },
+        { id: crypto.randomUUID(), name: 'Sorteos', amount: 0 }
+      ];
+    }
+    function defaultBalanceStyle() {
+      return { textColor: '#202426', headingColor: '#202426', fontSize: 15, headingSize: 22 };
+    }
     function eventSoldUnits(eventData) {
       return (eventData.sales || []).reduce((sum, sale) => sum + rangeCount(sale), 0);
     }
@@ -669,11 +720,21 @@
           price: Number(eventData.price) || 0,
           sellerPercent: Number(eventData.sellerPercent) || 0,
           adminPercent: Number(eventData.adminPercent) || 0,
+          prizesList: defaultBalancePrizes(),
           expenses: defaultBalanceExpenses()
         };
       }
+      if (!Array.isArray(eventData.balance.prizesList)) {
+        const totalPrize = Number(eventData.balance.prizes) || 0;
+        eventData.balance.prizesList = defaultBalancePrizes();
+        if (totalPrize) eventData.balance.prizesList[0].amount = totalPrize;
+      }
       if (!Array.isArray(eventData.balance.expenses)) eventData.balance.expenses = defaultBalanceExpenses();
+      eventData.balance.style = { ...defaultBalanceStyle(), ...(eventData.balance.style || {}) };
       return eventData.balance;
+    }
+    function prizesTotal(balance) {
+      return (balance.prizesList || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     }
     function balanceTotals(balance) {
       const units = Number(balance.units) || 0;
@@ -682,7 +743,7 @@
       const sellerCommission = pct(gross, balance.sellerPercent);
       const adminCommission = pct(gross, balance.adminPercent);
       const commissions = sellerCommission + adminCommission;
-      const prizes = Number(balance.prizes) || 0;
+      const prizes = prizesTotal(balance);
       const expenses = (balance.expenses || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
       return { gross, sellerCommission, adminCommission, commissions, prizes, expenses, result: gross - commissions - prizes - expenses };
     }
@@ -929,8 +990,13 @@
     }
 
     function balanceFromForm() {
+      const currentBalance = activeBalanceEvent() ? eventBalance(activeBalanceEvent()) : null;
       return {
-        prizes: parseAmount($('balancePrizes').value),
+        prizesList: [...document.querySelectorAll('[data-balance-prize]')].map(row => ({
+          id: row.dataset.balancePrize,
+          name: row.querySelector('[data-prize-name]').value.trim() || 'Premio',
+          amount: parseAmount(row.querySelector('[data-prize-amount]').value)
+        })),
         units: Number($('balanceUnits').value) || 0,
         price: parseAmount($('balancePrice').value),
         sellerPercent: parseAmount($('balanceSellerPercent').value),
@@ -939,7 +1005,8 @@
           id: row.dataset.balanceExpense,
           name: row.querySelector('[data-expense-name]').value.trim() || 'Gasto',
           amount: parseAmount(row.querySelector('[data-expense-amount]').value)
-        }))
+        })),
+        style: currentBalance?.style || defaultBalanceStyle()
       };
     }
 
@@ -954,13 +1021,41 @@
 
     function renderBalanceExpenses(expenses) {
       $('balanceExpenses').innerHTML = (expenses || []).map(item => `
-        <div class="grid-3" data-balance-expense="${item.id || crypto.randomUUID()}">
+        <div class="balance-line" data-balance-expense="${item.id || crypto.randomUUID()}">
           <label>Detalle<input data-expense-name autocomplete="off" value="${String(item.name || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}"></label>
           <label>Importe<input data-expense-amount inputmode="decimal" autocomplete="off" value="${Math.round(Number(item.amount) || 0)}"></label>
           <div class="actions"><button type="button" class="danger" data-delete-expense>Eliminar</button></div>
         </div>
       `).join('');
       [...$('balanceExpenses').querySelectorAll('input')].forEach(input => input.addEventListener('input', updateBalancePreview));
+    }
+
+    function renderBalancePrizes(prizes) {
+      $('balancePrizesList').innerHTML = (prizes || []).map(item => `
+        <div class="balance-line" data-balance-prize="${item.id || crypto.randomUUID()}">
+          <label>Premio<input data-prize-name autocomplete="off" value="${String(item.name || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}"></label>
+          <label>Importe<input data-prize-amount inputmode="decimal" autocomplete="off" value="${Math.round(Number(item.amount) || 0)}"></label>
+          <div class="actions"><button type="button" class="danger" data-delete-prize>Eliminar</button></div>
+        </div>
+      `).join('');
+      [...$('balancePrizesList').querySelectorAll('input')].forEach(input => input.addEventListener('input', updateBalancePreview));
+    }
+
+    function applyBalanceStyle(style) {
+      const target = $('page-balance-detail');
+      if (!target) return;
+      target.style.setProperty('--balance-text-color', style.textColor || defaultBalanceStyle().textColor);
+      target.style.setProperty('--balance-heading-color', style.headingColor || defaultBalanceStyle().headingColor);
+      target.style.setProperty('--balance-font-size', `${Number(style.fontSize) || defaultBalanceStyle().fontSize}px`);
+      target.style.setProperty('--balance-heading-size', `${Number(style.headingSize) || defaultBalanceStyle().headingSize}px`);
+    }
+
+    function fillBalanceConfig(style) {
+      const merged = { ...defaultBalanceStyle(), ...(style || {}) };
+      $('balanceConfigTextColor').value = merged.textColor;
+      $('balanceConfigHeadingColor').value = merged.headingColor;
+      $('balanceConfigFontSize').value = merged.fontSize;
+      $('balanceConfigHeadingSize').value = merged.headingSize;
     }
 
     function updateBalancePreview() {
@@ -973,12 +1068,14 @@
       const balance = eventBalance(eventData);
       $('balanceTitle').textContent = `Balance - ${eventData.name}`;
       $('balanceInfo').textContent = `${eventData.date} - ${eventData.town}, ${eventData.province}`;
-      $('balancePrizes').value = Math.round(Number(balance.prizes) || 0);
       $('balanceUnits').value = Number(balance.units) || 0;
       $('balancePrice').value = Math.round(Number(balance.price) || 0);
       $('balanceSellerPercent').value = Number(balance.sellerPercent) || 0;
       $('balanceAdminPercent').value = Number(balance.adminPercent) || 0;
       renderBalanceExpenses(balance.expenses);
+      renderBalancePrizes(balance.prizesList);
+      applyBalanceStyle(balance.style);
+      fillBalanceConfig(balance.style);
       setBalanceSummary(balance);
     }
 
@@ -1511,6 +1608,12 @@
         if (row) row.remove();
         updateBalancePreview();
       }
+      const deletePrize = event.target.closest('[data-delete-prize]');
+      if (deletePrize) {
+        const row = deletePrize.closest('[data-balance-prize]');
+        if (row) row.remove();
+        updateBalancePreview();
+      }
     });
 
     $('eventForm').addEventListener('submit', event => {
@@ -1660,11 +1763,37 @@
     $('clearDraftRanges').addEventListener('click', () => { if (draftRanges.length && confirm('Eliminar toda la lista previa?')) { draftRanges = []; selectedDraftId = null; renderDraft(); } });
     $('clearSaleForm').addEventListener('click', resetSaleForm);
     $('clearEventForm').addEventListener('click', resetEventForm);
-    ['balancePrizes', 'balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent'].forEach(id => $(id).addEventListener('input', updateBalancePreview));
+    ['balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent'].forEach(id => $(id).addEventListener('input', updateBalancePreview));
+    $('openBalanceConfig').addEventListener('click', () => {
+      const balance = activeBalanceEvent() ? eventBalance(activeBalanceEvent()) : { style: defaultBalanceStyle() };
+      fillBalanceConfig(balance.style);
+      $('balanceConfigModal').classList.remove('hidden');
+    });
+    $('closeBalanceConfig').addEventListener('click', () => $('balanceConfigModal').classList.add('hidden'));
+    $('applyBalanceConfig').addEventListener('click', () => {
+      const eventData = activeBalanceEvent();
+      if (!eventData) return;
+      const balance = eventBalance(eventData);
+      balance.style = {
+        textColor: $('balanceConfigTextColor').value,
+        headingColor: $('balanceConfigHeadingColor').value,
+        fontSize: Number($('balanceConfigFontSize').value) || defaultBalanceStyle().fontSize,
+        headingSize: Number($('balanceConfigHeadingSize').value) || defaultBalanceStyle().headingSize
+      };
+      applyBalanceStyle(balance.style);
+      saveEvents();
+      $('balanceConfigModal').classList.add('hidden');
+    });
     $('addBalanceExpense').addEventListener('click', () => {
       const current = balanceFromForm();
       current.expenses.push({ id: crypto.randomUUID(), name: 'Otro gasto', amount: 0 });
       renderBalanceExpenses(current.expenses);
+      setBalanceSummary(current);
+    });
+    $('addBalancePrize').addEventListener('click', () => {
+      const current = balanceFromForm();
+      current.prizesList.push({ id: crypto.randomUUID(), name: 'Nuevo premio', amount: 0 });
+      renderBalancePrizes(current.prizesList);
       setBalanceSummary(current);
     });
     $('balanceForm').addEventListener('submit', event => {
