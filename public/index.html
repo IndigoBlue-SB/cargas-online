@@ -1155,12 +1155,13 @@
 
     function setBalanceSummary(balance) {
       const totals = balanceTotals(balance);
+      const eventData = activeBalanceEvent();
       document.querySelector('.private-balance-fields').classList.toggle('hidden', !canSeePrivateBalance(eventData));
       $('balanceGross').textContent = money(totals.gross);
       $('balanceCommissions').textContent = money(totals.commissions);
       $('balancePrizesTotal').textContent = money(totals.prizes);
       $('balanceExpensesTotal').textContent = money(totals.expenses);
-      $('balanceResult').textContent = money(canSeePrivateBalance(activeBalanceEvent()) ? totals.result : totals.subtotal);
+      $('balanceResult').textContent = money(canSeePrivateBalance(eventData) ? totals.result : totals.subtotal);
       renderBalanceAccounts(balance, totals);
       updateBalanceAdminAmounts(balance);
     }
