@@ -154,11 +154,16 @@
     #activeEventTitle { color: var(--membrete-color); }
     #activeEventInfo { color: var(--event-info-color); font-family: var(--event-info-font-family); }
     .event-logo { object-fit: contain; max-width: 220px; }
-    .balance-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: 12px; align-items: start; }
+    .balance-grid { display: grid; grid-template-columns: minmax(230px, 300px) minmax(0, 1fr) minmax(260px, 340px); gap: 12px; align-items: start; }
     .balance-side { border-left: 1px solid var(--line); padding-left: 12px; display: grid; gap: 8px; }
-    .balance-side h3, .balance-main h3 { margin: 2px 0 0; color: var(--balance-heading-color, var(--ink)); font-size: var(--balance-heading-size, 22px); }
+    .balance-side h3, .balance-main h3, .balance-accounts h3 { margin: 2px 0 0; color: var(--balance-heading-color, var(--ink)); font-size: var(--balance-heading-size, 22px); }
     #page-balance-detail { color: var(--balance-text-color, var(--ink)); font-size: var(--balance-font-size, var(--font-size)); }
     .balance-line { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(90px, 130px) auto; gap: 6px; align-items: end; }
+    .balance-accounts { display: grid; gap: 6px; }
+    .balance-account-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(90px, 140px); gap: 6px; align-items: center; }
+    .balance-account-row span:first-child { background: #1295d8; color: #051116; font-weight: 700; padding: 5px 7px; border-radius: 3px; }
+    .balance-account-row input { background: #1295d8; color: #051116; font-weight: 700; border-color: #1295d8; }
+    .balance-account-row.is-total span:first-child, .balance-account-row.is-total input { background: #087ac0; color: #fff; }
     .floating-modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; z-index: 30; padding: 20px; }
     .floating-modal .modal-card { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; display: grid; gap: 10px; }
 
@@ -358,10 +363,21 @@
             <label>Comision vendedores %<input id="balanceSellerPercent" inputmode="decimal" autocomplete="off" value="0"></label>
             <label>Comision administradores %<input id="balanceAdminPercent" inputmode="decimal" autocomplete="off" value="0"></label>
           </div>
+          <div class="grid-4">
+            <label>% Gise<input id="balanceGisePercent" inputmode="decimal" autocomplete="off" value="0"></label>
+            <label>% Laureano<input id="balanceLaureanoPercent" inputmode="decimal" autocomplete="off" value="0"></label>
+            <span></span>
+            <span></span>
+          </div>
           <div class="balance-grid">
+            <div class="balance-accounts">
+              <h3>Cuentas</h3>
+              <div id="balanceAccounts" class="form-grid"></div>
+            </div>
             <div class="balance-main">
               <h3>Gastos</h3>
               <div id="balanceExpenses" class="form-grid"></div>
+              <button type="button" class="light" id="addBalanceExpense">Agregar gasto especial</button>
             </div>
             <aside class="balance-side">
               <h3>PREMIOS</h3>
@@ -370,7 +386,6 @@
             </aside>
           </div>
           <div class="actions">
-            <button type="button" class="light" id="addBalanceExpense">Agregar otro gasto</button>
             <button type="submit">Guardar balance</button>
           </div>
         </form>
@@ -720,6 +735,8 @@
           price: Number(eventData.price) || 0,
           sellerPercent: Number(eventData.sellerPercent) || 0,
           adminPercent: Number(eventData.adminPercent) || 0,
+          gisePercent: 0,
+          laureanoPercent: 0,
           prizesList: defaultBalancePrizes(),
           expenses: defaultBalanceExpenses()
         };
@@ -745,7 +762,11 @@
       const commissions = sellerCommission + adminCommission;
       const prizes = prizesTotal(balance);
       const expenses = (balance.expenses || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-      return { gross, sellerCommission, adminCommission, commissions, prizes, expenses, result: gross - commissions - prizes - expenses };
+      const subtotal = gross - commissions - prizes - expenses;
+      const giseAmount = pct(subtotal, balance.gisePercent);
+      const laureanoAmount = pct(subtotal, balance.laureanoPercent);
+      const extraPercents = giseAmount + laureanoAmount;
+      return { gross, sellerCommission, adminCommission, commissions, prizes, expenses, subtotal, giseAmount, laureanoAmount, extraPercents, result: subtotal - extraPercents };
     }
     function setImage(image, value) {
       image.classList.toggle('hidden', !value);
@@ -1001,6 +1022,8 @@
         price: parseAmount($('balancePrice').value),
         sellerPercent: parseAmount($('balanceSellerPercent').value),
         adminPercent: parseAmount($('balanceAdminPercent').value),
+        gisePercent: parseAmount($('balanceGisePercent').value),
+        laureanoPercent: parseAmount($('balanceLaureanoPercent').value),
         expenses: [...document.querySelectorAll('[data-balance-expense]')].map(row => ({
           id: row.dataset.balanceExpense,
           name: row.querySelector('[data-expense-name]').value.trim() || 'Gasto',
@@ -1017,6 +1040,28 @@
       $('balancePrizesTotal').textContent = money(totals.prizes);
       $('balanceExpensesTotal').textContent = money(totals.expenses);
       $('balanceResult').textContent = money(totals.result);
+      renderBalanceAccounts(balance, totals);
+    }
+
+    function renderBalanceAccounts(balance, totals = balanceTotals(balance)) {
+      const rows = [
+        ['Bingos vendidos', num(balance.units)],
+        ['Valor del Bingo', money(balance.price)],
+        ['% Vendedores', `${num(balance.sellerPercent)}% / ${money(totals.sellerCommission)}`],
+        ['% Administrador', `${num(balance.adminPercent)}% / ${money(totals.adminCommission)}`],
+        ['Total de Premios', money(totals.prizes)],
+        ['Total de Gastos', money(totals.expenses)],
+        ['Sub-Total', money(totals.subtotal)],
+        [`% Gise (${num(balance.gisePercent)}%)`, money(totals.giseAmount)],
+        [`% Laureano (${num(balance.laureanoPercent)}%)`, money(totals.laureanoAmount)],
+        ['TOTAL', money(totals.result)]
+      ];
+      $('balanceAccounts').innerHTML = rows.map(([label, value]) => `
+        <div class="balance-account-row ${label === 'TOTAL' ? 'is-total' : ''}">
+          <span>${label}</span>
+          <input readonly value="${String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}">
+        </div>
+      `).join('');
     }
 
     function renderBalanceExpenses(expenses) {
@@ -1072,6 +1117,8 @@
       $('balancePrice').value = Math.round(Number(balance.price) || 0);
       $('balanceSellerPercent').value = Number(balance.sellerPercent) || 0;
       $('balanceAdminPercent').value = Number(balance.adminPercent) || 0;
+      $('balanceGisePercent').value = Number(balance.gisePercent) || 0;
+      $('balanceLaureanoPercent').value = Number(balance.laureanoPercent) || 0;
       renderBalanceExpenses(balance.expenses);
       renderBalancePrizes(balance.prizesList);
       applyBalanceStyle(balance.style);
@@ -1763,7 +1810,7 @@
     $('clearDraftRanges').addEventListener('click', () => { if (draftRanges.length && confirm('Eliminar toda la lista previa?')) { draftRanges = []; selectedDraftId = null; renderDraft(); } });
     $('clearSaleForm').addEventListener('click', resetSaleForm);
     $('clearEventForm').addEventListener('click', resetEventForm);
-    ['balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent'].forEach(id => $(id).addEventListener('input', updateBalancePreview));
+    ['balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => $(id).addEventListener('input', updateBalancePreview));
     $('openBalanceConfig').addEventListener('click', () => {
       const balance = activeBalanceEvent() ? eventBalance(activeBalanceEvent()) : { style: defaultBalanceStyle() };
       fillBalanceConfig(balance.style);
