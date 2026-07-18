@@ -235,7 +235,7 @@
         <button type="button" data-page="stats" data-admin-only>ESTADISTICAS</button>
         <button type="button" data-page="delete" data-admin-only>ELIMINAR EVENTO</button>
         <button type="button" data-page="events">EVENTOS</button>
-        <button type="button" data-page="balance" data-admin-only>BALANCE</button>
+        <button type="button" data-page="balance">BALANCE</button>
         <button type="button" data-page="settings" data-admin-only>CONFIGURACIONES</button>
       </nav>
     </aside>
@@ -253,7 +253,7 @@
           <button type="button" class="event-card" data-page-shortcut="stats" data-admin-only><h3>ESTADISTICAS</h3><span class="muted">Ver totales generales y por evento.</span></button>
           <button type="button" class="event-card" data-page-shortcut="delete" data-admin-only><h3>ELIMINAR EVENTO</h3><span class="muted">Borrar eventos que ya no se necesiten.</span></button>
           <button type="button" class="event-card" data-page-shortcut="events"><h3>EVENTOS</h3><span class="muted">Entrar a eventos creados para cargar ventas.</span></button>
-          <button type="button" class="event-card" data-page-shortcut="balance" data-admin-only><h3>BALANCE</h3><span class="muted">Revisar premios, comisiones, recaudacion y gastos.</span></button>
+          <button type="button" class="event-card" data-page-shortcut="balance"><h3>BALANCE</h3><span class="muted">Revisar premios, comisiones, recaudacion y gastos.</span></button>
         </div>
       </section>
 
@@ -277,6 +277,10 @@
           <label>Usuarios habilitados
             <div id="eventUsers" class="event-user-list"></div>
             <small class="muted">Solo los usuarios seleccionados podran ver y cargar este evento. Si no seleccionas ninguno, queda solo para administrador.</small>
+          </label>
+          <label>Usuarios que pueden ver % e importes de Gise y Laureano
+            <div id="eventPrivateUsers" class="event-user-list"></div>
+            <small class="muted">Si no marcas un usuario, ese usuario no vera los datos de Noe, Gise y Laureano.</small>
           </label>
           <div class="grid-2">
             <label>Fuente inicial
@@ -364,9 +368,9 @@
             <label>Comision administradores %<input id="balanceAdminPercent" inputmode="decimal" autocomplete="off" value="0"></label>
           </div>
           <div class="grid-4">
+            <label>% Noe<input id="balanceNoePercent" inputmode="decimal" autocomplete="off" value="0"></label>
             <label>% Gise<input id="balanceGisePercent" inputmode="decimal" autocomplete="off" value="0"></label>
             <label>% Laureano<input id="balanceLaureanoPercent" inputmode="decimal" autocomplete="off" value="0"></label>
-            <span></span>
             <span></span>
           </div>
           <div class="balance-grid">
@@ -659,9 +663,15 @@
     }
     function isAdmin() { return currentUser?.role === 'admin'; }
     function selectedUsers() { return [...document.querySelectorAll('[data-event-user]:checked')].map(option => option.value); }
+    function selectedPrivateUsers() { return [...document.querySelectorAll('[data-private-user]:checked')].map(option => option.value); }
     function canAccessEvent(event) {
       if (isAdmin()) return true;
       const allowed = event.allowedUsers || [];
+      return allowed.map(normalize).includes(normalize(currentUser?.name));
+    }
+    function canSeePrivateBalance(event) {
+      if (isAdmin()) return true;
+      const allowed = event?.privateBalanceUsers || [];
       return allowed.map(normalize).includes(normalize(currentUser?.name));
     }
     function visibleEvents() { return events.filter(canAccessEvent); }
@@ -735,6 +745,7 @@
           price: Number(eventData.price) || 0,
           sellerPercent: Number(eventData.sellerPercent) || 0,
           adminPercent: Number(eventData.adminPercent) || 0,
+          noePercent: 0,
           gisePercent: 0,
           laureanoPercent: 0,
           prizesList: defaultBalancePrizes(),
@@ -763,10 +774,12 @@
       const prizes = prizesTotal(balance);
       const expenses = (balance.expenses || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
       const subtotal = gross - commissions - prizes - expenses;
-      const giseAmount = pct(subtotal, balance.gisePercent);
-      const laureanoAmount = pct(subtotal, balance.laureanoPercent);
+      const noeAmount = pct(subtotal, balance.noePercent);
+      const afterNoe = subtotal - noeAmount;
+      const giseAmount = pct(afterNoe, balance.gisePercent);
+      const laureanoAmount = pct(afterNoe, balance.laureanoPercent);
       const extraPercents = giseAmount + laureanoAmount;
-      return { gross, sellerCommission, adminCommission, commissions, prizes, expenses, subtotal, giseAmount, laureanoAmount, extraPercents, result: subtotal - extraPercents };
+      return { gross, sellerCommission, adminCommission, commissions, prizes, expenses, subtotal, noeAmount, afterNoe, giseAmount, laureanoAmount, extraPercents, result: afterNoe - extraPercents };
     }
     function setImage(image, value) {
       image.classList.toggle('hidden', !value);
@@ -880,13 +893,16 @@
       $('eventUsers').innerHTML = sortedUsers.length
         ? sortedUsers.map(user => `<label class="event-user-option"><input type="checkbox" data-event-user value="${user.name}"><span>${user.name}</span></label>`).join('')
         : '<div class="empty">Primero crea usuarios en Configuraciones.</div>';
+      $('eventPrivateUsers').innerHTML = sortedUsers.length
+        ? sortedUsers.map(user => `<label class="event-user-option"><input type="checkbox" data-private-user value="${user.name}"><span>${user.name}</span></label>`).join('')
+        : '<div class="empty">Primero crea usuarios en Configuraciones.</div>';
       $('usersList').innerHTML = appUsers.length
         ? appUsers.map(user => `<div class="user-row"><strong>${user.name}</strong><button type="button" class="danger" data-delete-user="${user.id}">Eliminar</button></div>`).join('')
         : '<div class="empty">Todavia no hay usuarios creados.</div>';
     }
 
     function go(page) {
-      if (!isAdmin() && ['create', 'stats', 'delete', 'balance', 'balance-detail', 'settings'].includes(page)) page = 'events';
+      if (!isAdmin() && ['create', 'stats', 'delete', 'settings'].includes(page)) page = 'events';
       activePage = page;
       screens.forEach(screen => screen.classList.toggle('hidden', screen.id !== `page-${page}`));
       navButtons.forEach(button => button.classList.toggle('active', button.dataset.page === page));
@@ -902,7 +918,7 @@
       if (!logged) return;
       $('sessionName').textContent = `${currentUser.name} (${isAdmin() ? 'Administrador' : 'Usuario'})`;
       document.querySelectorAll('[data-admin-only]').forEach(item => item.classList.toggle('hidden', !isAdmin()));
-      if (!isAdmin() && ['create', 'stats', 'delete', 'balance', 'balance-detail', 'settings'].includes(activePage)) activePage = 'events';
+      if (!isAdmin() && ['create', 'stats', 'delete', 'settings'].includes(activePage)) activePage = 'events';
       go(activePage);
     }
 
@@ -949,6 +965,7 @@
       $('saveEventButton').textContent = 'Crear evento';
       $('eventDate').valueAsDate = new Date();
       document.querySelectorAll('[data-event-user]').forEach(option => { option.checked = false; });
+      document.querySelectorAll('[data-private-user]').forEach(option => { option.checked = false; });
     }
 
     function editEvent(eventId) {
@@ -976,6 +993,8 @@
       $('eventNotes').value = eventData.notes || '';
       const allowed = (eventData.allowedUsers || []).map(normalize);
       document.querySelectorAll('[data-event-user]').forEach(option => { option.checked = allowed.includes(normalize(option.value)); });
+      const privateAllowed = (eventData.privateBalanceUsers || []).map(normalize);
+      document.querySelectorAll('[data-private-user]').forEach(option => { option.checked = privateAllowed.includes(normalize(option.value)); });
       $('saveEventButton').textContent = 'Actualizar evento';
       go('create');
     }
@@ -997,15 +1016,16 @@
       const list = $('balanceEventsList');
       if (!list) return;
       list.innerHTML = '';
-      if (!isAdmin()) { list.innerHTML = '<div class="empty">Solo el administrador puede trabajar balances.</div>'; return; }
-      if (!events.length) { list.innerHTML = '<div class="empty">No hay eventos creados.</div>'; return; }
-      events.forEach(event => {
+      const availableEvents = visibleEvents();
+      if (!availableEvents.length) { list.innerHTML = '<div class="empty">No hay eventos disponibles para este usuario.</div>'; return; }
+      availableEvents.forEach(event => {
         const totals = totalsFor(event.sales || [], event);
         const balance = eventBalance(event);
         const bTotals = balanceTotals(balance);
+        const visibleResult = canSeePrivateBalance(event) ? bTotals.result : bTotals.subtotal;
         const card = document.createElement('article');
         card.className = 'event-card';
-        card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${event.town}, ${event.province}</span><span>${num(totals.units)} bingos vendidos</span><span>Resultado ${money(bTotals.result)}</span></div><div class="actions"><button type="button" data-open-balance="${event.id}">Entrar al balance</button></div>`;
+        card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${event.town}, ${event.province}</span><span>${num(totals.units)} bingos vendidos</span><span>Resultado ${money(visibleResult)}</span></div><div class="actions"><button type="button" data-open-balance="${event.id}">Entrar al balance</button></div>`;
         list.appendChild(card);
       });
     }
@@ -1022,6 +1042,7 @@
         price: parseAmount($('balancePrice').value),
         sellerPercent: parseAmount($('balanceSellerPercent').value),
         adminPercent: parseAmount($('balanceAdminPercent').value),
+        noePercent: parseAmount($('balanceNoePercent').value),
         gisePercent: parseAmount($('balanceGisePercent').value),
         laureanoPercent: parseAmount($('balanceLaureanoPercent').value),
         expenses: [...document.querySelectorAll('[data-balance-expense]')].map(row => ({
@@ -1039,25 +1060,32 @@
       $('balanceCommissions').textContent = money(totals.commissions);
       $('balancePrizesTotal').textContent = money(totals.prizes);
       $('balanceExpensesTotal').textContent = money(totals.expenses);
-      $('balanceResult').textContent = money(totals.result);
+      $('balanceResult').textContent = money(canSeePrivateBalance(activeBalanceEvent()) ? totals.result : totals.subtotal);
       renderBalanceAccounts(balance, totals);
     }
 
     function renderBalanceAccounts(balance, totals = balanceTotals(balance)) {
+      const eventData = activeBalanceEvent();
+      const showPrivate = canSeePrivateBalance(eventData);
       const rows = [
         ['Bingos vendidos', num(balance.units)],
         ['Valor del Bingo', money(balance.price)],
-        ['% Vendedores', `${num(balance.sellerPercent)}% / ${money(totals.sellerCommission)}`],
-        ['% Administrador', `${num(balance.adminPercent)}% / ${money(totals.adminCommission)}`],
+        ['Vendedores', money(totals.sellerCommission)],
+        ['Administrador', money(totals.adminCommission)],
         ['Total de Premios', money(totals.prizes)],
         ['Total de Gastos', money(totals.expenses)],
-        ['Sub-Total', money(totals.subtotal)],
-        [`% Gise (${num(balance.gisePercent)}%)`, money(totals.giseAmount)],
-        [`% Laureano (${num(balance.laureanoPercent)}%)`, money(totals.laureanoAmount)],
-        ['TOTAL', money(totals.result)]
+        ['Sub-Total', money(totals.subtotal)]
       ];
+      if (showPrivate) {
+        rows.push(
+          [`% Noe (${num(balance.noePercent)}%)`, money(totals.noeAmount)],
+          [`Base Gise/Laureano`, money(totals.afterNoe)],
+          [`% Gise (${num(balance.gisePercent)}%)`, money(totals.giseAmount)],
+          [`% Laureano (${num(balance.laureanoPercent)}%)`, money(totals.laureanoAmount)]
+        );
+      }
       $('balanceAccounts').innerHTML = rows.map(([label, value]) => `
-        <div class="balance-account-row ${label === 'TOTAL' ? 'is-total' : ''}">
+        <div class="balance-account-row">
           <span>${label}</span>
           <input readonly value="${String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}">
         </div>
@@ -1109,18 +1137,36 @@
 
     function renderBalanceDetail() {
       const eventData = activeBalanceEvent();
-      if (!eventData || !isAdmin()) return;
+      if (!eventData || !canAccessEvent(eventData)) {
+        activeBalanceEventId = null;
+        go('balance');
+        return;
+      }
       const balance = eventBalance(eventData);
+      const canEditBalance = isAdmin();
       $('balanceTitle').textContent = `Balance - ${eventData.name}`;
       $('balanceInfo').textContent = `${eventData.date} - ${eventData.town}, ${eventData.province}`;
       $('balanceUnits').value = Number(balance.units) || 0;
       $('balancePrice').value = Math.round(Number(balance.price) || 0);
       $('balanceSellerPercent').value = Number(balance.sellerPercent) || 0;
       $('balanceAdminPercent').value = Number(balance.adminPercent) || 0;
+      $('balanceNoePercent').value = Number(balance.noePercent) || 0;
       $('balanceGisePercent').value = Number(balance.gisePercent) || 0;
       $('balanceLaureanoPercent').value = Number(balance.laureanoPercent) || 0;
+      const showPrivate = canSeePrivateBalance(eventData);
+      ['balanceNoePercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => {
+        const label = $(id).closest('label');
+        if (label) label.classList.toggle('hidden', !showPrivate);
+      });
       renderBalanceExpenses(balance.expenses);
       renderBalancePrizes(balance.prizesList);
+      $('balanceForm').querySelectorAll('input, button').forEach(control => {
+        control.disabled = !canEditBalance;
+      });
+      ['openBalanceConfig', 'addBalanceExpense', 'addBalancePrize'].forEach(id => $(id).classList.toggle('hidden', !canEditBalance));
+      $('balanceForm').querySelector('button[type="submit"]').classList.toggle('hidden', !canEditBalance);
+      $('balanceExpenses').querySelectorAll('[data-delete-expense]').forEach(button => button.classList.toggle('hidden', !canEditBalance));
+      $('balancePrizesList').querySelectorAll('[data-delete-prize]').forEach(button => button.classList.toggle('hidden', !canEditBalance));
       applyBalanceStyle(balance.style);
       fillBalanceConfig(balance.style);
       setBalanceSummary(balance);
@@ -1619,10 +1665,11 @@
         activeEventId = open.dataset.openEvent; currentView = 'detalle'; go('event');
       }
       const openBalance = event.target.closest('[data-open-balance]');
-      if (openBalance && isAdmin()) {
+      if (openBalance) {
         activeBalanceEventId = openBalance.dataset.openBalance;
         const eventData = activeBalanceEvent();
-        if (eventData) eventBalance(eventData);
+        if (!eventData || !canAccessEvent(eventData)) return;
+        eventBalance(eventData);
         go('balance-detail');
       }
       const editEventButton = event.target.closest('[data-edit-event]');
@@ -1640,7 +1687,8 @@
         if (user) {
           events = events.map(eventItem => ({
             ...eventItem,
-            allowedUsers: (eventItem.allowedUsers || []).filter(name => normalize(name) !== normalize(user.name))
+            allowedUsers: (eventItem.allowedUsers || []).filter(name => normalize(name) !== normalize(user.name)),
+            privateBalanceUsers: (eventItem.privateBalanceUsers || []).filter(name => normalize(name) !== normalize(user.name))
           }));
           saveEvents();
         }
@@ -1677,6 +1725,7 @@
         town: $('eventTown').value.trim(),
         province: $('eventProvince').value.trim(),
         allowedUsers: selectedUsers(),
+        privateBalanceUsers: selectedPrivateUsers(),
         font: $('eventFont').value,
         color: $('eventColor').value,
         eventLogoLeft: pendingLogos.eventLogoLeft || currentEvent?.eventLogoLeft || '',
@@ -1810,8 +1859,9 @@
     $('clearDraftRanges').addEventListener('click', () => { if (draftRanges.length && confirm('Eliminar toda la lista previa?')) { draftRanges = []; selectedDraftId = null; renderDraft(); } });
     $('clearSaleForm').addEventListener('click', resetSaleForm);
     $('clearEventForm').addEventListener('click', resetEventForm);
-    ['balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => $(id).addEventListener('input', updateBalancePreview));
+    ['balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent', 'balanceNoePercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => $(id).addEventListener('input', updateBalancePreview));
     $('openBalanceConfig').addEventListener('click', () => {
+      if (!isAdmin()) return;
       const balance = activeBalanceEvent() ? eventBalance(activeBalanceEvent()) : { style: defaultBalanceStyle() };
       fillBalanceConfig(balance.style);
       $('balanceConfigModal').classList.remove('hidden');
@@ -1819,7 +1869,7 @@
     $('closeBalanceConfig').addEventListener('click', () => $('balanceConfigModal').classList.add('hidden'));
     $('applyBalanceConfig').addEventListener('click', () => {
       const eventData = activeBalanceEvent();
-      if (!eventData) return;
+      if (!eventData || !isAdmin()) return;
       const balance = eventBalance(eventData);
       balance.style = {
         textColor: $('balanceConfigTextColor').value,
@@ -1832,12 +1882,14 @@
       $('balanceConfigModal').classList.add('hidden');
     });
     $('addBalanceExpense').addEventListener('click', () => {
+      if (!isAdmin()) return;
       const current = balanceFromForm();
       current.expenses.push({ id: crypto.randomUUID(), name: 'Otro gasto', amount: 0 });
       renderBalanceExpenses(current.expenses);
       setBalanceSummary(current);
     });
     $('addBalancePrize').addEventListener('click', () => {
+      if (!isAdmin()) return;
       const current = balanceFromForm();
       current.prizesList.push({ id: crypto.randomUUID(), name: 'Nuevo premio', amount: 0 });
       renderBalancePrizes(current.prizesList);
