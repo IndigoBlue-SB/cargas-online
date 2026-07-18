@@ -158,22 +158,22 @@
     #activeEventTitle { color: var(--membrete-color); }
     #activeEventInfo { color: var(--event-info-color); font-family: var(--event-info-font-family); }
     .event-logo { object-fit: contain; max-width: 220px; }
-    .balance-grid { display: grid; grid-template-columns: minmax(250px, 300px) minmax(220px, 280px) minmax(230px, 1fr) minmax(260px, 310px); gap: 8px; align-items: start; }
+    .balance-grid { display: grid; grid-template-columns: minmax(210px, 265px) minmax(220px, 280px) minmax(230px, 295px) minmax(260px, 310px); gap: 8px; align-items: start; }
     .balance-side, .balance-admins { border-left: 1px solid var(--line); padding-left: 8px; display: grid; gap: 5px; }
     .balance-side h3, .balance-main h3, .balance-accounts h3, .balance-admins h3 { margin: 1px 0 0; color: var(--balance-heading-color, var(--ink)); font-size: min(var(--balance-heading-size, 22px), 21px); line-height: 1.05; }
-    #page-balance-detail { color: var(--balance-text-color, var(--ink)); font-size: var(--balance-font-size, var(--font-size)); }
+    #page-balance-detail { color: var(--balance-text-color, var(--ink)); font-size: var(--balance-font-size, var(--font-size)); background-color: var(--balance-bg, transparent); background-image: var(--balance-bg-image, none); background-size: cover; background-position: center; border-radius: var(--radius); padding: 8px; }
+    #page-balance-detail .panel, #page-balance-detail .stat { box-shadow: 0 8px 22px rgba(5, 17, 22, .16); border-color: rgba(5, 17, 22, .12); }
     #page-balance-detail .panel { padding: 8px; gap: 6px; }
     #page-balance-detail label { gap: 2px; font-size: 11px; }
     #page-balance-detail input { min-height: 28px; padding: 5px 6px; font-size: 13px; }
     #page-balance-detail button { min-height: 30px; padding: 5px 8px; font-size: 13px; }
     #page-balance-detail .form-grid { gap: 5px; }
-    .balance-line { display: grid; grid-template-columns: minmax(82px, 1fr) 86px 70px; gap: 4px; align-items: end; }
+    .balance-line { display: grid; grid-template-columns: minmax(72px, 1fr) 82px 66px; gap: 4px; align-items: end; }
     .balance-admin-line { display: grid; grid-template-columns: minmax(68px, 1fr) 58px 42px 82px 60px; gap: 4px; align-items: end; }
     .balance-accounts { display: grid; gap: 5px; }
-    .balance-account-row { display: grid; grid-template-columns: minmax(128px, 1fr) minmax(94px, 132px); gap: 4px; align-items: center; }
-    .balance-account-row span:first-child { background: #1295d8; color: #051116; font-weight: 700; padding: 5px 6px; border-radius: 3px; }
-    .balance-account-row input { background: #1295d8; color: #051116; font-weight: 700; border-color: #1295d8; }
-    .balance-account-row.is-total span:first-child, .balance-account-row.is-total input { background: #087ac0; color: #fff; }
+    .balance-account-row { display: grid; grid-template-columns: minmax(114px, 1fr) minmax(84px, 112px); gap: 4px; align-items: center; }
+    .balance-account-row span:first-child { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); font-weight: 700; padding: 5px 6px; border-radius: 5px; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
+    .balance-account-row input { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); font-weight: 700; border-color: transparent; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
     .floating-modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; z-index: 30; padding: 20px; }
     .floating-modal .modal-card { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; display: grid; gap: 10px; }
 
@@ -428,11 +428,23 @@
             <label>Color titulos<input id="balanceConfigHeadingColor" type="color"></label>
           </div>
           <div class="grid-2">
+            <label>Color recuadros<input id="balanceConfigBoxColor" type="color"></label>
+            <label>Color texto recuadros<input id="balanceConfigBoxTextColor" type="color"></label>
+          </div>
+          <div class="grid-2">
+            <label>Fondo balance<input id="balanceConfigBgColor" type="color"></label>
+            <label class="logo-field">Imagen fondo balance
+              <input id="balanceConfigBgImageInput" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,image/*">
+              <img id="balanceConfigBgPreview" class="logo-preview hidden" alt="Vista fondo balance">
+            </label>
+          </div>
+          <div class="grid-2">
             <label>Tamano texto<input id="balanceConfigFontSize" type="number" min="11" max="26" step="1"></label>
             <label>Tamano titulos<input id="balanceConfigHeadingSize" type="number" min="14" max="34" step="1"></label>
           </div>
           <div class="actions">
             <button type="button" id="applyBalanceConfig">Aplicar</button>
+            <button type="button" class="light" id="clearBalanceBgImage">Quitar imagen</button>
           </div>
         </section>
       </div>
@@ -615,7 +627,7 @@
     let editingEventId = null;
     let splashDone = false;
     let lastPaymentSource = 'cash';
-    const pendingLogos = { mainLogo: null, eventLogoLeft: null, eventLogoRight: null };
+    const pendingLogos = { mainLogo: null, eventLogoLeft: null, eventLogoRight: null, balanceBgImage: null };
 
     const $ = id => document.getElementById(id);
     const screens = document.querySelectorAll('[data-screen]');
@@ -764,7 +776,16 @@
       return [];
     }
     function defaultBalanceStyle() {
-      return { textColor: '#202426', headingColor: '#202426', fontSize: 15, headingSize: 22 };
+      return {
+        textColor: '#202426',
+        headingColor: '#202426',
+        fontSize: 15,
+        headingSize: 22,
+        boxColor: '#eef2ed',
+        boxTextColor: '#051116',
+        bgColor: '#000000',
+        bgImage: ''
+      };
     }
     function eventSoldUnits(eventData) {
       return (eventData.sales || []).reduce((sum, sale) => sum + rangeCount(sale), 0);
@@ -1199,14 +1220,22 @@
       target.style.setProperty('--balance-heading-color', style.headingColor || defaultBalanceStyle().headingColor);
       target.style.setProperty('--balance-font-size', `${Number(style.fontSize) || defaultBalanceStyle().fontSize}px`);
       target.style.setProperty('--balance-heading-size', `${Number(style.headingSize) || defaultBalanceStyle().headingSize}px`);
+      target.style.setProperty('--balance-box-bg', style.boxColor || defaultBalanceStyle().boxColor);
+      target.style.setProperty('--balance-box-color', style.boxTextColor || defaultBalanceStyle().boxTextColor);
+      target.style.setProperty('--balance-bg', style.bgColor || defaultBalanceStyle().bgColor);
+      target.style.setProperty('--balance-bg-image', style.bgImage ? `url("${style.bgImage}")` : 'none');
     }
 
     function fillBalanceConfig(style) {
       const merged = { ...defaultBalanceStyle(), ...(style || {}) };
       $('balanceConfigTextColor').value = merged.textColor;
       $('balanceConfigHeadingColor').value = merged.headingColor;
+      $('balanceConfigBoxColor').value = merged.boxColor;
+      $('balanceConfigBoxTextColor').value = merged.boxTextColor;
+      $('balanceConfigBgColor').value = merged.bgColor;
       $('balanceConfigFontSize').value = merged.fontSize;
       $('balanceConfigHeadingSize').value = merged.headingSize;
+      setImage($('balanceConfigBgPreview'), merged.bgImage);
     }
 
     function updateBalancePreview() {
@@ -1963,12 +1992,27 @@
       balance.style = {
         textColor: $('balanceConfigTextColor').value,
         headingColor: $('balanceConfigHeadingColor').value,
+        boxColor: $('balanceConfigBoxColor').value,
+        boxTextColor: $('balanceConfigBoxTextColor').value,
+        bgColor: $('balanceConfigBgColor').value,
+        bgImage: pendingLogos.balanceBgImage || balance.style?.bgImage || '',
         fontSize: Number($('balanceConfigFontSize').value) || defaultBalanceStyle().fontSize,
         headingSize: Number($('balanceConfigHeadingSize').value) || defaultBalanceStyle().headingSize
       };
+      pendingLogos.balanceBgImage = null;
       applyBalanceStyle(balance.style);
       saveEvents();
       $('balanceConfigModal').classList.add('hidden');
+    });
+    $('clearBalanceBgImage').addEventListener('click', () => {
+      const eventData = activeBalanceEvent();
+      if (!eventData || !isAdmin()) return;
+      const balance = eventBalance(eventData);
+      balance.style = { ...defaultBalanceStyle(), ...(balance.style || {}), bgImage: '' };
+      pendingLogos.balanceBgImage = null;
+      setImage($('balanceConfigBgPreview'), '');
+      applyBalanceStyle(balance.style);
+      saveEvents();
     });
     $('addBalanceExpense').addEventListener('click', () => {
       if (!isAdmin()) return;
@@ -2057,7 +2101,8 @@
     [
       ['settingMainLogo', 'previewMainLogo', 'mainLogo'],
       ['eventLogoLeftInput', 'eventLogoLeftPreview', 'eventLogoLeft'],
-      ['eventLogoRightInput', 'eventLogoRightPreview', 'eventLogoRight']
+      ['eventLogoRightInput', 'eventLogoRightPreview', 'eventLogoRight'],
+      ['balanceConfigBgImageInput', 'balanceConfigBgPreview', 'balanceBgImage']
     ].forEach(([inputId, previewId, logoKey]) => {
       $(inputId).addEventListener('change', async () => {
         const value = await readImageFile($(inputId));
