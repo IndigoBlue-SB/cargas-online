@@ -163,7 +163,7 @@
     .balance-side, .balance-admins { border-left: 1px solid var(--line); padding-left: 8px; display: grid; gap: 5px; }
     .balance-side h3, .balance-main h3, .balance-accounts h3, .balance-admins h3 { margin: 1px 0 0; color: var(--balance-heading-color, var(--ink)); font-size: min(var(--balance-heading-size, 22px), 21px); line-height: 1.05; }
     #page-balance-detail { color: var(--balance-text-color, var(--ink)); font-size: var(--balance-font-size, var(--font-size)); background-color: var(--balance-bg, transparent); background-image: var(--balance-bg-image, none); background-size: cover; background-position: center; border-radius: var(--radius); padding: 8px; }
-    #page-balance-detail .panel, #page-balance-detail .stat { box-shadow: 0 8px 22px rgba(5, 17, 22, .16); border-color: rgba(5, 17, 22, .12); }
+    #page-balance-detail .panel, #page-balance-detail .stat { background: var(--balance-panel-bg, var(--panel)); box-shadow: 0 8px 22px rgba(5, 17, 22, .16); border-color: rgba(5, 17, 22, .12); }
     #page-balance-detail .panel { padding: 8px; gap: 6px; }
     #page-balance-detail label { gap: 2px; font-size: 11px; }
     #page-balance-detail input { min-height: 28px; padding: 5px 6px; font-size: 13px; }
@@ -434,10 +434,14 @@
           </div>
           <div class="grid-2">
             <label>Fondo balance<input id="balanceConfigBgColor" type="color"></label>
+            <label>Fondo columnas<input id="balanceConfigPanelColor" type="color"></label>
+          </div>
+          <div class="grid-2">
             <label class="logo-field">Imagen fondo balance
               <input id="balanceConfigBgImageInput" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,image/*">
               <img id="balanceConfigBgPreview" class="logo-preview hidden" alt="Vista fondo balance">
             </label>
+            <span></span>
           </div>
           <div class="grid-2">
             <label>Tamano texto<input id="balanceConfigFontSize" type="number" min="11" max="26" step="1"></label>
@@ -785,6 +789,7 @@
         boxColor: '#eef2ed',
         boxTextColor: '#051116',
         bgColor: '#000000',
+        panelColor: '#ffffff',
         bgImage: ''
       };
     }
@@ -1224,6 +1229,7 @@
       target.style.setProperty('--balance-box-bg', style.boxColor || defaultBalanceStyle().boxColor);
       target.style.setProperty('--balance-box-color', style.boxTextColor || defaultBalanceStyle().boxTextColor);
       target.style.setProperty('--balance-bg', style.bgColor || defaultBalanceStyle().bgColor);
+      target.style.setProperty('--balance-panel-bg', style.panelColor || defaultBalanceStyle().panelColor);
       target.style.setProperty('--balance-bg-image', style.bgImage ? `url("${style.bgImage}")` : 'none');
     }
 
@@ -1234,6 +1240,7 @@
       $('balanceConfigBoxColor').value = merged.boxColor;
       $('balanceConfigBoxTextColor').value = merged.boxTextColor;
       $('balanceConfigBgColor').value = merged.bgColor;
+      $('balanceConfigPanelColor').value = merged.panelColor;
       $('balanceConfigFontSize').value = merged.fontSize;
       $('balanceConfigHeadingSize').value = merged.headingSize;
       setImage($('balanceConfigBgPreview'), merged.bgImage);
@@ -1996,6 +2003,7 @@
         boxColor: $('balanceConfigBoxColor').value,
         boxTextColor: $('balanceConfigBoxTextColor').value,
         bgColor: $('balanceConfigBgColor').value,
+        panelColor: $('balanceConfigPanelColor').value,
         bgImage: pendingLogos.balanceBgImage || balance.style?.bgImage || '',
         fontSize: Number($('balanceConfigFontSize').value) || defaultBalanceStyle().fontSize,
         headingSize: Number($('balanceConfigHeadingSize').value) || defaultBalanceStyle().headingSize
