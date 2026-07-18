@@ -59,15 +59,15 @@
     input:focus, select:focus, textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(15, 118, 110, .12); }
     label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
 
-    .app { min-height: 100vh; display: grid; grid-template-columns: 210px minmax(0, 1fr); }
-    .sidebar { background: var(--side); color: #fff; padding: 14px; display: grid; align-content: start; gap: 12px; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 178px minmax(0, 1fr); }
+    .sidebar { background: var(--side); color: #fff; padding: 10px; display: grid; align-content: start; gap: 9px; }
     .brand h1 { margin: 0; font-size: 20px; line-height: 1.1; letter-spacing: 0; }
     .brand p { margin: 5px 0 0; color: rgba(255,255,255,.72); line-height: 1.3; font-size: 12px; }
-    .nav { display: grid; gap: 6px; }
+    .nav { display: grid; gap: 5px; }
     .nav button, .ghost { background: var(--nav-button-bg); color: var(--nav-button-color); text-align: left; }
     .nav button:hover, .ghost:hover { filter: brightness(1.08); }
     .nav button.active { background: var(--nav-button-active-bg); }
-    .main { padding: 12px; display: grid; gap: 10px; align-content: start; }
+    .main { padding: 10px; display: grid; gap: 8px; align-content: start; }
     .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
     .topbar h2 { margin: 0; font-size: 24px; letter-spacing: 0; }
     .muted { color: var(--muted); }
@@ -106,7 +106,7 @@
     .splash-enter:hover { background: rgba(255,255,255,.24); }
     @keyframes splashIn { from { opacity: 0; transform: translateY(18px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
     @keyframes logoFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-    .user-strip { display: grid; gap: 8px; padding: 12px; border-radius: var(--radius); background: rgba(255,255,255,.08); color: rgba(255,255,255,.84); }
+    .user-strip { display: grid; gap: 6px; padding: 8px; border-radius: var(--radius); background: rgba(255,255,255,.08); color: rgba(255,255,255,.84); }
 
     .hidden { display: none !important; }
     .event-layout { display: grid; grid-template-columns: 285px minmax(0, 1fr); gap: 10px; align-items: start; }
@@ -154,15 +154,20 @@
     #activeEventTitle { color: var(--membrete-color); }
     #activeEventInfo { color: var(--event-info-color); font-family: var(--event-info-font-family); }
     .event-logo { object-fit: contain; max-width: 220px; }
-    .balance-grid { display: grid; grid-template-columns: minmax(230px, 300px) minmax(260px, 330px) minmax(0, 1fr) minmax(260px, 340px); gap: 12px; align-items: start; }
-    .balance-side, .balance-admins { border-left: 1px solid var(--line); padding-left: 12px; display: grid; gap: 8px; }
-    .balance-side h3, .balance-main h3, .balance-accounts h3, .balance-admins h3 { margin: 2px 0 0; color: var(--balance-heading-color, var(--ink)); font-size: var(--balance-heading-size, 22px); }
+    .balance-grid { display: grid; grid-template-columns: minmax(250px, 300px) minmax(220px, 280px) minmax(230px, 1fr) minmax(260px, 310px); gap: 8px; align-items: start; }
+    .balance-side, .balance-admins { border-left: 1px solid var(--line); padding-left: 8px; display: grid; gap: 5px; }
+    .balance-side h3, .balance-main h3, .balance-accounts h3, .balance-admins h3 { margin: 1px 0 0; color: var(--balance-heading-color, var(--ink)); font-size: min(var(--balance-heading-size, 22px), 21px); line-height: 1.05; }
     #page-balance-detail { color: var(--balance-text-color, var(--ink)); font-size: var(--balance-font-size, var(--font-size)); }
-    .balance-line { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(90px, 130px) auto; gap: 6px; align-items: end; }
-    .balance-admin-line { display: grid; grid-template-columns: minmax(95px, 1fr) minmax(54px, 70px) minmax(86px, 110px) auto; gap: 6px; align-items: end; }
-    .balance-accounts { display: grid; gap: 6px; }
-    .balance-account-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(90px, 140px); gap: 6px; align-items: center; }
-    .balance-account-row span:first-child { background: #1295d8; color: #051116; font-weight: 700; padding: 5px 7px; border-radius: 3px; }
+    #page-balance-detail .panel { padding: 8px; gap: 6px; }
+    #page-balance-detail label { gap: 2px; font-size: 11px; }
+    #page-balance-detail input { min-height: 28px; padding: 5px 6px; font-size: 13px; }
+    #page-balance-detail button { min-height: 30px; padding: 5px 8px; font-size: 13px; }
+    #page-balance-detail .form-grid { gap: 5px; }
+    .balance-line { display: grid; grid-template-columns: minmax(82px, 1fr) 86px 70px; gap: 4px; align-items: end; }
+    .balance-admin-line { display: grid; grid-template-columns: minmax(72px, 1fr) 42px 82px 66px; gap: 4px; align-items: end; }
+    .balance-accounts { display: grid; gap: 5px; }
+    .balance-account-row { display: grid; grid-template-columns: minmax(128px, 1fr) minmax(94px, 132px); gap: 4px; align-items: center; }
+    .balance-account-row span:first-child { background: #1295d8; color: #051116; font-weight: 700; padding: 5px 6px; border-radius: 3px; }
     .balance-account-row input { background: #1295d8; color: #051116; font-weight: 700; border-color: #1295d8; }
     .balance-account-row.is-total span:first-child, .balance-account-row.is-total input { background: #087ac0; color: #fff; }
     .floating-modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; z-index: 30; padding: 20px; }
