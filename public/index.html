@@ -292,9 +292,9 @@
             <div id="eventUsers" class="event-user-list"></div>
             <small class="muted">Solo los usuarios seleccionados podran ver y cargar este evento. Si no seleccionas ninguno, queda solo para administrador.</small>
           </label>
-          <label>Usuarios que pueden ver % e importes de Gise y Laureano
+          <label class="admin-only-setting">Usuarios que pueden ver % e importes de Noe, Gise y Laureano
             <div id="eventPrivateUsers" class="event-user-list"></div>
-            <small class="muted">Si no marcas un usuario, ese usuario no vera los datos de Noe, Gise y Laureano.</small>
+            <small class="muted">Si no marcas un usuario, ese usuario no vera esos datos privados en Cuentas ni en PDF.</small>
           </label>
           <div class="grid-2">
             <label>Fuente inicial
@@ -389,7 +389,7 @@
             <label>Comision vendedores %<input id="balanceSellerPercent" inputmode="decimal" autocomplete="off" value="0"></label>
             <label>Comision administrador gral %<input id="balanceAdminPercent" inputmode="decimal" autocomplete="off" value="0"></label>
           </div>
-          <div class="grid-4">
+          <div class="grid-4 private-balance-fields">
             <label>% Noe<input id="balanceNoePercent" inputmode="decimal" autocomplete="off" value="0"></label>
             <label>% Gise<input id="balanceGisePercent" inputmode="decimal" autocomplete="off" value="0"></label>
             <label>% Laureano<input id="balanceLaureanoPercent" inputmode="decimal" autocomplete="off" value="0"></label>
@@ -1155,6 +1155,7 @@
 
     function setBalanceSummary(balance) {
       const totals = balanceTotals(balance);
+      document.querySelector('.private-balance-fields').classList.toggle('hidden', !canSeePrivateBalance(eventData));
       $('balanceGross').textContent = money(totals.gross);
       $('balanceCommissions').textContent = money(totals.commissions);
       $('balancePrizesTotal').textContent = money(totals.prizes);
@@ -1754,25 +1755,24 @@
       $('printArea').classList.remove('hidden');
       $('printArea').innerHTML = `
         <style>
-          @page { size: A4 landscape; margin: 10mm; }
+          @page { size: A4 portrait; margin: 10mm; }
           #printArea { font-family: Arial, sans-serif; color: #111; }
           #printArea h1 { margin: 0 0 4px; font-size: 22px; }
-          #printArea h2 { margin: 14px 0 6px; font-size: 15px; }
+          #printArea h2 { margin: 12px 0 6px; font-size: 15px; }
           #printArea p { margin: 0 0 10px; color: #555; }
-          #printArea table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px; }
-          #printArea th, #printArea td { border: 1px solid #ccc; padding: 5px; text-align: left; }
+          #printArea table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 9px; page-break-inside: avoid; }
+          #printArea th, #printArea td { border: 1px solid #ccc; padding: 5px 6px; text-align: left; }
           #printArea th { background: #eef2ed; }
-          #printArea .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+          #printArea .section { page-break-inside: avoid; }
         </style>
         <h1>${htmlCell(title).replace(/^<td>|<\/td>$/g, '')}</h1>
         <p>${htmlCell(subtitle).replace(/^<td>|<\/td>$/g, '')}</p>
         <h2>Resumen</h2>
         ${exportTableHtml(['Concepto', 'Importe'], summary)}
-        <div class="cols">
-          <section><h2>Cuentas</h2>${exportTableHtml(['Concepto', 'Importe'], balanceReportRows(balance, totals))}</section>
-          <section><h2>Administradores</h2>${exportTableHtml(['Administrador', 'Cantidad', '% carton', 'Importe'], adminRows.length ? adminRows : [['Sin administradores', '', '', money(0)]])}</section>
-          <section><h2>Gastos</h2>${exportTableHtml(['Detalle', 'Importe'], expenseRows.length ? expenseRows : [['Sin gastos', money(0)]])}<h2>Premios</h2>${exportTableHtml(['Premio', 'Importe'], prizeRows.length ? prizeRows : [['Sin premios', money(0)]])}</section>
-        </div>
+        <section class="section"><h2>Cuentas</h2>${exportTableHtml(['Concepto', 'Importe'], balanceReportRows(balance, totals))}</section>
+        <section class="section"><h2>Administradores</h2>${exportTableHtml(['Administrador', 'Cantidad', '% carton', 'Importe'], adminRows.length ? adminRows : [['Sin administradores', '', '', money(0)]])}</section>
+        <section class="section"><h2>Gastos</h2>${exportTableHtml(['Detalle', 'Importe'], expenseRows.length ? expenseRows : [['Sin gastos', money(0)]])}</section>
+        <section class="section"><h2>Premios</h2>${exportTableHtml(['Premio', 'Importe'], prizeRows.length ? prizeRows : [['Sin premios', money(0)]])}</section>
       `;
       window.print();
       $('printArea').classList.add('hidden');
