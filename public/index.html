@@ -165,7 +165,8 @@
     #page-balance-detail { color: var(--balance-text-color, var(--ink)); font-size: var(--balance-font-size, var(--font-size)); background-color: var(--balance-bg, transparent); background-image: var(--balance-bg-image, none); background-size: cover; background-position: center; border-radius: var(--radius); padding: 8px; }
     #page-balance-detail .panel, #page-balance-detail .stat { background: var(--balance-panel-bg, var(--panel)); box-shadow: 0 8px 22px rgba(5, 17, 22, .16); border-color: rgba(5, 17, 22, .12); }
     #page-balance-detail .panel { padding: 8px; gap: 6px; }
-    #page-balance-detail label { gap: 2px; font-size: 11px; }
+    #page-balance-detail label { gap: 2px; color: var(--balance-label-color, var(--muted)); font-size: var(--balance-label-size, 11px); }
+    #page-balance-detail .stat span { color: var(--balance-label-color, var(--muted)); font-size: var(--balance-label-size, 11px); }
     #page-balance-detail input { min-height: 28px; padding: 5px 6px; font-size: 13px; }
     #page-balance-detail button { min-height: 30px; padding: 5px 8px; font-size: 13px; }
     #page-balance-detail .form-grid { gap: 5px; }
@@ -175,6 +176,7 @@
     .balance-account-row { display: grid; grid-template-columns: minmax(106px, 1fr) minmax(78px, 102px); gap: 4px; align-items: center; }
     .balance-account-row span:first-child { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); font-weight: 700; padding: 5px 6px; border-radius: 5px; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
     .balance-account-row input { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); font-weight: 700; border-color: transparent; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
+    .balance-admin-line input, .balance-line input { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); border-color: transparent; box-shadow: 0 5px 12px rgba(5, 17, 22, .11); }
     .floating-modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; z-index: 30; padding: 20px; }
     .floating-modal .modal-card { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; display: grid; gap: 10px; }
 
@@ -399,7 +401,7 @@
             <aside class="balance-admins">
               <h3>Administradores</h3>
               <div id="balanceAdminsList" class="form-grid"></div>
-              <button type="button" class="light" id="addBalanceAdmin">Agregar administrador</button>
+              <button type="button" class="light hidden" id="addBalanceAdmin">Agregar administrador</button>
             </aside>
             <div class="balance-main">
               <h3>Gastos</h3>
@@ -427,6 +429,10 @@
           <div class="grid-2">
             <label>Color texto<input id="balanceConfigTextColor" type="color"></label>
             <label>Color titulos<input id="balanceConfigHeadingColor" type="color"></label>
+          </div>
+          <div class="grid-2">
+            <label>Color nombres<input id="balanceConfigLabelColor" type="color"></label>
+            <label>Tamano nombres<input id="balanceConfigLabelSize" type="number" min="9" max="22" step="1"></label>
           </div>
           <div class="grid-2">
             <label>Color recuadros<input id="balanceConfigBoxColor" type="color"></label>
@@ -780,10 +786,26 @@
     function defaultBalanceAdmins() {
       return [];
     }
+    function automaticBalanceAdmins(eventData) {
+      const groups = new Map();
+      (eventData.sales || []).forEach(sale => {
+        const name = saleAdminName(sale, eventData).trim();
+        if (!name) return;
+        const percent = saleAdminPercent(sale, eventData);
+        const key = `${normalize(name)}|${percent}`;
+        if (!groups.has(key)) {
+          groups.set(key, { id: key, name, units: 0, percent, automatic: true });
+        }
+        groups.get(key).units += rangeCount(sale);
+      });
+      return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'es') || b.units - a.units);
+    }
     function defaultBalanceStyle() {
       return {
         textColor: '#202426',
         headingColor: '#202426',
+        labelColor: '#667078',
+        labelSize: 11,
         fontSize: 15,
         headingSize: 22,
         boxColor: '#eef2ed',
@@ -819,6 +841,7 @@
       }
       if (!Array.isArray(eventData.balance.expenses)) eventData.balance.expenses = defaultBalanceExpenses();
       if (!Array.isArray(eventData.balance.admins)) eventData.balance.admins = defaultBalanceAdmins();
+      eventData.balance.admins = automaticBalanceAdmins(eventData);
       eventData.balance.style = { ...defaultBalanceStyle(), ...(eventData.balance.style || {}) };
       return eventData.balance;
     }
@@ -1175,11 +1198,11 @@
         const amount = balanceCartonPercentAmount(balance, percent, units);
         return `
           <div class="balance-admin-line" data-balance-admin="${item.id || crypto.randomUUID()}">
-            <label>Administrador<input data-admin-name autocomplete="off" value="${String(item.name || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}"></label>
-            <label>Cantidad<input data-admin-units type="number" min="0" step="1" value="${units}"></label>
-            <label>% carton<input data-admin-percent inputmode="decimal" autocomplete="off" value="${percent}"></label>
+            <label>Administrador<input data-admin-name autocomplete="off" ${item.automatic ? 'readonly' : ''} value="${String(item.name || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}"></label>
+            <label>Cantidad<input data-admin-units type="number" min="0" step="1" ${item.automatic ? 'readonly' : ''} value="${units}"></label>
+            <label>% carton<input data-admin-percent inputmode="decimal" autocomplete="off" ${item.automatic ? 'readonly' : ''} value="${percent}"></label>
             <label>Importe<input data-admin-amount readonly value="${formatInputAmount(amount)}"></label>
-            <div class="actions"><button type="button" class="danger" data-delete-admin>Eliminar</button></div>
+            <div class="actions">${item.automatic ? '<span class="badge">Auto</span>' : '<button type="button" class="danger" data-delete-admin>Eliminar</button>'}</div>
           </div>
         `;
       }).join('');
@@ -1224,6 +1247,8 @@
       if (!target) return;
       target.style.setProperty('--balance-text-color', style.textColor || defaultBalanceStyle().textColor);
       target.style.setProperty('--balance-heading-color', style.headingColor || defaultBalanceStyle().headingColor);
+      target.style.setProperty('--balance-label-color', style.labelColor || defaultBalanceStyle().labelColor);
+      target.style.setProperty('--balance-label-size', `${Number(style.labelSize) || defaultBalanceStyle().labelSize}px`);
       target.style.setProperty('--balance-font-size', `${Number(style.fontSize) || defaultBalanceStyle().fontSize}px`);
       target.style.setProperty('--balance-heading-size', `${Number(style.headingSize) || defaultBalanceStyle().headingSize}px`);
       target.style.setProperty('--balance-box-bg', style.boxColor || defaultBalanceStyle().boxColor);
@@ -1237,6 +1262,8 @@
       const merged = { ...defaultBalanceStyle(), ...(style || {}) };
       $('balanceConfigTextColor').value = merged.textColor;
       $('balanceConfigHeadingColor').value = merged.headingColor;
+      $('balanceConfigLabelColor').value = merged.labelColor;
+      $('balanceConfigLabelSize').value = merged.labelSize;
       $('balanceConfigBoxColor').value = merged.boxColor;
       $('balanceConfigBoxTextColor').value = merged.boxTextColor;
       $('balanceConfigBgColor').value = merged.bgColor;
@@ -1279,7 +1306,8 @@
       $('balanceForm').querySelectorAll('input, button').forEach(control => {
         control.disabled = !canEditBalance;
       });
-      ['openBalanceConfig', 'addBalanceAdmin', 'addBalanceExpense', 'addBalancePrize'].forEach(id => $(id).classList.toggle('hidden', !canEditBalance));
+      ['openBalanceConfig', 'addBalanceExpense', 'addBalancePrize'].forEach(id => $(id).classList.toggle('hidden', !canEditBalance));
+      $('addBalanceAdmin').classList.add('hidden');
       $('balanceForm').querySelector('button[type="submit"]').classList.toggle('hidden', !canEditBalance);
       $('balanceAdminsList').querySelectorAll('[data-delete-admin]').forEach(button => button.classList.toggle('hidden', !canEditBalance));
       $('balanceExpenses').querySelectorAll('[data-delete-expense]').forEach(button => button.classList.toggle('hidden', !canEditBalance));
@@ -2000,6 +2028,8 @@
       balance.style = {
         textColor: $('balanceConfigTextColor').value,
         headingColor: $('balanceConfigHeadingColor').value,
+        labelColor: $('balanceConfigLabelColor').value,
+        labelSize: Number($('balanceConfigLabelSize').value) || defaultBalanceStyle().labelSize,
         boxColor: $('balanceConfigBoxColor').value,
         boxTextColor: $('balanceConfigBoxTextColor').value,
         bgColor: $('balanceConfigBgColor').value,
