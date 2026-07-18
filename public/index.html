@@ -158,7 +158,8 @@
     #activeEventTitle { color: var(--membrete-color); }
     #activeEventInfo { color: var(--event-info-color); font-family: var(--event-info-font-family); }
     .event-logo { object-fit: contain; max-width: 220px; }
-    .balance-grid { display: grid; grid-template-columns: minmax(210px, 265px) minmax(220px, 280px) minmax(230px, 295px) minmax(260px, 310px); gap: 8px; align-items: start; }
+    .balance-grid { display: grid; grid-template-columns: minmax(205px, 240px) minmax(338px, 360px) minmax(255px, 300px) minmax(285px, 330px); gap: 10px; align-items: start; width: 100%; }
+    .balance-accounts, .balance-admins, .balance-main, .balance-side { min-width: 0; }
     .balance-side, .balance-admins { border-left: 1px solid var(--line); padding-left: 8px; display: grid; gap: 5px; }
     .balance-side h3, .balance-main h3, .balance-accounts h3, .balance-admins h3 { margin: 1px 0 0; color: var(--balance-heading-color, var(--ink)); font-size: min(var(--balance-heading-size, 22px), 21px); line-height: 1.05; }
     #page-balance-detail { color: var(--balance-text-color, var(--ink)); font-size: var(--balance-font-size, var(--font-size)); background-color: var(--balance-bg, transparent); background-image: var(--balance-bg-image, none); background-size: cover; background-position: center; border-radius: var(--radius); padding: 8px; }
@@ -168,10 +169,10 @@
     #page-balance-detail input { min-height: 28px; padding: 5px 6px; font-size: 13px; }
     #page-balance-detail button { min-height: 30px; padding: 5px 8px; font-size: 13px; }
     #page-balance-detail .form-grid { gap: 5px; }
-    .balance-line { display: grid; grid-template-columns: minmax(72px, 1fr) 82px 66px; gap: 4px; align-items: end; }
-    .balance-admin-line { display: grid; grid-template-columns: minmax(68px, 1fr) 58px 42px 82px 60px; gap: 4px; align-items: end; }
+    .balance-line { display: grid; grid-template-columns: minmax(70px, 1fr) 82px 64px; gap: 4px; align-items: end; }
+    .balance-admin-line { display: grid; grid-template-columns: minmax(86px, 1fr) 54px 38px 74px 56px; gap: 4px; align-items: end; }
     .balance-accounts { display: grid; gap: 5px; }
-    .balance-account-row { display: grid; grid-template-columns: minmax(114px, 1fr) minmax(84px, 112px); gap: 4px; align-items: center; }
+    .balance-account-row { display: grid; grid-template-columns: minmax(106px, 1fr) minmax(78px, 102px); gap: 4px; align-items: center; }
     .balance-account-row span:first-child { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); font-weight: 700; padding: 5px 6px; border-radius: 5px; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
     .balance-account-row input { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); font-weight: 700; border-color: transparent; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
     .floating-modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; z-index: 30; padding: 20px; }
