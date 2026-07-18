@@ -220,6 +220,7 @@
         <button type="button" data-page="stats" data-admin-only>ESTADISTICAS</button>
         <button type="button" data-page="delete" data-admin-only>ELIMINAR EVENTO</button>
         <button type="button" data-page="events">EVENTOS</button>
+        <button type="button" data-page="balance" data-admin-only>BALANCE</button>
         <button type="button" data-page="settings" data-admin-only>CONFIGURACIONES</button>
       </nav>
     </aside>
@@ -237,6 +238,7 @@
           <button type="button" class="event-card" data-page-shortcut="stats" data-admin-only><h3>ESTADISTICAS</h3><span class="muted">Ver totales generales y por evento.</span></button>
           <button type="button" class="event-card" data-page-shortcut="delete" data-admin-only><h3>ELIMINAR EVENTO</h3><span class="muted">Borrar eventos que ya no se necesiten.</span></button>
           <button type="button" class="event-card" data-page-shortcut="events"><h3>EVENTOS</h3><span class="muted">Entrar a eventos creados para cargar ventas.</span></button>
+          <button type="button" class="event-card" data-page-shortcut="balance" data-admin-only><h3>BALANCE</h3><span class="muted">Revisar premios, comisiones, recaudacion y gastos.</span></button>
         </div>
       </section>
 
@@ -315,6 +317,47 @@
       <section id="page-delete" data-screen class="hidden">
         <div class="topbar"><h2>Eliminar evento</h2></div>
         <div id="deleteList" class="event-list"></div>
+      </section>
+
+      <section id="page-balance" data-screen class="hidden">
+        <div class="topbar">
+          <div><h2>Balance</h2><p class="muted">Elegir un evento para trabajar su balance.</p></div>
+        </div>
+        <div id="balanceEventsList" class="event-list"></div>
+      </section>
+
+      <section id="page-balance-detail" data-screen class="hidden">
+        <div class="topbar">
+          <div><h2 id="balanceTitle">Balance</h2><p id="balanceInfo" class="muted"></p></div>
+          <button type="button" class="secondary" data-page-shortcut="balance">Volver a balances</button>
+        </div>
+        <div class="cards">
+          <div class="stat"><span>Recaudacion</span><strong id="balanceGross">$0</strong></div>
+          <div class="stat"><span>Comisiones</span><strong id="balanceCommissions">$0</strong></div>
+          <div class="stat"><span>Premios</span><strong id="balancePrizesTotal">$0</strong></div>
+          <div class="stat"><span>Gastos</span><strong id="balanceExpensesTotal">$0</strong></div>
+          <div class="stat"><span>Resultado</span><strong id="balanceResult">$0</strong></div>
+        </div>
+        <form id="balanceForm" class="panel form-grid">
+          <div class="grid-4">
+            <label>Premios del evento<input id="balancePrizes" inputmode="decimal" autocomplete="off" value="0"></label>
+            <label>Bingos vendidos<input id="balanceUnits" type="number" min="0" step="1" value="0"></label>
+            <label>Valor del bingo<input id="balancePrice" inputmode="decimal" autocomplete="off" value="0"></label>
+            <label>Comision vendedores %<input id="balanceSellerPercent" inputmode="decimal" autocomplete="off" value="0"></label>
+          </div>
+          <div class="grid-4">
+            <label>Comision administradores %<input id="balanceAdminPercent" inputmode="decimal" autocomplete="off" value="0"></label>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <h3>Gastos</h3>
+          <div id="balanceExpenses" class="form-grid"></div>
+          <div class="actions">
+            <button type="button" class="light" id="addBalanceExpense">Agregar otro gasto</button>
+            <button type="submit">Guardar balance</button>
+          </div>
+        </form>
       </section>
 
       <section id="page-settings" data-screen class="hidden">
@@ -487,6 +530,7 @@
     let currentUser = null;
     let activePage = 'home';
     let activeEventId = null;
+    let activeBalanceEventId = null;
     let currentView = 'detalle';
     let draftRanges = [];
     let selectedDraftId = null;
@@ -571,6 +615,7 @@
     }
     function visibleEvents() { return events.filter(canAccessEvent); }
     function activeEvent() { return events.find(event => event.id === activeEventId); }
+    function activeBalanceEvent() { return events.find(event => event.id === activeBalanceEventId); }
     function rangeCount(item) { const d = Number(item.desde) || 0; const h = Number(item.hasta) || 0; return h >= d ? h - d + 1 : 0; }
     function saleTotal(item, event = activeEvent()) { return rangeCount(item) * (Number(event?.price) || 0); }
     function pct(amount, percent) { return (Number(amount) || 0) * (Number(percent) || 0) / 100; }
@@ -604,6 +649,42 @@
       if (load.cashAmount) parts.push(`Efectivo ${money(load.cashAmount)}`);
       if (load.transferAmount) parts.push(`Transferencia ${money(load.transferAmount)}`);
       return parts.join(' / ') || load.payment || 'Sin pago';
+    }
+    function defaultBalanceExpenses() {
+      return [
+        { id: crypto.randomUUID(), name: 'Transmision', amount: 0 },
+        { id: crypto.randomUUID(), name: 'Libreria', amount: 0 },
+        { id: crypto.randomUUID(), name: 'Imprenta', amount: 0 },
+        { id: crypto.randomUUID(), name: 'Viaticos', amount: 0 }
+      ];
+    }
+    function eventSoldUnits(eventData) {
+      return (eventData.sales || []).reduce((sum, sale) => sum + rangeCount(sale), 0);
+    }
+    function eventBalance(eventData) {
+      if (!eventData.balance) {
+        eventData.balance = {
+          prizes: 0,
+          units: eventSoldUnits(eventData),
+          price: Number(eventData.price) || 0,
+          sellerPercent: Number(eventData.sellerPercent) || 0,
+          adminPercent: Number(eventData.adminPercent) || 0,
+          expenses: defaultBalanceExpenses()
+        };
+      }
+      if (!Array.isArray(eventData.balance.expenses)) eventData.balance.expenses = defaultBalanceExpenses();
+      return eventData.balance;
+    }
+    function balanceTotals(balance) {
+      const units = Number(balance.units) || 0;
+      const price = Number(balance.price) || 0;
+      const gross = units * price;
+      const sellerCommission = pct(gross, balance.sellerPercent);
+      const adminCommission = pct(gross, balance.adminPercent);
+      const commissions = sellerCommission + adminCommission;
+      const prizes = Number(balance.prizes) || 0;
+      const expenses = (balance.expenses || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      return { gross, sellerCommission, adminCommission, commissions, prizes, expenses, result: gross - commissions - prizes - expenses };
     }
     function setImage(image, value) {
       image.classList.toggle('hidden', !value);
@@ -723,7 +804,7 @@
     }
 
     function go(page) {
-      if (!isAdmin() && ['create', 'stats', 'delete', 'settings'].includes(page)) page = 'events';
+      if (!isAdmin() && ['create', 'stats', 'delete', 'balance', 'balance-detail', 'settings'].includes(page)) page = 'events';
       activePage = page;
       screens.forEach(screen => screen.classList.toggle('hidden', screen.id !== `page-${page}`));
       navButtons.forEach(button => button.classList.toggle('active', button.dataset.page === page));
@@ -739,7 +820,7 @@
       if (!logged) return;
       $('sessionName').textContent = `${currentUser.name} (${isAdmin() ? 'Administrador' : 'Usuario'})`;
       document.querySelectorAll('[data-admin-only]').forEach(item => item.classList.toggle('hidden', !isAdmin()));
-      if (!isAdmin() && ['create', 'stats', 'delete', 'settings'].includes(activePage)) activePage = 'events';
+      if (!isAdmin() && ['create', 'stats', 'delete', 'balance', 'balance-detail', 'settings'].includes(activePage)) activePage = 'events';
       go(activePage);
     }
 
@@ -828,6 +909,77 @@
         card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${event.sales?.length || 0} cargas guardadas</span></div><button type="button" class="danger" data-delete-event="${event.id}">Eliminar evento</button>`;
         list.appendChild(card);
       });
+    }
+
+    function renderBalanceEvents() {
+      const list = $('balanceEventsList');
+      if (!list) return;
+      list.innerHTML = '';
+      if (!isAdmin()) { list.innerHTML = '<div class="empty">Solo el administrador puede trabajar balances.</div>'; return; }
+      if (!events.length) { list.innerHTML = '<div class="empty">No hay eventos creados.</div>'; return; }
+      events.forEach(event => {
+        const totals = totalsFor(event.sales || [], event);
+        const balance = eventBalance(event);
+        const bTotals = balanceTotals(balance);
+        const card = document.createElement('article');
+        card.className = 'event-card';
+        card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${event.town}, ${event.province}</span><span>${num(totals.units)} bingos vendidos</span><span>Resultado ${money(bTotals.result)}</span></div><div class="actions"><button type="button" data-open-balance="${event.id}">Entrar al balance</button></div>`;
+        list.appendChild(card);
+      });
+    }
+
+    function balanceFromForm() {
+      return {
+        prizes: parseAmount($('balancePrizes').value),
+        units: Number($('balanceUnits').value) || 0,
+        price: parseAmount($('balancePrice').value),
+        sellerPercent: parseAmount($('balanceSellerPercent').value),
+        adminPercent: parseAmount($('balanceAdminPercent').value),
+        expenses: [...document.querySelectorAll('[data-balance-expense]')].map(row => ({
+          id: row.dataset.balanceExpense,
+          name: row.querySelector('[data-expense-name]').value.trim() || 'Gasto',
+          amount: parseAmount(row.querySelector('[data-expense-amount]').value)
+        }))
+      };
+    }
+
+    function setBalanceSummary(balance) {
+      const totals = balanceTotals(balance);
+      $('balanceGross').textContent = money(totals.gross);
+      $('balanceCommissions').textContent = money(totals.commissions);
+      $('balancePrizesTotal').textContent = money(totals.prizes);
+      $('balanceExpensesTotal').textContent = money(totals.expenses);
+      $('balanceResult').textContent = money(totals.result);
+    }
+
+    function renderBalanceExpenses(expenses) {
+      $('balanceExpenses').innerHTML = (expenses || []).map(item => `
+        <div class="grid-3" data-balance-expense="${item.id || crypto.randomUUID()}">
+          <label>Detalle<input data-expense-name autocomplete="off" value="${String(item.name || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}"></label>
+          <label>Importe<input data-expense-amount inputmode="decimal" autocomplete="off" value="${Math.round(Number(item.amount) || 0)}"></label>
+          <div class="actions"><button type="button" class="danger" data-delete-expense>Eliminar</button></div>
+        </div>
+      `).join('');
+      [...$('balanceExpenses').querySelectorAll('input')].forEach(input => input.addEventListener('input', updateBalancePreview));
+    }
+
+    function updateBalancePreview() {
+      setBalanceSummary(balanceFromForm());
+    }
+
+    function renderBalanceDetail() {
+      const eventData = activeBalanceEvent();
+      if (!eventData || !isAdmin()) return;
+      const balance = eventBalance(eventData);
+      $('balanceTitle').textContent = `Balance - ${eventData.name}`;
+      $('balanceInfo').textContent = `${eventData.date} - ${eventData.town}, ${eventData.province}`;
+      $('balancePrizes').value = Math.round(Number(balance.prizes) || 0);
+      $('balanceUnits').value = Number(balance.units) || 0;
+      $('balancePrice').value = Math.round(Number(balance.price) || 0);
+      $('balanceSellerPercent').value = Number(balance.sellerPercent) || 0;
+      $('balanceAdminPercent').value = Number(balance.adminPercent) || 0;
+      renderBalanceExpenses(balance.expenses);
+      setBalanceSummary(balance);
     }
 
     function renderStats() {
@@ -1265,8 +1417,10 @@
       renderUsers();
       renderEventCards();
       renderDeleteList();
+      renderBalanceEvents();
       renderStats();
       if (activeEventId) renderActiveEvent();
+      if (activeBalanceEventId && activePage === 'balance-detail') renderBalanceDetail();
     }
 
     navButtons.forEach(button => button.addEventListener('click', () => go(button.dataset.page)));
@@ -1320,6 +1474,13 @@
         if (!eventData || !canAccessEvent(eventData)) return;
         activeEventId = open.dataset.openEvent; currentView = 'detalle'; go('event');
       }
+      const openBalance = event.target.closest('[data-open-balance]');
+      if (openBalance && isAdmin()) {
+        activeBalanceEventId = openBalance.dataset.openBalance;
+        const eventData = activeBalanceEvent();
+        if (eventData) eventBalance(eventData);
+        go('balance-detail');
+      }
       const editEventButton = event.target.closest('[data-edit-event]');
       if (editEventButton && isAdmin()) editEvent(editEventButton.dataset.editEvent);
       const del = event.target.closest('[data-delete-event]');
@@ -1344,6 +1505,12 @@
       }
       const draft = event.target.closest('[data-draft-id]');
       if (draft) { selectedDraftId = draft.dataset.draftId; renderDraft(); }
+      const deleteExpense = event.target.closest('[data-delete-expense]');
+      if (deleteExpense) {
+        const row = deleteExpense.closest('[data-balance-expense]');
+        if (row) row.remove();
+        updateBalancePreview();
+      }
     });
 
     $('eventForm').addEventListener('submit', event => {
@@ -1493,6 +1660,23 @@
     $('clearDraftRanges').addEventListener('click', () => { if (draftRanges.length && confirm('Eliminar toda la lista previa?')) { draftRanges = []; selectedDraftId = null; renderDraft(); } });
     $('clearSaleForm').addEventListener('click', resetSaleForm);
     $('clearEventForm').addEventListener('click', resetEventForm);
+    ['balancePrizes', 'balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent'].forEach(id => $(id).addEventListener('input', updateBalancePreview));
+    $('addBalanceExpense').addEventListener('click', () => {
+      const current = balanceFromForm();
+      current.expenses.push({ id: crypto.randomUUID(), name: 'Otro gasto', amount: 0 });
+      renderBalanceExpenses(current.expenses);
+      setBalanceSummary(current);
+    });
+    $('balanceForm').addEventListener('submit', event => {
+      event.preventDefault();
+      const eventData = activeBalanceEvent();
+      if (!eventData || !isAdmin()) return;
+      eventData.balance = balanceFromForm();
+      saveEvents();
+      renderBalanceEvents();
+      renderBalanceDetail();
+      alert('Balance guardado.');
+    });
     $('exportGroup').addEventListener('input', updateExportValues);
     $('openExport').addEventListener('click', exportRows);
     $('applySettingsButton').addEventListener('click', async () => {
