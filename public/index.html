@@ -154,11 +154,12 @@
     #activeEventTitle { color: var(--membrete-color); }
     #activeEventInfo { color: var(--event-info-color); font-family: var(--event-info-font-family); }
     .event-logo { object-fit: contain; max-width: 220px; }
-    .balance-grid { display: grid; grid-template-columns: minmax(230px, 300px) minmax(0, 1fr) minmax(260px, 340px); gap: 12px; align-items: start; }
-    .balance-side { border-left: 1px solid var(--line); padding-left: 12px; display: grid; gap: 8px; }
-    .balance-side h3, .balance-main h3, .balance-accounts h3 { margin: 2px 0 0; color: var(--balance-heading-color, var(--ink)); font-size: var(--balance-heading-size, 22px); }
+    .balance-grid { display: grid; grid-template-columns: minmax(230px, 300px) minmax(260px, 330px) minmax(0, 1fr) minmax(260px, 340px); gap: 12px; align-items: start; }
+    .balance-side, .balance-admins { border-left: 1px solid var(--line); padding-left: 12px; display: grid; gap: 8px; }
+    .balance-side h3, .balance-main h3, .balance-accounts h3, .balance-admins h3 { margin: 2px 0 0; color: var(--balance-heading-color, var(--ink)); font-size: var(--balance-heading-size, 22px); }
     #page-balance-detail { color: var(--balance-text-color, var(--ink)); font-size: var(--balance-font-size, var(--font-size)); }
     .balance-line { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(90px, 130px) auto; gap: 6px; align-items: end; }
+    .balance-admin-line { display: grid; grid-template-columns: minmax(95px, 1fr) minmax(54px, 70px) minmax(86px, 110px) auto; gap: 6px; align-items: end; }
     .balance-accounts { display: grid; gap: 6px; }
     .balance-account-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(90px, 140px); gap: 6px; align-items: center; }
     .balance-account-row span:first-child { background: #1295d8; color: #051116; font-weight: 700; padding: 5px 7px; border-radius: 3px; }
@@ -178,7 +179,7 @@
       .cards, .grid-4 { grid-template-columns: repeat(2, 1fr); }
       .toolbar { grid-template-columns: 1fr 1fr; }
       .balance-grid { grid-template-columns: 1fr; }
-      .balance-side { border-left: 0; padding-left: 0; }
+      .balance-side, .balance-admins { border-left: 0; padding-left: 0; }
       .settings-grid { grid-template-columns: repeat(3, 1fr); }
       .settings-users { grid-template-columns: 1fr 1fr auto; }
       .user-list { grid-column: 1 / -1; }
@@ -187,7 +188,7 @@
     @media (max-width: 680px) {
       .main, .sidebar { padding: 16px; }
       .cards, .grid-2, .grid-3, .grid-4, .toolbar, .settings-grid, .preview-meta { grid-template-columns: 1fr; }
-      .balance-line { grid-template-columns: 1fr; }
+      .balance-line, .balance-admin-line { grid-template-columns: 1fr; }
       .topbar { align-items: flex-start; flex-direction: column; }
     }
   </style>
@@ -365,7 +366,7 @@
             <label>Bingos vendidos<input id="balanceUnits" type="number" min="0" step="1" value="0"></label>
             <label>Valor del bingo<input id="balancePrice" inputmode="decimal" autocomplete="off" value="0"></label>
             <label>Comision vendedores %<input id="balanceSellerPercent" inputmode="decimal" autocomplete="off" value="0"></label>
-            <label>Comision administradores %<input id="balanceAdminPercent" inputmode="decimal" autocomplete="off" value="0"></label>
+            <label>Comision administrador gral %<input id="balanceAdminPercent" inputmode="decimal" autocomplete="off" value="0"></label>
           </div>
           <div class="grid-4">
             <label>% Noe<input id="balanceNoePercent" inputmode="decimal" autocomplete="off" value="0"></label>
@@ -378,6 +379,11 @@
               <h3>Cuentas</h3>
               <div id="balanceAccounts" class="form-grid"></div>
             </div>
+            <aside class="balance-admins">
+              <h3>Administradores</h3>
+              <div id="balanceAdminsList" class="form-grid"></div>
+              <button type="button" class="light" id="addBalanceAdmin">Agregar administrador</button>
+            </aside>
             <div class="balance-main">
               <h3>Gastos</h3>
               <div id="balanceExpenses" class="form-grid"></div>
@@ -661,6 +667,13 @@
       const rounded = Math.max(Number(value) || 0, 0);
       return String(Math.round(rounded));
     }
+    function formatInputAmount(value) {
+      return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(Math.round(Number(value) || 0));
+    }
+    function bindAmountFormatting(input) {
+      input.addEventListener('blur', () => { input.value = formatInputAmount(parseAmount(input.value)); });
+      input.addEventListener('focus', () => input.select());
+    }
     function isAdmin() { return currentUser?.role === 'admin'; }
     function selectedUsers() { return [...document.querySelectorAll('[data-event-user]:checked')].map(option => option.value); }
     function selectedPrivateUsers() { return [...document.querySelectorAll('[data-private-user]:checked')].map(option => option.value); }
@@ -731,6 +744,9 @@
         { id: crypto.randomUUID(), name: 'Sorteos', amount: 0 }
       ];
     }
+    function defaultBalanceAdmins() {
+      return [];
+    }
     function defaultBalanceStyle() {
       return { textColor: '#202426', headingColor: '#202426', fontSize: 15, headingSize: 22 };
     }
@@ -748,6 +764,7 @@
           noePercent: 0,
           gisePercent: 0,
           laureanoPercent: 0,
+          admins: defaultBalanceAdmins(),
           prizesList: defaultBalancePrizes(),
           expenses: defaultBalanceExpenses()
         };
@@ -758,6 +775,7 @@
         if (totalPrize) eventData.balance.prizesList[0].amount = totalPrize;
       }
       if (!Array.isArray(eventData.balance.expenses)) eventData.balance.expenses = defaultBalanceExpenses();
+      if (!Array.isArray(eventData.balance.admins)) eventData.balance.admins = defaultBalanceAdmins();
       eventData.balance.style = { ...defaultBalanceStyle(), ...(eventData.balance.style || {}) };
       return eventData.balance;
     }
@@ -769,8 +787,9 @@
       const price = Number(balance.price) || 0;
       const gross = units * price;
       const sellerCommission = pct(gross, balance.sellerPercent);
-      const adminCommission = pct(gross, balance.adminPercent);
-      const commissions = sellerCommission + adminCommission;
+      const adminGeneralCommission = pct(gross, balance.adminPercent);
+      const adminsCommission = (balance.admins || []).reduce((sum, item) => sum + pct(gross, item.percent), 0);
+      const commissions = sellerCommission + adminGeneralCommission + adminsCommission;
       const prizes = prizesTotal(balance);
       const expenses = (balance.expenses || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
       const subtotal = gross - commissions - prizes - expenses;
@@ -779,7 +798,7 @@
       const giseAmount = pct(afterNoe, balance.gisePercent);
       const laureanoAmount = pct(afterNoe, balance.laureanoPercent);
       const extraPercents = giseAmount + laureanoAmount;
-      return { gross, sellerCommission, adminCommission, commissions, prizes, expenses, subtotal, noeAmount, afterNoe, giseAmount, laureanoAmount, extraPercents, result: afterNoe - extraPercents };
+      return { gross, sellerCommission, adminGeneralCommission, adminsCommission, commissions, prizes, expenses, subtotal, noeAmount, afterNoe, giseAmount, laureanoAmount, extraPercents, result: afterNoe - extraPercents };
     }
     function setImage(image, value) {
       image.classList.toggle('hidden', !value);
@@ -1045,6 +1064,11 @@
         noePercent: parseAmount($('balanceNoePercent').value),
         gisePercent: parseAmount($('balanceGisePercent').value),
         laureanoPercent: parseAmount($('balanceLaureanoPercent').value),
+        admins: [...document.querySelectorAll('[data-balance-admin]')].map(row => ({
+          id: row.dataset.balanceAdmin,
+          name: row.querySelector('[data-admin-name]').value.trim() || 'Administrador',
+          percent: parseAmount(row.querySelector('[data-admin-percent]').value)
+        })),
         expenses: [...document.querySelectorAll('[data-balance-expense]')].map(row => ({
           id: row.dataset.balanceExpense,
           name: row.querySelector('[data-expense-name]').value.trim() || 'Gasto',
@@ -1062,6 +1086,7 @@
       $('balanceExpensesTotal').textContent = money(totals.expenses);
       $('balanceResult').textContent = money(canSeePrivateBalance(activeBalanceEvent()) ? totals.result : totals.subtotal);
       renderBalanceAccounts(balance, totals);
+      updateBalanceAdminAmounts(balance);
     }
 
     function renderBalanceAccounts(balance, totals = balanceTotals(balance)) {
@@ -1071,7 +1096,8 @@
         ['Bingos vendidos', num(balance.units)],
         ['Valor del Bingo', money(balance.price)],
         ['Vendedores', money(totals.sellerCommission)],
-        ['Administrador', money(totals.adminCommission)],
+        ['Administrador Gral', money(totals.adminGeneralCommission)],
+        ['Administradores', money(totals.adminsCommission)],
         ['Total de Premios', money(totals.prizes)],
         ['Total de Gastos', money(totals.expenses)],
         ['Sub-Total', money(totals.subtotal)]
@@ -1092,26 +1118,54 @@
       `).join('');
     }
 
+    function renderBalanceAdmins(admins, balance = balanceFromForm()) {
+      const gross = balanceTotals(balance).gross;
+      $('balanceAdminsList').innerHTML = (admins || []).map(item => {
+        const percent = Number(item.percent) || 0;
+        const amount = pct(gross, percent);
+        return `
+          <div class="balance-admin-line" data-balance-admin="${item.id || crypto.randomUUID()}">
+            <label>Administrador<input data-admin-name autocomplete="off" value="${String(item.name || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}"></label>
+            <label>%<input data-admin-percent inputmode="decimal" autocomplete="off" value="${percent}"></label>
+            <label>Importe<input data-admin-amount readonly value="${formatInputAmount(amount)}"></label>
+            <div class="actions"><button type="button" class="danger" data-delete-admin>Eliminar</button></div>
+          </div>
+        `;
+      }).join('');
+      [...$('balanceAdminsList').querySelectorAll('[data-admin-name], [data-admin-percent]')].forEach(input => input.addEventListener('input', updateBalancePreview));
+    }
+
+    function updateBalanceAdminAmounts(balance) {
+      const gross = balanceTotals(balance).gross;
+      [...$('balanceAdminsList').querySelectorAll('[data-balance-admin]')].forEach(row => {
+        const percent = parseAmount(row.querySelector('[data-admin-percent]').value);
+        const amountInput = row.querySelector('[data-admin-amount]');
+        if (amountInput) amountInput.value = formatInputAmount(pct(gross, percent));
+      });
+    }
+
     function renderBalanceExpenses(expenses) {
       $('balanceExpenses').innerHTML = (expenses || []).map(item => `
         <div class="balance-line" data-balance-expense="${item.id || crypto.randomUUID()}">
           <label>Detalle<input data-expense-name autocomplete="off" value="${String(item.name || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}"></label>
-          <label>Importe<input data-expense-amount inputmode="decimal" autocomplete="off" value="${Math.round(Number(item.amount) || 0)}"></label>
+          <label>Importe<input data-expense-amount inputmode="decimal" autocomplete="off" value="${formatInputAmount(item.amount)}"></label>
           <div class="actions"><button type="button" class="danger" data-delete-expense>Eliminar</button></div>
         </div>
       `).join('');
       [...$('balanceExpenses').querySelectorAll('input')].forEach(input => input.addEventListener('input', updateBalancePreview));
+      [...$('balanceExpenses').querySelectorAll('[data-expense-amount]')].forEach(bindAmountFormatting);
     }
 
     function renderBalancePrizes(prizes) {
       $('balancePrizesList').innerHTML = (prizes || []).map(item => `
         <div class="balance-line" data-balance-prize="${item.id || crypto.randomUUID()}">
           <label>Premio<input data-prize-name autocomplete="off" value="${String(item.name || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}"></label>
-          <label>Importe<input data-prize-amount inputmode="decimal" autocomplete="off" value="${Math.round(Number(item.amount) || 0)}"></label>
+          <label>Importe<input data-prize-amount inputmode="decimal" autocomplete="off" value="${formatInputAmount(item.amount)}"></label>
           <div class="actions"><button type="button" class="danger" data-delete-prize>Eliminar</button></div>
         </div>
       `).join('');
       [...$('balancePrizesList').querySelectorAll('input')].forEach(input => input.addEventListener('input', updateBalancePreview));
+      [...$('balancePrizesList').querySelectorAll('[data-prize-amount]')].forEach(bindAmountFormatting);
     }
 
     function applyBalanceStyle(style) {
@@ -1147,7 +1201,7 @@
       $('balanceTitle').textContent = `Balance - ${eventData.name}`;
       $('balanceInfo').textContent = `${eventData.date} - ${eventData.town}, ${eventData.province}`;
       $('balanceUnits').value = Number(balance.units) || 0;
-      $('balancePrice').value = Math.round(Number(balance.price) || 0);
+      $('balancePrice').value = formatInputAmount(balance.price);
       $('balanceSellerPercent').value = Number(balance.sellerPercent) || 0;
       $('balanceAdminPercent').value = Number(balance.adminPercent) || 0;
       $('balanceNoePercent').value = Number(balance.noePercent) || 0;
@@ -1158,13 +1212,15 @@
         const label = $(id).closest('label');
         if (label) label.classList.toggle('hidden', !showPrivate);
       });
+      renderBalanceAdmins(balance.admins, balance);
       renderBalanceExpenses(balance.expenses);
       renderBalancePrizes(balance.prizesList);
       $('balanceForm').querySelectorAll('input, button').forEach(control => {
         control.disabled = !canEditBalance;
       });
-      ['openBalanceConfig', 'addBalanceExpense', 'addBalancePrize'].forEach(id => $(id).classList.toggle('hidden', !canEditBalance));
+      ['openBalanceConfig', 'addBalanceAdmin', 'addBalanceExpense', 'addBalancePrize'].forEach(id => $(id).classList.toggle('hidden', !canEditBalance));
       $('balanceForm').querySelector('button[type="submit"]').classList.toggle('hidden', !canEditBalance);
+      $('balanceAdminsList').querySelectorAll('[data-delete-admin]').forEach(button => button.classList.toggle('hidden', !canEditBalance));
       $('balanceExpenses').querySelectorAll('[data-delete-expense]').forEach(button => button.classList.toggle('hidden', !canEditBalance));
       $('balancePrizesList').querySelectorAll('[data-delete-prize]').forEach(button => button.classList.toggle('hidden', !canEditBalance));
       applyBalanceStyle(balance.style);
@@ -1709,6 +1765,12 @@
         if (row) row.remove();
         updateBalancePreview();
       }
+      const deleteAdmin = event.target.closest('[data-delete-admin]');
+      if (deleteAdmin) {
+        const row = deleteAdmin.closest('[data-balance-admin]');
+        if (row) row.remove();
+        updateBalancePreview();
+      }
     });
 
     $('eventForm').addEventListener('submit', event => {
@@ -1860,6 +1922,7 @@
     $('clearSaleForm').addEventListener('click', resetSaleForm);
     $('clearEventForm').addEventListener('click', resetEventForm);
     ['balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent', 'balanceNoePercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => $(id).addEventListener('input', updateBalancePreview));
+    bindAmountFormatting($('balancePrice'));
     $('openBalanceConfig').addEventListener('click', () => {
       if (!isAdmin()) return;
       const balance = activeBalanceEvent() ? eventBalance(activeBalanceEvent()) : { style: defaultBalanceStyle() };
@@ -1886,6 +1949,13 @@
       const current = balanceFromForm();
       current.expenses.push({ id: crypto.randomUUID(), name: 'Otro gasto', amount: 0 });
       renderBalanceExpenses(current.expenses);
+      setBalanceSummary(current);
+    });
+    $('addBalanceAdmin').addEventListener('click', () => {
+      if (!isAdmin()) return;
+      const current = balanceFromForm();
+      current.admins.push({ id: crypto.randomUUID(), name: 'Administrador', percent: 0 });
+      renderBalanceAdmins(current.admins, current);
       setBalanceSummary(current);
     });
     $('addBalancePrize').addEventListener('click', () => {
