@@ -284,7 +284,7 @@
           <button type="button" class="event-card" data-page-shortcut="delete" data-admin-only><h3>ELIMINAR EVENTO</h3><span class="muted">Borrar eventos que ya no se necesiten.</span></button>
           <button type="button" class="event-card" data-page-shortcut="events"><h3>EVENTOS</h3><span class="muted">Entrar a eventos creados para cargar ventas.</span></button>
           <button type="button" class="event-card" data-page-shortcut="balance"><h3>BALANCE</h3><span class="muted">Revisar premios, comisiones, recaudacion y gastos.</span></button>
-                  <button type="button" class="event-card" data-page-shortcut="accounting"><h3>CONTABLE</h3><span class="muted">Control semanal desde Base Gise/Laureano por evento.</span></button>
+                  <button type="button" class="event-card" data-page-shortcut="accounting"><h3>CONTABLE</h3><span class="muted">Control semanal desde INDIGO BLUE por evento.</span></button>
         </div>
       </section>
 
@@ -378,10 +378,10 @@
 
       <section id="page-accounting" data-screen class="hidden">
         <div class="topbar">
-          <div><h2>Contable</h2><p class="muted">Resumen semanal tomado de Base Gise/Laureano de cada balance.</p></div>
+          <div><h2>Contable</h2><p class="muted">Resumen semanal tomado de INDIGO BLUE de cada balance.</p></div>
         </div>
         <div class="cards">
-          <div class="stat"><span>Base Gise/Laureano</span><strong id="accountingBaseTotal">$0</strong></div>
+          <div class="stat"><span>INDIGO BLUE</span><strong id="accountingBaseTotal">$0</strong></div>
           <div class="stat"><span>Gastos contables</span><strong id="accountingSpentTotal">$0</strong></div>
           <div class="stat"><span>Saldo semanal</span><strong id="accountingNetTotal">$0</strong></div>
           <div class="stat"><span>Eventos incluidos</span><strong id="accountingEventsTotal">0</strong></div>
@@ -1371,7 +1371,7 @@
       const accounting = eventAccounting(eventData);
       const spent = accountingEventSpent(eventData);
       $('accountingEventTitle').textContent = eventData.name;
-      $('accountingEventInfo').textContent = `${accountingWeekStart} a ${accountingWeekEnd} - ${num(balance.units)} bingos - Base Gise/Laureano ${money(base)} - Saldo ${money(base - spent)}`;
+      $('accountingEventInfo').textContent = `${accountingWeekStart} a ${accountingWeekEnd} - ${num(balance.units)} bingos - INDIGO BLUE ${money(base)} - Saldo ${money(base - spent)}`;
       $('accountingCategoriesList').innerHTML = accounting.categories.map(category => {
         const total = accountingCategoryTotal(category);
         const isOpen = openAccountingCategories.has(category.id);
@@ -1468,7 +1468,7 @@
       if (showPrivate) {
         rows.push(
           [`% Noe (${num(balance.noePercent)}%)`, money(totals.noeAmount)],
-          [`Base Gise/Laureano`, money(totals.afterNoe)],
+          [`INDIGO BLUE`, money(totals.afterNoe)],
           [`% Gise (${num(balance.gisePercent)}%)`, money(totals.giseAmount)],
           [`% Laureano (${num(balance.laureanoPercent)}%)`, money(totals.laureanoAmount)]
         );
@@ -2016,7 +2016,7 @@
       if (canSeePrivateBalance(activeBalanceEvent())) {
         rows.push(
           [`Noe ${num(balance.noePercent)}%`, money(totals.noeAmount)],
-          ['Base Gise/Laureano', money(totals.afterNoe)],
+          ['INDIGO BLUE', money(totals.afterNoe)],
           [`Gise ${num(balance.gisePercent)}%`, money(totals.giseAmount)],
           [`Laureano ${num(balance.laureanoPercent)}%`, money(totals.laureanoAmount)],
           ['Resultado', money(totals.result)]
