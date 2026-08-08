@@ -178,6 +178,14 @@
     .balance-account-row span:first-child { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); font-weight: 700; padding: 5px 6px; border-radius: 5px; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
     .balance-account-row input { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); font-weight: 700; border-color: transparent; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
     .balance-admin-line input, .balance-line input { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); border-color: transparent; box-shadow: 0 5px 12px rgba(5, 17, 22, .11); }
+    .accounting-layout { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 10px; align-items: start; }
+    .accounting-events, .accounting-categories { display: grid; gap: 8px; }
+    .accounting-event { width: 100%; text-align: left; color: var(--ink); background: #fbfcfa; border: 1px solid var(--line); display: grid; gap: 5px; }
+    .accounting-event.active { border-color: var(--brand); background: var(--soft); }
+    .accounting-detail-line { display: grid; grid-template-columns: minmax(130px, 1fr) 116px 64px; gap: 6px; align-items: end; }
+    .accounting-category { display: grid; gap: 8px; }
+    .accounting-category-head { display: grid; grid-template-columns: minmax(160px, 1fr) auto auto; gap: 6px; align-items: end; }
+    .accounting-category h3 { margin: 0; font-size: 16px; }
     .floating-modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; z-index: 30; padding: 20px; }
     .floating-modal .modal-card { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; display: grid; gap: 10px; }
 
@@ -191,7 +199,7 @@
       .app, .event-layout { grid-template-columns: 1fr; }
       .cards, .grid-4 { grid-template-columns: repeat(2, 1fr); }
       .toolbar { grid-template-columns: 1fr 1fr; }
-      .balance-grid { grid-template-columns: 1fr; }
+      .balance-grid, .accounting-layout { grid-template-columns: 1fr; }
       .balance-side, .balance-admins { border-left: 0; padding-left: 0; }
       .settings-grid { grid-template-columns: repeat(3, 1fr); }
       .settings-users { grid-template-columns: 1fr 1fr auto; }
@@ -201,7 +209,7 @@
     @media (max-width: 680px) {
       .main, .sidebar { padding: 16px; }
       .cards, .grid-2, .grid-3, .grid-4, .toolbar, .settings-grid, .preview-meta { grid-template-columns: 1fr; }
-      .balance-line, .balance-admin-line { grid-template-columns: 1fr; }
+      .balance-line, .balance-admin-line, .accounting-detail-line, .accounting-category-head { grid-template-columns: 1fr; }
       .topbar { align-items: flex-start; flex-direction: column; }
     }
   </style>
@@ -250,6 +258,7 @@
         <button type="button" data-page="delete" data-admin-only>ELIMINAR EVENTO</button>
         <button type="button" data-page="events">EVENTOS</button>
         <button type="button" data-page="balance">BALANCE</button>
+                <button type="button" data-page="accounting">CONTABLE</button>
         <button type="button" data-page="settings" data-admin-only>CONFIGURACIONES</button>
       </nav>
     </aside>
@@ -268,6 +277,7 @@
           <button type="button" class="event-card" data-page-shortcut="delete" data-admin-only><h3>ELIMINAR EVENTO</h3><span class="muted">Borrar eventos que ya no se necesiten.</span></button>
           <button type="button" class="event-card" data-page-shortcut="events"><h3>EVENTOS</h3><span class="muted">Entrar a eventos creados para cargar ventas.</span></button>
           <button type="button" class="event-card" data-page-shortcut="balance"><h3>BALANCE</h3><span class="muted">Revisar premios, comisiones, recaudacion y gastos.</span></button>
+                  <button type="button" class="event-card" data-page-shortcut="accounting"><h3>CONTABLE</h3><span class="muted">Control semanal desde Base Gise/Laureano por evento.</span></button>
         </div>
       </section>
 
@@ -359,6 +369,35 @@
         <div id="balanceEventsList" class="event-list"></div>
       </section>
 
+      <section id="page-accounting" data-screen class="hidden">
+        <div class="topbar">
+          <div><h2>Contable</h2><p class="muted">Resumen semanal tomado de Base Gise/Laureano de cada balance.</p></div>
+        </div>
+        <div class="cards">
+          <div class="stat"><span>Base Gise/Laureano</span><strong id="accountingBaseTotal">$0</strong></div>
+          <div class="stat"><span>Gastos contables</span><strong id="accountingSpentTotal">$0</strong></div>
+          <div class="stat"><span>Saldo semanal</span><strong id="accountingNetTotal">$0</strong></div>
+          <div class="stat"><span>Eventos</span><strong id="accountingEventsTotal">0</strong></div>
+          <div class="stat"><span>Bingos vendidos</span><strong id="accountingUnitsTotal">0</strong></div>
+        </div>
+        <div class="accounting-layout">
+          <section class="panel accounting-events">
+            <h3>Eventos</h3>
+            <div id="accountingEventsList" class="accounting-events"></div>
+          </section>
+          <section class="panel accounting-categories">
+            <div class="topbar">
+              <div>
+                <h3 id="accountingEventTitle">Elegir evento</h3>
+                <p id="accountingEventInfo" class="muted"></p>
+              </div>
+              <button type="button" id="addAccountingCategory">Agregar categoria</button>
+            </div>
+            <div id="accountingCategoriesList" class="accounting-categories"></div>
+            <div class="actions"><button type="button" id="saveAccounting">Guardar contable</button></div>
+          </section>
+        </div>
+      </section>
       <section id="page-balance-detail" data-screen class="hidden">
         <div class="topbar">
           <div><h2 id="balanceTitle">Balance</h2><p id="balanceInfo" class="muted"></p></div>
@@ -633,6 +672,7 @@
     let activePage = 'home';
     let activeEventId = null;
     let activeBalanceEventId = null;
+    let activeAccountingEventId = null;
     let currentView = 'detalle';
     let draftRanges = [];
     let selectedDraftId = null;
@@ -699,7 +739,7 @@
     }
     function money(value) { return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Math.round(Number(value) || 0)); }
     function num(value) { return new Intl.NumberFormat('es-AR').format(Number(value) || 0); }
-    function normalize(value) { return String(value || '').trim().toLowerCase(); }
+    function escapeAttr(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])); }    function normalize(value) { return String(value || '').trim().toLowerCase(); }
     function parseAmount(value) {
       const clean = String(value || '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
       return Number(clean) || 0;
@@ -821,10 +861,11 @@
       return (eventData.sales || []).reduce((sum, sale) => sum + rangeCount(sale), 0);
     }
     function eventBalance(eventData) {
+      const soldUnits = eventSoldUnits(eventData);
       if (!eventData.balance) {
         eventData.balance = {
           prizes: 0,
-          units: eventSoldUnits(eventData),
+          units: soldUnits,
           price: Number(eventData.price) || 0,
           sellerPercent: Number(eventData.sellerPercent) || 0,
           adminPercent: Number(eventData.adminPercent) || 0,
@@ -836,6 +877,7 @@
           expenses: defaultBalanceExpenses()
         };
       }
+      eventData.balance.units = soldUnits;
       if (!Array.isArray(eventData.balance.prizesList)) {
         const totalPrize = Number(eventData.balance.prizes) || 0;
         eventData.balance.prizesList = defaultBalancePrizes();
@@ -1123,6 +1165,122 @@
       });
     }
 
+    function defaultAccountingCategories() {
+      return [
+        { id: crypto.randomUUID(), name: 'Gastos', details: [] },
+        { id: crypto.randomUUID(), name: 'Premios', details: [] },
+        { id: crypto.randomUUID(), name: 'Viaticos', details: [] }
+      ];
+    }
+    function eventAccounting(eventData) {
+      if (!eventData.accounting) eventData.accounting = { categories: defaultAccountingCategories() };
+      if (!Array.isArray(eventData.accounting.categories)) eventData.accounting.categories = defaultAccountingCategories();
+      eventData.accounting.categories = eventData.accounting.categories.map(category => ({
+        id: category.id || crypto.randomUUID(),
+        name: category.name || 'Categoria',
+        details: Array.isArray(category.details) ? category.details.map(detail => ({
+          id: detail.id || crypto.randomUUID(),
+          name: detail.name || '',
+          amount: Number(detail.amount) || 0
+        })) : []
+      }));
+      return eventData.accounting;
+    }
+    function accountingEventBase(eventData) {
+      const balance = eventBalance(eventData);
+      return balanceTotals(balance).afterNoe;
+    }
+    function accountingCategoryTotal(category) {
+      return (category.details || []).reduce((sum, detail) => sum + (Number(detail.amount) || 0), 0);
+    }
+    function accountingEventSpent(eventData) {
+      return eventAccounting(eventData).categories.reduce((sum, category) => sum + accountingCategoryTotal(category), 0);
+    }
+    function activeAccountingEvent() {
+      return visibleEvents().find(eventItem => eventItem.id === activeAccountingEventId) || visibleEvents()[0] || null;
+    }
+    function accountingFromForm() {
+      return {
+        categories: [...document.querySelectorAll('[data-accounting-category]')].map(categoryRow => ({
+          id: categoryRow.dataset.accountingCategory,
+          name: categoryRow.querySelector('[data-accounting-category-name]').value.trim() || 'Categoria',
+          details: [...categoryRow.querySelectorAll('[data-accounting-detail]')].map(detailRow => ({
+            id: detailRow.dataset.accountingDetail,
+            name: detailRow.querySelector('[data-accounting-detail-name]').value.trim() || 'Detalle',
+            amount: parseAmount(detailRow.querySelector('[data-accounting-detail-amount]').value)
+          }))
+        }))
+      };
+    }
+    function renderAccounting() {
+      const availableEvents = visibleEvents();
+      const selected = activeAccountingEvent();
+      if (!activeAccountingEventId && selected) activeAccountingEventId = selected.id;
+      const totals = availableEvents.reduce((acc, eventData) => {
+        const balance = eventBalance(eventData);
+        const base = balanceTotals(balance).afterNoe;
+        const spent = accountingEventSpent(eventData);
+        acc.base += base;
+        acc.spent += spent;
+        acc.units += Number(balance.units) || 0;
+        return acc;
+      }, { base: 0, spent: 0, units: 0 });
+      $('accountingBaseTotal').textContent = money(totals.base);
+      $('accountingSpentTotal').textContent = money(totals.spent);
+      $('accountingNetTotal').textContent = money(totals.base - totals.spent);
+      $('accountingEventsTotal').textContent = num(availableEvents.length);
+      $('accountingUnitsTotal').textContent = num(totals.units);
+      $('accountingEventsList').innerHTML = availableEvents.length ? availableEvents.map(eventData => {
+        const base = accountingEventBase(eventData);
+        const spent = accountingEventSpent(eventData);
+        const balance = eventBalance(eventData);
+        return `<button type="button" class="accounting-event ${eventData.id === activeAccountingEventId ? 'active' : ''}" data-open-accounting="${eventData.id}"><strong>${eventData.name}</strong><span class="muted">${num(balance.units)} bingos vendidos</span><span>Base ${money(base)} - Saldo ${money(base - spent)}</span></button>`;
+      }).join('') : '<div class="empty">No hay eventos disponibles.</div>';
+      renderAccountingDetail(selected);
+    }
+    function renderAccountingDetail(eventData) {
+      if (!eventData) {
+        $('accountingEventTitle').textContent = 'Elegir evento';
+        $('accountingEventInfo').textContent = 'No hay eventos disponibles para trabajar.';
+        $('accountingCategoriesList').innerHTML = '';
+        return;
+      }
+      const balance = eventBalance(eventData);
+      const base = balanceTotals(balance).afterNoe;
+      const accounting = eventAccounting(eventData);
+      const spent = accountingEventSpent(eventData);
+      $('accountingEventTitle').textContent = eventData.name;
+      $('accountingEventInfo').textContent = `${num(balance.units)} bingos vendidos - Base Gise/Laureano ${money(base)} - Saldo ${money(base - spent)}`;
+      $('accountingCategoriesList').innerHTML = accounting.categories.map(category => {
+        const total = accountingCategoryTotal(category);
+        const details = (category.details || []).map(detail => `
+          <div class="accounting-detail-line" data-accounting-detail="${detail.id || crypto.randomUUID()}">
+            <label>Detalle<input data-accounting-detail-name value="${escapeAttr(detail.name || '')}"></label>
+            <label>Importe<input data-accounting-detail-amount inputmode="decimal" autocomplete="off" value="${formatInputAmount(detail.amount)}"></label>
+            <button type="button" class="danger" data-delete-accounting-detail>Quitar</button>
+          </div>
+        `).join('');
+        return `
+          <article class="panel accounting-category" data-accounting-category="${category.id || crypto.randomUUID()}">
+            <div class="accounting-category-head">
+              <label>Categoria<input data-accounting-category-name value="${escapeAttr(category.name || 'Categoria')}"></label>
+              <h3>${money(total)}</h3>
+              <button type="button" class="danger" data-delete-accounting-category>Quitar categoria</button>
+            </div>
+            <div class="form-grid">${details || '<div class="empty">Sin detalles cargados.</div>'}</div>
+            <button type="button" class="light" data-add-accounting-detail>Agregar detalle</button>
+          </article>
+        `;
+      }).join('');
+      [...$('accountingCategoriesList').querySelectorAll('[data-accounting-detail-amount]')].forEach(bindAmountFormatting);
+    }
+    function saveAccountingFromForm() {
+      const eventData = activeAccountingEvent();
+      if (!eventData) return;
+      eventData.accounting = accountingFromForm();
+      saveEvents();
+      renderAccounting();
+    }
     function balanceFromForm() {
       const currentBalance = activeBalanceEvent() ? eventBalance(activeBalanceEvent()) : null;
       return {
@@ -1896,6 +2054,8 @@
         eventBalance(eventData);
         go('balance-detail');
       }
+      const openAccounting = event.target.closest('[data-open-accounting]');
+      if (openAccounting) { activeAccountingEventId = openAccounting.dataset.openAccounting; renderAccounting(); }
       const editEventButton = event.target.closest('[data-edit-event]');
       if (editEventButton && isAdmin()) editEvent(editEventButton.dataset.editEvent);
       const del = event.target.closest('[data-delete-event]');
@@ -1939,6 +2099,20 @@
         if (row) row.remove();
         updateBalancePreview();
       }
+      const deleteAccountingDetail = event.target.closest('[data-delete-accounting-detail]');
+      if (deleteAccountingDetail) { deleteAccountingDetail.closest('[data-accounting-detail]')?.remove(); saveAccountingFromForm(); }
+      const addAccountingDetail = event.target.closest('[data-add-accounting-detail]');
+      if (addAccountingDetail) {
+        const category = addAccountingDetail.closest('[data-accounting-category]');
+        saveAccountingFromForm();
+        const eventData = activeAccountingEvent();
+        const accounting = eventData ? eventAccounting(eventData) : null;
+        const target = accounting?.categories.find(item => item.id === category?.dataset.accountingCategory);
+        if (target) target.details.push({ id: crypto.randomUUID(), name: '', amount: 0 });
+        if (eventData) { saveEvents(); renderAccounting(); }
+      }
+      const deleteAccountingCategory = event.target.closest('[data-delete-accounting-category]');
+      if (deleteAccountingCategory && confirm('Quitar esta categoria contable?')) { deleteAccountingCategory.closest('[data-accounting-category]')?.remove(); saveAccountingFromForm(); }
       const logoutTop = event.target.closest('[data-logout-top]');
       if (logoutTop) $('logoutButton').click();
     });
@@ -2248,4 +2422,11 @@
   </script>
 </body>
 </html>
+
+
+
+
+
+
+
 
