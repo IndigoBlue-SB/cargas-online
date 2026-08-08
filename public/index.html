@@ -1197,7 +1197,10 @@
       return eventAccounting(eventData).categories.reduce((sum, category) => sum + accountingCategoryTotal(category), 0);
     }
     function activeAccountingEvent() {
-      return visibleEvents().find(eventItem => eventItem.id === activeAccountingEventId) || visibleEvents()[0] || null;
+      const availableEvents = visibleEvents();
+      const selected = availableEvents.find(eventItem => eventItem.id === activeAccountingEventId) || availableEvents[0] || null;
+      activeAccountingEventId = selected?.id || null;
+      return selected;
     }
     function accountingFromForm() {
       return {
@@ -1990,6 +1993,7 @@
       renderEventCards();
       renderDeleteList();
       renderBalanceEvents();
+      if (activePage === 'accounting') renderAccounting();
       renderStats();
       if (activeEventId) renderActiveEvent();
       if (activeBalanceEventId && activePage === 'balance-detail') renderBalanceDetail();
@@ -2326,6 +2330,26 @@
       current.prizesList.push({ id: crypto.randomUUID(), name: 'Nuevo premio', amount: 0 });
       renderBalancePrizes(current.prizesList);
       setBalanceSummary(current);
+    });
+    $('addAccountingCategory').addEventListener('click', () => {
+      const eventData = activeAccountingEvent();
+      if (!eventData) {
+        alert('No hay eventos disponibles para cargar contable.');
+        return;
+      }
+      saveAccountingFromForm();
+      eventAccounting(eventData).categories.push({ id: crypto.randomUUID(), name: 'Nueva categoria', details: [] });
+      saveEvents();
+      renderAccounting();
+    });
+    $('saveAccounting').addEventListener('click', () => {
+      const eventData = activeAccountingEvent();
+      if (!eventData) {
+        alert('No hay eventos disponibles para guardar contable.');
+        return;
+      }
+      saveAccountingFromForm();
+      alert('Contable guardado.');
     });
     $('balanceForm').addEventListener('submit', event => {
       event.preventDefault();
