@@ -147,6 +147,11 @@
     #page-settings input[type="file"] { padding: 3px; font-size: 11px; }
     .settings-grid { display: grid; grid-template-columns: repeat(6, minmax(95px, 1fr)); gap: 5px; }
     .settings-users { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(120px, 1fr) auto minmax(220px, 2fr); gap: 6px; align-items: end; }
+    .permissions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px; }
+    .permission-card { border: 1px solid var(--line); border-radius: var(--radius); background: #fbfcfa; padding: 8px; display: grid; gap: 6px; }
+    .permission-card strong { font-size: 13px; }
+    .permission-card label { display: flex; align-items: center; gap: 7px; color: var(--ink); }
+    .permission-card input { width: auto; }
     .user-list { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 1px; }
     .user-row { display: inline-flex; justify-content: space-between; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: var(--radius); padding: 5px 6px; background: #fbfcfa; white-space: nowrap; }
     .event-user-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius); background: #fbfcfa; }
@@ -575,6 +580,9 @@
             <button type="button" id="createUser">Crear usuario</button>
             <div id="usersList" class="user-list"></div>
           </div>
+          <hr>
+          <h3>Permisos por funcion</h3>
+          <div id="functionPermissions" class="permissions-grid"></div>
         </section>
       </section>
 
@@ -675,7 +683,10 @@
   <div id="printArea" class="hidden"></div>
 
   <script>
-    const defaultSettings = { font: 'Arial, Helvetica, sans-serif', size: 15, buttonSize: 15, totalSize: 22, brand: '#0f766e', buttonBg: '#0f766e', navButtonBg: '#2b7bbb', navButtonActiveBg: '#0f766e', navButtonColor: '#ffffff', homeCardTitleColor: '#0f766e', membreteColor: '#202426', eventInfoColor: '#667078', eventInfoFont: 'Arial, Helvetica, sans-serif', bg: '#f4f6f2', panel: '#ffffff', splash: '#123f8c', side: '#18312d', radius: '8px', mainLogo: '', mainLogoSize: 180, eventLogoLeft: '', eventLogoRight: '', eventLogoLeftSize: 86, eventLogoRightSize: 86, adminPassword: 'admin123' };
+    const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], balance: [], accounting: [], settings: [] };
+    const functionLabels = { home: 'Inicio', create: 'Crear evento', stats: 'Estadisticas', delete: 'Eliminar evento', events: 'Eventos', balance: 'Balance', accounting: 'Contable', settings: 'Configuraciones' };
+    const userDefaultPages = ['home', 'events', 'balance', 'accounting'];
+    const defaultSettings = { font: 'Arial, Helvetica, sans-serif', size: 15, buttonSize: 15, totalSize: 22, brand: '#0f766e', buttonBg: '#0f766e', navButtonBg: '#2b7bbb', navButtonActiveBg: '#0f766e', navButtonColor: '#ffffff', homeCardTitleColor: '#0f766e', membreteColor: '#202426', eventInfoColor: '#667078', eventInfoFont: 'Arial, Helvetica, sans-serif', bg: '#f4f6f2', panel: '#ffffff', splash: '#123f8c', side: '#18312d', radius: '8px', mainLogo: '', mainLogoSize: 180, eventLogoLeft: '', eventLogoRight: '', eventLogoLeftSize: 86, eventLogoRightSize: 86, adminPassword: 'admin123', functionPermissions: defaultFunctionPermissions };
     let events = [];
     let settings = { ...defaultSettings };
     if (!settings.adminPassword) settings.adminPassword = defaultSettings.adminPassword;
@@ -749,6 +760,7 @@
       events = data.events || [];
       appUsers = data.users || appUsers;
       settings = { ...defaultSettings, ...(data.settings || {}) };
+      settings.functionPermissions = normalizeFunctionPermissions(settings.functionPermissions);
       applySettings();
       renderAll();
     }
@@ -807,6 +819,33 @@
       return Boolean(dateText) && dateText >= accountingWeekStart && dateText <= accountingWeekEnd;
     }
     function isAdmin() { return currentUser?.role === 'admin'; }
+    function normalizeFunctionPermissions(value) {
+      const permissions = Object.fromEntries(Object.keys(defaultFunctionPermissions).map(page => [page, []]));
+      Object.keys(permissions).forEach(page => {
+        permissions[page] = Array.isArray(value?.[page]) ? value[page].filter(Boolean) : [];
+      });
+      return permissions;
+    }
+    function canUsePage(page) {
+      if (isAdmin()) return true;
+      if (page === 'event' || page === 'balance-detail') return true;
+      const permissions = normalizeFunctionPermissions(settings.functionPermissions);
+      const allowed = permissions[page] || [];
+      if (allowed.length) return allowed.map(normalize).includes(normalize(currentUser?.name));
+      return userDefaultPages.includes(page);
+    }
+    function firstAllowedPage() {
+      return ['home', 'events', 'balance', 'accounting', 'stats', 'create', 'delete', 'settings'].find(canUsePage) || 'events';
+    }
+    function selectedFunctionPermissions() {
+      const permissions = Object.fromEntries(Object.keys(defaultFunctionPermissions).map(page => [page, []]));
+      document.querySelectorAll('[data-function-permission]').forEach(input => {
+        const page = input.dataset.functionPermission;
+        if (!permissions[page]) permissions[page] = [];
+        if (input.checked) permissions[page].push(input.value);
+      });
+      return permissions;
+    }
     function selectedUsers() { return [...document.querySelectorAll('[data-event-user]:checked')].map(option => option.value); }
     function selectedPrivateUsers() { return [...document.querySelectorAll('[data-private-user]:checked')].map(option => option.value); }
     function canAccessEvent(event) {
@@ -1036,6 +1075,7 @@
     }
 
     function applySettings() {
+      settings.functionPermissions = normalizeFunctionPermissions(settings.functionPermissions);
       document.documentElement.style.setProperty('--font-family', settings.font);
       document.documentElement.style.setProperty('--font-size', `${settings.size}px`);
       document.documentElement.style.setProperty('--button-font-size', `${settings.buttonSize || defaultSettings.buttonSize}px`);
@@ -1079,11 +1119,13 @@
       setImage($('splashLogoImage'), settings.mainLogo);
       $('splashLogoFallback').classList.toggle('hidden', Boolean(settings.mainLogo));
       setImage($('previewMainLogo'), settings.mainLogo);
+      renderUsers();
     }
 
     function renderUsers() {
       const sortedUsers = appUsers.sort((a, b) => a.name.localeCompare(b.name, 'es'));
       const loginCurrent = $('loginAccount').value;
+      const permissions = normalizeFunctionPermissions(settings.functionPermissions);
       $('loginAccount').innerHTML = '<option value="admin:Administrador">Administrador</option>'
         + sortedUsers.map(user => `<option value="user:${user.name}">${user.name}</option>`).join('');
       $('loginAccount').value = [...$('loginAccount').options].some(option => option.value === loginCurrent) ? loginCurrent : 'admin:Administrador';
@@ -1096,14 +1138,30 @@
       $('usersList').innerHTML = appUsers.length
         ? appUsers.map(user => `<div class="user-row"><strong>${user.name}</strong><button type="button" class="danger" data-delete-user="${user.id}">Eliminar</button></div>`).join('')
         : '<div class="empty">Todavia no hay usuarios creados.</div>';
+      $('functionPermissions').innerHTML = sortedUsers.length
+        ? Object.entries(functionLabels).map(([page, label]) => `
+            <div class="permission-card">
+              <strong>${label}</strong>
+              ${sortedUsers.map(user => {
+                const checked = (permissions[page] || []).map(normalize).includes(normalize(user.name))
+                  || (!(permissions[page] || []).length && userDefaultPages.includes(page));
+                return `<label><input type="checkbox" data-function-permission="${page}" value="${escapeAttr(user.name)}" ${checked ? 'checked' : ''}><span>${escapeAttr(user.name)}</span></label>`;
+              }).join('')}
+            </div>
+          `).join('')
+        : '<div class="empty">Primero crea usuarios para asignar permisos.</div>';
     }
 
     function go(page) {
-      if (!isAdmin() && ['create', 'stats', 'delete', 'settings'].includes(page)) page = 'events';
+      if (!canUsePage(page)) page = firstAllowedPage();
       activePage = page;
       $('appShell').classList.toggle('balance-full', page === 'balance-detail');
       screens.forEach(screen => screen.classList.toggle('hidden', screen.id !== `page-${page}`));
       navButtons.forEach(button => button.classList.toggle('active', button.dataset.page === page));
+      document.querySelectorAll('[data-page], [data-page-shortcut]').forEach(item => {
+        const pageName = item.dataset.page || item.dataset.pageShortcut;
+        item.classList.toggle('hidden', !canUsePage(pageName));
+      });
       renderAll();
     }
 
@@ -1115,8 +1173,8 @@
       $('appShell').classList.toggle('hidden', !splashDone || !logged);
       if (!logged) return;
       $('sessionName').textContent = `${currentUser.name} (${isAdmin() ? 'Administrador' : 'Usuario'})`;
-      document.querySelectorAll('[data-admin-only]').forEach(item => item.classList.toggle('hidden', !isAdmin()));
-      if (!isAdmin() && ['create', 'stats', 'delete', 'settings'].includes(activePage)) activePage = 'events';
+      document.querySelectorAll('[data-admin-only]').forEach(item => item.classList.toggle('hidden', !canUsePage(item.dataset.page || item.dataset.pageShortcut || activePage)));
+      if (!canUsePage(activePage)) activePage = firstAllowedPage();
       go(activePage);
     }
 
@@ -1146,7 +1204,7 @@
         const totals = totalsFor(event.sales || [], event);
         const card = document.createElement('article');
         card.className = 'event-card';
-        card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${event.town}, ${event.province}</span><span>${num(totals.units)} bingos - ${money(totals.sales)}</span></div><div class="actions"><button type="button" data-open-event="${event.id}">Entrar al evento</button>${isAdmin() ? `<button type="button" class="light" data-edit-event="${event.id}">Editar evento</button>` : ''}</div>`;
+        card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${event.town}, ${event.province}</span><span>${num(totals.units)} bingos - ${money(totals.sales)}</span></div><div class="actions"><button type="button" data-open-event="${event.id}">Entrar al evento</button>${canUsePage('create') ? `<button type="button" class="light" data-edit-event="${event.id}">Editar evento</button>` : ''}</div>`;
         list.appendChild(card);
       });
     }
@@ -1203,7 +1261,7 @@
     function renderDeleteList() {
       const list = $('deleteList');
       list.innerHTML = '';
-      if (!isAdmin()) { list.innerHTML = '<div class="empty">Solo el administrador puede eliminar eventos.</div>'; return; }
+      if (!canUsePage('delete')) { list.innerHTML = '<div class="empty">Este usuario no tiene permiso para eliminar eventos.</div>'; return; }
       if (!events.length) { list.innerHTML = '<div class="empty">No hay eventos para eliminar.</div>'; return; }
       events.forEach(event => {
         const card = document.createElement('article');
@@ -1579,7 +1637,7 @@
         return;
       }
       const balance = eventBalance(eventData);
-      const canEditBalance = isAdmin();
+      const canEditBalance = canUsePage('balance');
       $('balanceTitle').textContent = `Balance - ${eventData.name}`;
       $('balanceInfo').textContent = `${eventData.date} - ${eventData.town}, ${eventData.province}`;
       $('balanceUnits').value = Number(balance.units) || 0;
@@ -1612,7 +1670,7 @@
     }
 
     function renderStats() {
-      if (!isAdmin()) return;
+      if (!canUsePage('stats')) return;
       const allSales = events.flatMap(event => (event.sales || []).map(sale => ({ sale, event })));
       const totalSales = allSales.reduce((sum, item) => sum + saleTotal(item.sale, item.event), 0);
       const units = allSales.reduce((sum, item) => sum + rangeCount(item.sale), 0);
@@ -2207,15 +2265,15 @@
         }
       }
       const editEventButton = event.target.closest('[data-edit-event]');
-      if (editEventButton && isAdmin()) editEvent(editEventButton.dataset.editEvent);
+      if (editEventButton && canUsePage('create')) editEvent(editEventButton.dataset.editEvent);
       const del = event.target.closest('[data-delete-event]');
-      if (del && isAdmin() && confirm('Eliminar este evento y todas sus ventas?')) { events = events.filter(e => e.id !== del.dataset.deleteEvent); saveEvents(); renderAll(); }
+      if (del && canUsePage('delete') && confirm('Eliminar este evento y todas sus ventas?')) { events = events.filter(e => e.id !== del.dataset.deleteEvent); saveEvents(); renderAll(); }
       const editLoadButton = event.target.closest('[data-edit-load]');
       if (editLoadButton && isAdmin()) editLoad(editLoadButton.dataset.editLoad);
       const deleteLoadButton = event.target.closest('[data-delete-load]');
       if (deleteLoadButton && isAdmin()) deleteLoad(deleteLoadButton.dataset.deleteLoad);
       const deleteUserButton = event.target.closest('[data-delete-user]');
-      if (deleteUserButton && isAdmin() && confirm('Eliminar este usuario?')) {
+      if (deleteUserButton && canUsePage('settings') && confirm('Eliminar este usuario?')) {
         const user = appUsers.find(item => item.id === deleteUserButton.dataset.deleteUser);
         appUsers = appUsers.filter(item => item.id !== deleteUserButton.dataset.deleteUser);
         if (user) {
@@ -2224,6 +2282,12 @@
             allowedUsers: (eventItem.allowedUsers || []).filter(name => normalize(name) !== normalize(user.name)),
             privateBalanceUsers: (eventItem.privateBalanceUsers || []).filter(name => normalize(name) !== normalize(user.name))
           }));
+          const permissions = normalizeFunctionPermissions(settings.functionPermissions);
+          Object.keys(permissions).forEach(page => {
+            permissions[page] = permissions[page].filter(name => normalize(name) !== normalize(user.name));
+          });
+          settings = { ...settings, functionPermissions: permissions };
+          saveSettingsData();
           saveEvents();
         }
         saveUsers();
@@ -2277,7 +2341,7 @@
 
     $('eventForm').addEventListener('submit', event => {
       event.preventDefault();
-      if (!isAdmin()) return;
+      if (!canUsePage('create')) return;
       const currentEvent = editingEventId ? events.find(eventItem => eventItem.id === editingEventId) : null;
       const eventPayload = {
         name: $('eventName').value.trim(),
@@ -2317,7 +2381,7 @@
     });
 
     $('createUser').addEventListener('click', () => {
-      if (!isAdmin()) return;
+      if (!canUsePage('settings')) return;
       const name = $('newUserName').value.trim();
       const password = $('newUserPassword').value.trim();
       if (!name || !password) {
@@ -2563,7 +2627,8 @@
         mainLogo: pendingLogos.mainLogo || settings.mainLogo || '',
         mainLogoSize: Number($('settingMainLogoSize').value) || defaultSettings.mainLogoSize,
         radius: $('settingRadius').value,
-        adminPassword: $('settingAdminPassword').value || settings.adminPassword
+        adminPassword: $('settingAdminPassword').value || settings.adminPassword,
+        functionPermissions: selectedFunctionPermissions()
       };
       if (!saveSettingsData()) return;
       applySettings();
@@ -2591,6 +2656,8 @@
       $('settingSide').value = defaultSettings.side;
       $('settingRadius').value = defaultSettings.radius;
       $('settingAdminPassword').value = '';
+      settings.functionPermissions = normalizeFunctionPermissions(defaultSettings.functionPermissions);
+      renderUsers();
     });
     [
       ['settingMainLogo', 'previewMainLogo', 'mainLogo'],

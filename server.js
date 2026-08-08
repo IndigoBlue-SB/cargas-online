@@ -11,6 +11,7 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 const BUNDLED_DB_FILE = path.join(ROOT, 'data', 'db.json');
 const BUNDLE_DATA_VERSION = '2026-06-23-03';
 const sessions = new Map();
+const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], balance: [], accounting: [], settings: [] };
 
 const defaultDb = {
   events: [],
@@ -39,7 +40,8 @@ const defaultDb = {
     eventLogoRight: '',
     eventLogoLeftSize: 86,
     eventLogoRightSize: 86,
-    adminPassword: 'admin123'
+    adminPassword: 'admin123',
+    functionPermissions: defaultFunctionPermissions
   }
 };
 
@@ -169,12 +171,30 @@ function requireAdmin(req, res) {
   return session;
 }
 
+function normalize(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizeFunctionPermissions(value) {
+  const permissions = Object.fromEntries(Object.keys(defaultFunctionPermissions).map(page => [page, []]));
+  Object.keys(permissions).forEach(page => {
+    permissions[page] = Array.isArray(value?.[page]) ? value[page].filter(Boolean) : [];
+  });
+  return permissions;
+}
+
+function hasFunctionPermission(session, settings, page) {
+  if (session?.role === 'admin') return true;
+  const permissions = normalizeFunctionPermissions(settings?.functionPermissions);
+  return (permissions[page] || []).map(normalize).includes(normalize(session?.name));
+}
+
 function visibleEventsFor(session, events) {
   if (session.role === 'admin') return events;
   return events.filter(event => {
     const allowedUsers = event.allowedUsers || [];
     return allowedUsers.some(name => (
-      String(name).trim().toLowerCase() === String(session.name).trim().toLowerCase()
+      normalize(name) === normalize(session.name)
     ));
   });
 }
@@ -269,7 +289,7 @@ async function handleApi(req, res) {
   if (url.pathname === '/api/state' && req.method === 'GET') {
     return sendJson(res, 200, {
       events: visibleEventsFor(session, db.events || []),
-      users: session.role === 'admin' ? (db.users || []) : [],
+      users: hasFunctionPermission(session, db.settings, 'settings') ? (db.users || []) : [],
       settings: db.settings || defaultDb.settings
     });
   }
@@ -280,18 +300,31 @@ async function handleApi(req, res) {
       db.events = Array.isArray(body.events) ? body.events : [];
     } else {
       const incoming = Array.isArray(body.events) ? body.events : [];
+      const incomingById = new Map(incoming.map(event => [event.id, event]));
       const allowedIds = new Set(visibleEventsFor(session, db.events || []).map(event => event.id));
+      const canCreate = hasFunctionPermission(session, db.settings, 'create');
+      const canDelete = hasFunctionPermission(session, db.settings, 'delete');
+      const currentIds = new Set((db.events || []).map(event => event.id));
       db.events = (db.events || []).map(event => {
         if (!allowedIds.has(event.id)) return event;
-        return incoming.find(item => item.id === event.id) || event;
-      });
+        if (incomingById.has(event.id)) return incomingById.get(event.id);
+        return canDelete ? null : event;
+      }).filter(Boolean);
+      if (canCreate) {
+        incoming.forEach(event => {
+          if (!event?.id || currentIds.has(event.id)) return;
+          const allowedUsers = Array.isArray(event.allowedUsers) ? event.allowedUsers : [];
+          if (!allowedUsers.map(normalize).includes(normalize(session.name))) allowedUsers.push(session.name);
+          db.events.push({ ...event, allowedUsers, sales: Array.isArray(event.sales) ? event.sales : [] });
+        });
+      }
     }
     writeDb(db);
     return sendJson(res, 200, { ok: true });
   }
 
   if (url.pathname === '/api/users' && req.method === 'PUT') {
-    if (!requireAdmin(req, res)) return;
+    if (!hasFunctionPermission(session, db.settings, 'settings')) return sendJson(res, 403, { error: 'Sin permiso para configuraciones' });
     const body = await readBody(req);
     db.users = Array.isArray(body.users) ? body.users : db.users;
     writeDb(db);
@@ -299,7 +332,7 @@ async function handleApi(req, res) {
   }
 
   if (url.pathname === '/api/settings' && req.method === 'PUT') {
-    if (!requireAdmin(req, res)) return;
+    if (!hasFunctionPermission(session, db.settings, 'settings')) return sendJson(res, 403, { error: 'Sin permiso para configuraciones' });
     const body = await readBody(req);
     db.settings = { ...defaultDb.settings, ...(body.settings || {}) };
     writeDb(db);
