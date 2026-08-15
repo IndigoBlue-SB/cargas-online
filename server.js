@@ -200,6 +200,20 @@ function visibleEventsFor(session, events) {
   });
 }
 
+function isBingoLoadConfirmed(event) {
+  return event?.bingoClosure?.status === 'confirmed';
+}
+
+function protectConfirmedEvent(existing, incoming, session) {
+  if (session.role === 'admin' || !isBingoLoadConfirmed(existing)) return incoming;
+  return {
+    ...incoming,
+    sales: Array.isArray(existing.sales) ? existing.sales : [],
+    bingoSeed: existing.bingoSeed,
+    bingoClosure: existing.bingoClosure
+  };
+}
+
 function contentType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   return {
@@ -295,6 +309,21 @@ async function handleApi(req, res) {
     });
   }
 
+  if (url.pathname === '/api/bingo/confirmed' && req.method === 'GET') {
+    const confirmedEvents = visibleEventsFor(session, db.events || [])
+      .filter(isBingoLoadConfirmed)
+      .map(event => ({
+        id: event.id,
+        name: event.name,
+        date: event.date,
+        town: event.town,
+        province: event.province,
+        bingoSeed: event.bingoSeed,
+        closure: event.bingoClosure
+      }));
+    return sendJson(res, 200, { events: confirmedEvents });
+  }
+
   if (url.pathname === '/api/events' && req.method === 'PUT') {
     const body = await readBody(req);
     if (session.role === 'admin') {
@@ -308,7 +337,7 @@ async function handleApi(req, res) {
       const currentIds = new Set((db.events || []).map(event => event.id));
       db.events = (db.events || []).map(event => {
         if (!allowedIds.has(event.id)) return event;
-        if (incomingById.has(event.id)) return incomingById.get(event.id);
+        if (incomingById.has(event.id)) return protectConfirmedEvent(event, incomingById.get(event.id), session);
         return canDelete ? null : event;
       }).filter(Boolean);
       if (canCreate) {

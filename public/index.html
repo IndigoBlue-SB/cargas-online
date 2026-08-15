@@ -163,6 +163,11 @@
     #activeEventTitle { color: var(--membrete-color); }
     #activeEventInfo { color: var(--event-info-color); font-family: var(--event-info-font-family); }
     .event-logo { object-fit: contain; max-width: 220px; }
+    .bingo-closure-panel { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; background: #fbfcfa; box-shadow: var(--shadow); }
+    .bingo-closure-panel.confirmed { border-color: #0f766e; background: #ecfdf5; }
+    .bingo-closure-panel h3 { margin: 0 0 3px; font-size: 16px; }
+    .bingo-closure-panel p { margin: 0; color: var(--muted); font-size: 13px; }
+    .bingo-closure-panel .actions { justify-content: flex-end; }
     .balance-grid { display: grid; grid-template-columns: minmax(190px, 225px) minmax(420px, 460px) minmax(245px, 1fr) minmax(245px, 1fr); gap: 12px; align-items: start; width: 100%; }
     .balance-accounts, .balance-admins, .balance-main, .balance-side { min-width: 0; }
     .balance-side, .balance-admins { border-left: 1px solid var(--line); padding-left: 8px; display: grid; gap: 5px; }
@@ -673,6 +678,16 @@
           </div>
           <button type="button" class="secondary" data-page-shortcut="events">Volver a eventos</button>
         </div>
+        <div id="bingoClosurePanel" class="bingo-closure-panel">
+          <div>
+            <h3 id="bingoClosureTitle">Carga abierta para bingo</h3>
+            <p id="bingoClosureInfo">La cantidad oficial para Balance, Contable y Bingo se fija al confirmar la carga.</p>
+          </div>
+          <div class="actions">
+            <button type="button" id="confirmBingoLoad">Confirmar carga para bingo</button>
+            <button type="button" class="danger hidden" id="reopenBingoLoad">Reabrir carga</button>
+          </div>
+        </div>
 
         <div class="event-layout">
           <form id="saleForm" class="panel form-grid">
@@ -1008,6 +1023,11 @@
       const [year, month, day] = String(isoDate || '').split('-');
       return year && month && day ? `${day}-${month}-${year.slice(-2)}` : '';
     }
+    function formatDateTime(value) {
+      const date = value ? new Date(value) : null;
+      if (!date || Number.isNaN(date.getTime())) return 'sin fecha';
+      return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getFullYear()).slice(-2)} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    }
     function parseShortDate(value) {
       const clean = String(value || '').trim();
       const match = clean.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2}|\d{4})$/);
@@ -1104,7 +1124,42 @@
     function visibleEvents() { return events.filter(canAccessEvent); }
     function activeEvent() { return events.find(event => event.id === activeEventId); }
     function activeBalanceEvent() { return events.find(event => event.id === activeBalanceEventId); }
+    function clonePlain(value) { return JSON.parse(JSON.stringify(value)); }
     function rangeCount(item) { const d = Number(item.desde) || 0; const h = Number(item.hasta) || 0; return h >= d ? h - d + 1 : 0; }
+    function unitsFromSales(sales = []) {
+      const units = new Set();
+      sales.forEach(sale => {
+        const desde = Number(sale.desde) || 0;
+        const hasta = Number(sale.hasta) || 0;
+        if (!desde || !hasta) return;
+        const start = Math.min(desde, hasta);
+        const end = Math.max(desde, hasta);
+        for (let unit = start; unit <= end; unit += 1) units.add(unit);
+      });
+      return [...units].sort((a, b) => a - b);
+    }
+    function ensureBingoControl(eventData) {
+      if (!eventData) return null;
+      if (!eventData.bingoSeed) eventData.bingoSeed = crypto.randomUUID();
+      if (!eventData.bingoClosure) eventData.bingoClosure = { status: 'open' };
+      if (!eventData.bingoClosure.status) eventData.bingoClosure.status = 'open';
+      return eventData.bingoClosure;
+    }
+    function isBingoLoadConfirmed(eventData) {
+      return ensureBingoControl(eventData)?.status === 'confirmed';
+    }
+    function officialSales(eventData) {
+      const closure = ensureBingoControl(eventData);
+      return closure?.status === 'confirmed' && Array.isArray(closure.snapshotSales)
+        ? closure.snapshotSales
+        : (eventData?.sales || []);
+    }
+    function officialSoldUnits(eventData) {
+      const closure = ensureBingoControl(eventData);
+      return closure?.status === 'confirmed' && Array.isArray(closure.soldUnits)
+        ? closure.soldUnits
+        : unitsFromSales(eventData?.sales || []);
+    }
     function saleTotal(item, event = activeEvent()) { return rangeCount(item) * (Number(event?.price) || 0); }
     function pct(amount, percent) { return (Number(amount) || 0) * (Number(percent) || 0) / 100; }
     function saleSellerPercent(sale, event = activeEvent()) {
@@ -1165,7 +1220,7 @@
     }
     function automaticBalanceAdmins(eventData) {
       const groups = new Map();
-      groupLoads(eventData.sales || [], eventData).forEach(load => {
+      groupLoads(officialSales(eventData), eventData).forEach(load => {
         const name = String(load.adminName || '').trim();
         if (!name) return;
         const paidUnits = Math.max((Number(load.units) || 0) - (Number(load.freeUnits) || 0), 0);
@@ -1196,7 +1251,7 @@
       };
     }
     function eventSoldUnits(eventData) {
-      return (eventData.sales || []).reduce((sum, sale) => sum + rangeCount(sale), 0);
+      return officialSoldUnits(eventData).length;
     }
     function eventBalance(eventData) {
       const soldUnits = eventSoldUnits(eventData);
@@ -1450,10 +1505,11 @@
       list.innerHTML = '';
       if (!availableEvents.length) { list.innerHTML = '<div class="empty">No hay eventos disponibles para este usuario.</div>'; return; }
       availableEvents.forEach(event => {
-        const totals = totalsFor(event.sales || [], event);
+        const totals = totalsFor(officialSales(event), event);
+        const status = isBingoLoadConfirmed(event) ? '<span>Carga confirmada</span>' : '<span>Carga abierta</span>';
         const card = document.createElement('article');
         card.className = 'event-card';
-        card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${event.town}, ${event.province}</span><span>${num(totals.units)} bingos - ${money(totals.sales)}</span></div><div class="actions"><button type="button" data-open-event="${event.id}">Entrar al evento</button>${canUsePage('create') ? `<button type="button" class="light" data-edit-event="${event.id}">Editar evento</button>` : ''}</div>`;
+        card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${event.town}, ${event.province}</span><span>${num(totals.units)} bingos - ${money(totals.sales)}</span>${status}</div><div class="actions"><button type="button" data-open-event="${event.id}">Entrar al evento</button>${canUsePage('create') ? `<button type="button" class="light" data-edit-event="${event.id}">Editar evento</button>` : ''}</div>`;
         list.appendChild(card);
       });
     }
@@ -1513,9 +1569,10 @@
       if (!canUsePage('delete')) { list.innerHTML = '<div class="empty">Este usuario no tiene permiso para eliminar eventos.</div>'; return; }
       if (!events.length) { list.innerHTML = '<div class="empty">No hay eventos para eliminar.</div>'; return; }
       events.forEach(event => {
+        const sales = officialSales(event);
         const card = document.createElement('article');
         card.className = 'event-card';
-        card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${event.sales?.length || 0} cargas guardadas</span></div><button type="button" class="danger" data-delete-event="${event.id}">Eliminar evento</button>`;
+        card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${sales.length || 0} cargas guardadas</span><span>${isBingoLoadConfirmed(event) ? 'Carga confirmada' : 'Carga abierta'}</span></div><button type="button" class="danger" data-delete-event="${event.id}">Eliminar evento</button>`;
         list.appendChild(card);
       });
     }
@@ -1527,7 +1584,7 @@
       const availableEvents = visibleEvents();
       if (!availableEvents.length) { list.innerHTML = '<div class="empty">No hay eventos disponibles para este usuario.</div>'; return; }
       availableEvents.forEach(event => {
-        const totals = totalsFor(event.sales || [], event);
+        const totals = totalsFor(officialSales(event), event);
         const balance = eventBalance(event);
         const bTotals = balanceTotals(balance);
         const visibleResult = canSeePrivateBalance(event) ? bTotals.result : bTotals.subtotal;
@@ -1575,12 +1632,16 @@
     }
     function accountingSalesForWeek(eventData) {
       ensureAccountingWeek();
-      return (eventData.sales || []).filter(sale => dateInAccountingWeek(saleDate(sale)));
+      return officialSales(eventData).filter(sale => dateInAccountingWeek(saleDate(sale)));
     }
     function accountingEventForWeek(eventData) {
+      const sales = accountingSalesForWeek(eventData);
       return {
         ...eventData,
-        sales: accountingSalesForWeek(eventData),
+        sales,
+        bingoClosure: isBingoLoadConfirmed(eventData)
+          ? { ...(eventData.bingoClosure || {}), soldUnits: unitsFromSales(sales), snapshotSales: sales }
+          : eventData.bingoClosure,
         balance: eventData.balance ? { ...eventData.balance } : null
       };
     }
@@ -1975,10 +2036,10 @@
 
     function renderStats() {
       if (!canUsePage('stats')) return;
-      const allSales = events.flatMap(event => (event.sales || []).map(sale => ({ sale, event })));
+      const allSales = events.flatMap(event => officialSales(event).map(sale => ({ sale, event })));
       const totalSales = allSales.reduce((sum, item) => sum + saleTotal(item.sale, item.event), 0);
       const units = allSales.reduce((sum, item) => sum + rangeCount(item.sale), 0);
-      const commissions = events.reduce((sum, event) => sum + groupLoads(event.sales || [], event).reduce((loadSum, load) => {
+      const commissions = events.reduce((sum, event) => sum + groupLoads(officialSales(event), event).reduce((loadSum, load) => {
         const financials = loadFinancials(load, event);
         return loadSum + financials.sellerCommission + financials.adminCommission;
       }, 0), 0);
@@ -1989,14 +2050,15 @@
       $('statsCount').textContent = `${events.length} eventos`;
       $('statsHead').innerHTML = '<tr><th>Evento</th><th>Fecha</th><th>Localidad</th><th>Provincia</th><th>Cargas</th><th>Bingos</th><th>Total</th><th>Comisiones</th></tr>';
       $('statsTable').innerHTML = events.map(event => {
-        const totals = totalsFor(event.sales || [], event);
-        return `<tr><td><strong>${event.name}</strong></td><td>${event.date}</td><td>${event.town}</td><td>${event.province}</td><td>${event.sales?.length || 0}</td><td>${num(totals.units)}</td><td>${money(totals.sales)}</td><td>${money(totals.seller + totals.admin)}</td></tr>`;
+        const sales = officialSales(event);
+        const totals = totalsFor(sales, event);
+        return `<tr><td><strong>${event.name}</strong></td><td>${event.date}</td><td>${event.town}</td><td>${event.province}</td><td>${sales.length || 0}</td><td>${num(totals.units)}</td><td>${money(totals.sales)}</td><td>${money(totals.seller + totals.admin)}</td></tr>`;
       }).join('');
     }
 
     function eventSales() {
       const event = activeEvent();
-      return event?.sales || [];
+      return officialSales(event);
     }
 
     function uniqueSales(key) {
@@ -2088,6 +2150,8 @@
       setImage($('eventLogoRight'), event.eventLogoRight || '');
       $('eventLogoLeft').style.width = `${event.eventLogoLeftSize || defaultSettings.eventLogoLeftSize}px`;
       $('eventLogoRight').style.width = `${event.eventLogoRightSize || defaultSettings.eventLogoRightSize}px`;
+      ensureBingoControl(event);
+      renderBingoClosure(event);
       fields.localidad.placeholder = event.town;
       fields.provincia.placeholder = event.province;
       fields.vendedor.readOnly = false;
@@ -2109,6 +2173,29 @@
       renderSalesTable(items);
     }
 
+    function renderBingoClosure(event) {
+      const closure = ensureBingoControl(event);
+      const confirmed = closure.status === 'confirmed';
+      const officialUnits = officialSoldUnits(event);
+      $('bingoClosurePanel').classList.toggle('confirmed', confirmed);
+      $('bingoClosureTitle').textContent = confirmed ? 'Carga confirmada para bingo' : 'Carga abierta para bingo';
+      $('bingoClosureInfo').textContent = confirmed
+        ? `${num(officialUnits.length)} series/cartones oficiales. Confirmo ${closure.confirmedBy || 'Sin usuario'} el ${formatDateTime(closure.confirmedAt)}. Semilla oficial: ${event.bingoSeed}.`
+        : `${num(unitsFromSales(event.sales || []).length)} series/cartones cargados. Al confirmar, esta cantidad se usa para Balance, Contable y Bingo. Semilla oficial: ${event.bingoSeed}.`;
+      $('confirmBingoLoad').classList.toggle('hidden', confirmed);
+      $('confirmBingoLoad').disabled = confirmed || !unitsFromSales(event.sales || []).length;
+      $('reopenBingoLoad').classList.toggle('hidden', !confirmed || !isAdmin());
+      const formDisabled = confirmed;
+      $('saleForm').querySelectorAll('input, button').forEach(control => {
+        control.disabled = formDisabled;
+      });
+      if (confirmed) {
+        $('saveSaleButton').textContent = 'Carga confirmada';
+      } else if (!editingLoadId) {
+        $('saveSaleButton').textContent = 'Guardar carga del vendedor';
+      }
+    }
+
     function renderSalesTable(items) {
       $('salesTable').innerHTML = '';
       if (currentView === 'detalle') {
@@ -2117,10 +2204,11 @@
         $('emptyState').classList.toggle('hidden', loads.length > 0);
         $('visibleCount').textContent = `${loads.length} ${loads.length === 1 ? 'carga' : 'cargas'}`;
         $('tableTitle').textContent = 'Ventas cargadas';
-        $('tableHead').innerHTML = `<tr><th>Vendedor/a</th><th>Cant.</th><th>Sin cargo</th><th>Ingresos</th><th>Com. venta</th><th>Admin.</th><th>Importe</th><th>Pago</th><th>Localidad</th><th>Provincia</th>${isAdmin() ? '<th></th>' : ''}</tr>`;
+        const canModifyLoads = isAdmin() && !isBingoLoadConfirmed(event);
+        $('tableHead').innerHTML = `<tr><th>Vendedor/a</th><th>Cant.</th><th>Sin cargo</th><th>Ingresos</th><th>Com. venta</th><th>Admin.</th><th>Importe</th><th>Pago</th><th>Localidad</th><th>Provincia</th>${canModifyLoads ? '<th></th>' : ''}</tr>`;
         $('salesTable').innerHTML = loads.map(load => {
           const { income, sellerCommission, adminCommission, netAmount } = loadFinancials(load, event);
-          return `<tr><td><strong>${load.seller}</strong></td><td>${num(load.units)}</td><td>${num(load.freeUnits)}</td><td>${money(income)}</td><td>${money(sellerCommission)}</td><td>${adminCellText(load.adminName, adminCommission)}</td><td>${money(netAmount)}</td><td>${paymentLabel(load)}</td><td>${load.town}</td><td>${load.province}</td>${isAdmin() ? `<td><div class="table-actions"><button type="button" class="light" data-edit-load="${load.id}">Editar</button><button type="button" class="danger" data-delete-load="${load.id}">Eliminar</button></div></td>` : ''}</tr>`;
+          return `<tr><td><strong>${load.seller}</strong></td><td>${num(load.units)}</td><td>${num(load.freeUnits)}</td><td>${money(income)}</td><td>${money(sellerCommission)}</td><td>${adminCellText(load.adminName, adminCommission)}</td><td>${money(netAmount)}</td><td>${paymentLabel(load)}</td><td>${load.town}</td><td>${load.province}</td>${canModifyLoads ? `<td><div class="table-actions"><button type="button" class="light" data-edit-load="${load.id}">Editar</button><button type="button" class="danger" data-delete-load="${load.id}">Eliminar</button></div></td>` : ''}</tr>`;
         }).join('');
         return;
       }
@@ -2189,6 +2277,7 @@
     function editLoad(loadId) {
       const eventData = activeEvent();
       if (!eventData) return;
+      if (isBingoLoadConfirmed(eventData)) return alert('La carga esta confirmada para bingo. Reabrila antes de editar.');
       const loadSales = eventData.sales.filter(sale => (sale.batchId || sale.id) === loadId);
       if (!loadSales.length) return;
       const first = loadSales[0];
@@ -2220,6 +2309,7 @@
     function deleteLoad(loadId) {
       const eventData = activeEvent();
       if (!eventData) return;
+      if (isBingoLoadConfirmed(eventData)) return alert('La carga esta confirmada para bingo. Reabrila antes de eliminar.');
       if (!confirm('Eliminar esta carga?')) return;
       eventData.sales = eventData.sales.filter(sale => (sale.batchId || sale.id) !== loadId);
       if (editingLoadId === loadId) resetSaleForm();
@@ -2227,6 +2317,49 @@
       renderActiveEvent();
       renderStats();
       renderEventCards();
+    }
+
+    function confirmBingoLoad() {
+      const eventData = activeEvent();
+      if (!eventData) return;
+      ensureBingoControl(eventData);
+      const soldUnits = unitsFromSales(eventData.sales || []);
+      if (!soldUnits.length) return alert('No hay series/cartones cargados para confirmar.');
+      const message = `Confirmar ${num(soldUnits.length)} series/cartones para Balance, Contable y Bingo? Luego la carga queda bloqueada.`;
+      if (!confirm(message)) return;
+      eventData.bingoClosure = {
+        status: 'confirmed',
+        confirmedAt: new Date().toISOString(),
+        confirmedBy: currentUser?.name || (isAdmin() ? 'Administrador' : 'Usuario'),
+        mode: 'series',
+        soldUnits,
+        soldCardsCount: soldUnits.length,
+        snapshotSales: clonePlain(eventData.sales || [])
+      };
+      saveEvents();
+      resetSaleForm();
+      renderActiveEvent();
+      renderBalanceEvents();
+      renderAccounting();
+      renderStats();
+    }
+
+    function reopenBingoLoad() {
+      const eventData = activeEvent();
+      if (!eventData || !isAdmin()) return;
+      if (!isBingoLoadConfirmed(eventData)) return;
+      if (!confirm('Reabrir esta carga? Los usuarios podran modificarla nuevamente hasta que se confirme otra vez.')) return;
+      eventData.bingoClosure = {
+        ...(eventData.bingoClosure || {}),
+        status: 'open',
+        reopenedAt: new Date().toISOString(),
+        reopenedBy: currentUser?.name || 'Administrador'
+      };
+      saveEvents();
+      renderActiveEvent();
+      renderBalanceEvents();
+      renderAccounting();
+      renderStats();
     }
 
     function updateExportValues() {
@@ -2592,9 +2725,17 @@
       const del = event.target.closest('[data-delete-event]');
       if (del && canUsePage('delete') && confirm('Eliminar este evento y todas sus ventas?')) { events = events.filter(e => e.id !== del.dataset.deleteEvent); saveEvents(); renderAll(); }
       const editLoadButton = event.target.closest('[data-edit-load]');
-      if (editLoadButton && isAdmin()) editLoad(editLoadButton.dataset.editLoad);
+      if (editLoadButton && isAdmin()) {
+        const eventData = activeEvent();
+        if (isBingoLoadConfirmed(eventData)) return alert('La carga esta confirmada para bingo. Reabrila antes de editar.');
+        editLoad(editLoadButton.dataset.editLoad);
+      }
       const deleteLoadButton = event.target.closest('[data-delete-load]');
       if (deleteLoadButton && isAdmin()) deleteLoad(deleteLoadButton.dataset.deleteLoad);
+      const confirmBingoButton = event.target.closest('#confirmBingoLoad');
+      if (confirmBingoButton) confirmBingoLoad();
+      const reopenBingoButton = event.target.closest('#reopenBingoLoad');
+      if (reopenBingoButton) reopenBingoLoad();
       const deleteUserButton = event.target.closest('[data-delete-user]');
       if (deleteUserButton && canUsePage('settings') && confirm('Eliminar este usuario?')) {
         const user = appUsers.find(item => item.id === deleteUserButton.dataset.deleteUser);
@@ -2692,6 +2833,8 @@
         const newEvent = {
           id: crypto.randomUUID(),
           createdAt: Date.now(),
+          bingoSeed: crypto.randomUUID(),
+          bingoClosure: { status: 'open' },
           ...eventPayload,
           sales: []
         };
@@ -2726,6 +2869,11 @@
       event.preventDefault();
       const eventData = activeEvent();
       if (!eventData) return;
+      if (isBingoLoadConfirmed(eventData)) {
+        alert('La carga esta confirmada para bingo. Reabrila antes de modificar ventas.');
+        renderActiveEvent();
+        return;
+      }
       if ((fields.desde.value || fields.hasta.value) && !addDraftRange()) return;
       if (!draftRanges.length) { alert('Agregue al menos un rango a la lista previa.'); fields.desde.focus(); return; }
       const previousLoad = editingLoadId ? eventData.sales.find(sale => (sale.batchId || sale.id) === editingLoadId) : null;
