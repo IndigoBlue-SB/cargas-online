@@ -224,8 +224,8 @@ button:disabled {
   font-size: var(--game-title-size);
   text-align: left;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  line-height: 1.05;
 }
 
 .game-brand-main .eyebrow {
@@ -318,7 +318,7 @@ h2 {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(320px, var(--number-board-fr, 0.88fr)) minmax(220px, 1fr);
+  grid-template-columns: minmax(220px, 0.72fr) minmax(430px, var(--number-board-fr, 1.5fr)) minmax(220px, 0.72fr);
   gap: 10px;
   align-items: start;
   min-width: 0;
@@ -2280,7 +2280,7 @@ dialog::backdrop {
   }
 
   .dashboard-grid {
-    grid-template-columns: minmax(190px, 1fr) minmax(0, var(--number-board-fr, 0.88fr)) minmax(210px, 1fr);
+    grid-template-columns: minmax(190px, 0.72fr) minmax(410px, var(--number-board-fr, 1.5fr)) minmax(210px, 0.72fr);
     gap: 10px;
     height: 100%;
     align-items: stretch;

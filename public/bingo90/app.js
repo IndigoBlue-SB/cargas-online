@@ -1901,7 +1901,7 @@ function previewProjectionCard() {
 function readBoardVisualSettingsFromForm() {
   state.visualSettings.bingoLogoSize = clamp(Number(els.eventBingoLogoSizeInput.value) || 158, 60, 360);
   state.visualSettings.indigoLogoSize = clamp(Number(els.eventIndigoLogoSizeInput.value) || 118, 60, 320);
-  state.visualSettings.boardPanelWidth = clamp(Number(els.eventBoardPanelWidthInput.value) || 88, 55, 120);
+  state.visualSettings.boardPanelWidth = clamp(Number(els.eventBoardPanelWidthInput.value) || 150, 100, 220);
   state.visualSettings.boardFontFamily = els.eventBoardFontFamilyInput.value;
   state.visualSettings.boardFontSize = clamp(Number(els.eventBoardFontSizeInput.value) || 22, 12, 260);
   state.visualSettings.sideTitleSize = clamp(Number(els.eventSideTitleSizeInput.value) || 19, 12, 120);
@@ -5013,7 +5013,7 @@ function createDefaultVisualSettings() {
     indigoLogoSize: 118,
     ballImageKeys: {},
     ballImageSetName: "",
-    boardPanelWidth: 88,
+    boardPanelWidth: 150,
     boardFontFamily: "Arial, Helvetica, sans-serif",
     boardFontSize: 22,
     sideTitleSize: 19,
@@ -5057,7 +5057,9 @@ function applyVisualSettings() {
   document.documentElement.style.setProperty("--screen-margin-right", `${state.visualSettings.screenMarginRight}px`);
   document.documentElement.style.setProperty("--bingo-logo-size", `${state.visualSettings.bingoLogoSize}px`);
   document.documentElement.style.setProperty("--indigo-logo-size", `${state.visualSettings.indigoLogoSize}px`);
-  document.documentElement.style.setProperty("--number-board-fr", `${state.visualSettings.boardPanelWidth / 100}fr`);
+  const boardPanelWidth = Number(state.visualSettings.boardPanelWidth) < 100 ? 150 : state.visualSettings.boardPanelWidth;
+  state.visualSettings.boardPanelWidth = boardPanelWidth;
+  document.documentElement.style.setProperty("--number-board-fr", `${boardPanelWidth / 100}fr`);
   document.documentElement.style.setProperty("--board-font-family", state.visualSettings.boardFontFamily);
   document.documentElement.style.setProperty("--board-font-size", `${state.visualSettings.boardFontSize}px`);
   document.documentElement.style.setProperty("--side-title-size", `${state.visualSettings.sideTitleSize}px`);
