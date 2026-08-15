@@ -1,12 +1,13 @@
 {
-  "name": "Cargas",
+  "name": "Cargas Online",
   "short_name": "Cargas",
-  "description": "Control de cargas y ventas de bingos por evento.",
-  "start_url": "/",
+  "description": "Control online de eventos, ventas, balances y contable.",
+  "start_url": "/?app=pwa",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f4f6f2",
   "theme_color": "#0f766e",
+  "id": "/",
   "orientation": "landscape",
   "icons": [
     {
