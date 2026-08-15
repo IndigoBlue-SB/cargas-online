@@ -3172,6 +3172,7 @@ function resetGame() {
 }
 
 function fillEventDialog(options = {}) {
+  state.visualSettings = normalizeVisualSettings(state.visualSettings);
   if (options.blank) activateEventTab("general");
   els.saveEventBtn.textContent = options.blank ? "Generar evento" : "Guardar cambios";
   els.eventNameInput.value = options.blank ? "" : state.eventName;
@@ -4286,7 +4287,7 @@ function loadEvent(eventId, options = {}) {
   state.prizeAmounts = { ...state.prizeAmounts, ...(event.prizeAmounts || {}) };
   state.prizeSettings = normalizePrizeSettings({ ...state.prizeSettings, ...(event.prizeSettings || {}) });
   state.cardDesign = { ...state.cardDesign, ...(event.cardDesign || {}) };
-  state.visualSettings = { ...createDefaultVisualSettings(), ...(event.visualSettings || {}) };
+  state.visualSettings = normalizeVisualSettings(event.visualSettings || {});
   state.stripDesign = { ...createDefaultStripDesign(), ...(event.stripDesign || {}) };
   persistStripDesignDraft();
   state.projectionSettings = normalizeProjectionSettings(event.projectionSettings || {});
@@ -4325,10 +4326,7 @@ function applyDesignFromEvent(sourceEvent) {
     ...state.cardDesign,
     ...clonePlain(sourceEvent.cardDesign || {}),
   };
-  state.visualSettings = {
-    ...createDefaultVisualSettings(),
-    ...clonePlain(sourceEvent.visualSettings || {}),
-  };
+  state.visualSettings = normalizeVisualSettings(clonePlain(sourceEvent.visualSettings || {}));
   state.stripDesign = {
     ...createDefaultStripDesign(),
     ...clonePlain(sourceEvent.stripDesign || {}),
@@ -5045,8 +5043,19 @@ function createDefaultVisualSettings() {
   };
 }
 
+function normalizeVisualSettings(settings = {}) {
+  const next = { ...createDefaultVisualSettings(), ...settings };
+  next.bingoLogoSize = Number(next.bingoLogoSize) < 60 ? 158 : clamp(Number(next.bingoLogoSize) || 158, 60, 360);
+  next.indigoLogoSize = Number(next.indigoLogoSize) < 60 ? 118 : clamp(Number(next.indigoLogoSize) || 118, 60, 320);
+  next.boardPanelWidth = Number(next.boardPanelWidth) < 100 ? 150 : clamp(Number(next.boardPanelWidth) || 150, 100, 220);
+  next.boardFontSize = clamp(Number(next.boardFontSize) || 22, 12, 260);
+  next.sideTitleSize = clamp(Number(next.sideTitleSize) || 19, 12, 120);
+  next.sideTextSize = clamp(Number(next.sideTextSize) || 16, 12, 120);
+  return next;
+}
+
 function applyVisualSettings() {
-  state.visualSettings = { ...createDefaultVisualSettings(), ...state.visualSettings };
+  state.visualSettings = normalizeVisualSettings(state.visualSettings);
   document.documentElement.style.setProperty("--accent", state.visualSettings.accentColor);
   document.documentElement.style.setProperty("--panel", state.visualSettings.panelColor);
   document.documentElement.style.setProperty("--last-ball-size", `${state.visualSettings.ballSize}px`);
@@ -5057,9 +5066,7 @@ function applyVisualSettings() {
   document.documentElement.style.setProperty("--screen-margin-right", `${state.visualSettings.screenMarginRight}px`);
   document.documentElement.style.setProperty("--bingo-logo-size", `${state.visualSettings.bingoLogoSize}px`);
   document.documentElement.style.setProperty("--indigo-logo-size", `${state.visualSettings.indigoLogoSize}px`);
-  const boardPanelWidth = Number(state.visualSettings.boardPanelWidth) < 100 ? 150 : state.visualSettings.boardPanelWidth;
-  state.visualSettings.boardPanelWidth = boardPanelWidth;
-  document.documentElement.style.setProperty("--number-board-fr", `${boardPanelWidth / 100}fr`);
+  document.documentElement.style.setProperty("--number-board-fr", `${state.visualSettings.boardPanelWidth / 100}fr`);
   document.documentElement.style.setProperty("--board-font-family", state.visualSettings.boardFontFamily);
   document.documentElement.style.setProperty("--board-font-size", `${state.visualSettings.boardFontSize}px`);
   document.documentElement.style.setProperty("--side-title-size", `${state.visualSettings.sideTitleSize}px`);
