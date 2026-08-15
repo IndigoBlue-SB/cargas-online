@@ -248,12 +248,12 @@ button:disabled {
 }
 
 .bingo-logo-slot {
-  min-height: 170px;
+  min-height: calc(var(--bingo-logo-size, 158px) + 12px);
   margin-bottom: 8px;
 }
 
 .indigo-logo-slot {
-  min-height: 130px;
+  min-height: calc(var(--indigo-logo-size, 118px) + 12px);
   margin-bottom: 8px;
 }
 
@@ -266,11 +266,11 @@ button:disabled {
 }
 
 .bingo-logo-slot img {
-  max-height: 158px;
+  max-height: var(--bingo-logo-size, 158px);
 }
 
 .indigo-logo-slot img {
-  max-height: 118px;
+  max-height: var(--indigo-logo-size, 118px);
 }
 
 .game-logo-slot.has-logo {
@@ -318,7 +318,7 @@ h2 {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(220px, 360px);
+  grid-template-columns: minmax(220px, 1fr) minmax(320px, var(--number-board-fr, 0.88fr)) minmax(220px, 1fr);
   gap: 10px;
   align-items: start;
   min-width: 0;
@@ -339,6 +339,7 @@ h2 {
 .result-panel {
   padding: 10px;
   color: var(--panel-text-color);
+  font-size: var(--side-text-size, 16px);
 }
 
 .main-board {
@@ -1023,6 +1024,7 @@ select {
 .panel-section h2,
 .result-panel h2 {
   color: var(--panel-heading-color);
+  font-size: var(--side-title-size, 19px);
 }
 
 .number-board {
@@ -1043,7 +1045,7 @@ select {
   background: var(--board-button-color, rgba(255, 255, 255, 0.04));
   box-shadow: 0 10px 18px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   font-family: var(--board-font-family, Arial, Helvetica, sans-serif);
-  font-size: var(--board-font-size, 22px);
+  font-size: min(var(--board-font-size, 22px), 8vw, 9vh);
   font-weight: 700;
 }
 
@@ -2229,20 +2231,20 @@ dialog::backdrop {
   }
 
   .game-logo-slot img {
-    max-height: 84px;
+    max-height: min(var(--bingo-logo-size, 84px), 18vh);
   }
 
   .bingo-logo-slot {
-    min-height: clamp(128px, 21vh, 160px);
+    min-height: min(calc(var(--bingo-logo-size, 158px) + 12px), 24vh);
     margin-bottom: 6px;
   }
 
   .bingo-logo-slot img {
-    max-height: clamp(120px, 20vh, 152px);
+    max-height: min(var(--bingo-logo-size, 158px), 23vh);
   }
 
   .indigo-logo-slot {
-    min-height: clamp(82px, 14vh, 118px);
+    min-height: min(calc(var(--indigo-logo-size, 118px) + 12px), 18vh);
     margin-bottom: 6px;
   }
 
@@ -2253,7 +2255,7 @@ dialog::backdrop {
   .indigo-logo-slot img {
     width: auto;
     max-width: 100%;
-    max-height: clamp(76px, 13vh, 108px);
+    max-height: min(var(--indigo-logo-size, 118px), 17vh);
     object-position: center;
   }
 
@@ -2278,7 +2280,7 @@ dialog::backdrop {
   }
 
   .dashboard-grid {
-    grid-template-columns: clamp(190px, 18vw, 250px) minmax(0, 1fr) clamp(210px, 19vw, 250px);
+    grid-template-columns: minmax(190px, 1fr) minmax(0, var(--number-board-fr, 0.88fr)) minmax(210px, 1fr);
     gap: 10px;
     height: 100%;
     align-items: stretch;
@@ -2297,6 +2299,7 @@ dialog::backdrop {
     min-height: 0;
     overflow: hidden;
     padding: 8px;
+    font-size: min(var(--side-text-size, 16px), 3.2vh, 2vw);
   }
 
   .control-panel {
@@ -2343,7 +2346,7 @@ dialog::backdrop {
   .panel-section h2,
   .board-header h2 {
     margin-bottom: 4px;
-    font-size: 14px;
+    font-size: min(var(--side-title-size, 19px), 3.8vh, 2.4vw);
   }
 
   .live-ball-panel {
@@ -2403,7 +2406,7 @@ dialog::backdrop {
   label,
   .winner-item span,
   .saved-event-item span {
-    font-size: 12px;
+    font-size: min(max(12px, calc(var(--side-text-size, 16px) * 0.78)), 2.6vh, 1.7vw);
   }
 
   .current-prize-box {

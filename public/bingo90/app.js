@@ -251,12 +251,17 @@ const els = {
   eventScreenMarginRightInput: document.querySelector("#eventScreenMarginRightInput"),
   eventBingoLogoInput: document.querySelector("#eventBingoLogoInput"),
   eventBingoLogoStatus: document.querySelector("#eventBingoLogoStatus"),
+  eventBingoLogoSizeInput: document.querySelector("#eventBingoLogoSizeInput"),
   eventIndigoLogoInput: document.querySelector("#eventIndigoLogoInput"),
   eventIndigoLogoStatus: document.querySelector("#eventIndigoLogoStatus"),
+  eventIndigoLogoSizeInput: document.querySelector("#eventIndigoLogoSizeInput"),
   eventBallImagesInput: document.querySelector("#eventBallImagesInput"),
   eventBallImagesStatus: document.querySelector("#eventBallImagesStatus"),
+  eventBoardPanelWidthInput: document.querySelector("#eventBoardPanelWidthInput"),
   eventBoardFontFamilyInput: document.querySelector("#eventBoardFontFamilyInput"),
   eventBoardFontSizeInput: document.querySelector("#eventBoardFontSizeInput"),
+  eventSideTitleSizeInput: document.querySelector("#eventSideTitleSizeInput"),
+  eventSideTextSizeInput: document.querySelector("#eventSideTextSizeInput"),
   eventBoardButtonColorInput: document.querySelector("#eventBoardButtonColorInput"),
   eventBoardTextColorInput: document.querySelector("#eventBoardTextColorInput"),
   eventBoardDrawnColorInput: document.querySelector("#eventBoardDrawnColorInput"),
@@ -519,8 +524,13 @@ function bindEvents() {
   els.eventIndigoLogoInput.addEventListener("change", () => handleEventLogoSelection("indigo"));
   els.eventBallImagesInput.addEventListener("change", handleBallImagesFolderSelection);
   [
+    els.eventBingoLogoSizeInput,
+    els.eventIndigoLogoSizeInput,
+    els.eventBoardPanelWidthInput,
     els.eventBoardFontFamilyInput,
     els.eventBoardFontSizeInput,
+    els.eventSideTitleSizeInput,
+    els.eventSideTextSizeInput,
     els.eventBoardButtonColorInput,
     els.eventBoardTextColorInput,
     els.eventBoardDrawnColorInput,
@@ -1889,8 +1899,13 @@ function previewProjectionCard() {
 }
 
 function readBoardVisualSettingsFromForm() {
+  state.visualSettings.bingoLogoSize = clamp(Number(els.eventBingoLogoSizeInput.value) || 158, 60, 360);
+  state.visualSettings.indigoLogoSize = clamp(Number(els.eventIndigoLogoSizeInput.value) || 118, 60, 320);
+  state.visualSettings.boardPanelWidth = clamp(Number(els.eventBoardPanelWidthInput.value) || 88, 55, 120);
   state.visualSettings.boardFontFamily = els.eventBoardFontFamilyInput.value;
-  state.visualSettings.boardFontSize = clamp(Number(els.eventBoardFontSizeInput.value) || 22, 12, 200);
+  state.visualSettings.boardFontSize = clamp(Number(els.eventBoardFontSizeInput.value) || 22, 12, 260);
+  state.visualSettings.sideTitleSize = clamp(Number(els.eventSideTitleSizeInput.value) || 19, 12, 120);
+  state.visualSettings.sideTextSize = clamp(Number(els.eventSideTextSizeInput.value) || 16, 12, 120);
   state.visualSettings.boardButtonColor = els.eventBoardButtonColorInput.value;
   state.visualSettings.boardTextColor = els.eventBoardTextColorInput.value;
   state.visualSettings.boardDrawnColor = els.eventBoardDrawnColorInput.value;
@@ -3176,12 +3191,17 @@ function fillEventDialog(options = {}) {
   els.eventBingoLogoStatus.textContent = state.visualSettings.bingoLogoName
     ? `Logo cargado: ${state.visualSettings.bingoLogoName}`
     : "Sin logo cargado.";
+  els.eventBingoLogoSizeInput.value = state.visualSettings.bingoLogoSize;
   els.eventIndigoLogoStatus.textContent = state.visualSettings.indigoLogoName
     ? `Logo cargado: ${state.visualSettings.indigoLogoName}`
     : "Sin logo cargado.";
+  els.eventIndigoLogoSizeInput.value = state.visualSettings.indigoLogoSize;
   els.eventBallImagesStatus.textContent = getBallImagesStatusText();
+  els.eventBoardPanelWidthInput.value = state.visualSettings.boardPanelWidth;
   els.eventBoardFontFamilyInput.value = state.visualSettings.boardFontFamily;
   els.eventBoardFontSizeInput.value = state.visualSettings.boardFontSize;
+  els.eventSideTitleSizeInput.value = state.visualSettings.sideTitleSize;
+  els.eventSideTextSizeInput.value = state.visualSettings.sideTextSize;
   els.eventBoardButtonColorInput.value = state.visualSettings.boardButtonColor;
   els.eventBoardTextColorInput.value = state.visualSettings.boardTextColor;
   els.eventBoardDrawnColorInput.value = state.visualSettings.boardDrawnColor;
@@ -4987,12 +5007,17 @@ function createDefaultVisualSettings() {
     screenMarginRight: 0,
     bingoLogoData: "",
     bingoLogoName: "",
+    bingoLogoSize: 158,
     indigoLogoData: "",
     indigoLogoName: "",
+    indigoLogoSize: 118,
     ballImageKeys: {},
     ballImageSetName: "",
+    boardPanelWidth: 88,
     boardFontFamily: "Arial, Helvetica, sans-serif",
     boardFontSize: 22,
+    sideTitleSize: 19,
+    sideTextSize: 16,
     boardButtonColor: "#1f2933",
     boardTextColor: "#bcd7f3",
     boardDrawnColor: "#ffcb45",
@@ -5030,8 +5055,13 @@ function applyVisualSettings() {
   document.documentElement.style.setProperty("--screen-margin-bottom", `${state.visualSettings.screenMarginBottom}px`);
   document.documentElement.style.setProperty("--screen-margin-left", `${state.visualSettings.screenMarginLeft}px`);
   document.documentElement.style.setProperty("--screen-margin-right", `${state.visualSettings.screenMarginRight}px`);
+  document.documentElement.style.setProperty("--bingo-logo-size", `${state.visualSettings.bingoLogoSize}px`);
+  document.documentElement.style.setProperty("--indigo-logo-size", `${state.visualSettings.indigoLogoSize}px`);
+  document.documentElement.style.setProperty("--number-board-fr", `${state.visualSettings.boardPanelWidth / 100}fr`);
   document.documentElement.style.setProperty("--board-font-family", state.visualSettings.boardFontFamily);
   document.documentElement.style.setProperty("--board-font-size", `${state.visualSettings.boardFontSize}px`);
+  document.documentElement.style.setProperty("--side-title-size", `${state.visualSettings.sideTitleSize}px`);
+  document.documentElement.style.setProperty("--side-text-size", `${state.visualSettings.sideTextSize}px`);
   document.documentElement.style.setProperty("--board-button-color", state.visualSettings.boardButtonColor);
   document.documentElement.style.setProperty("--board-text-color", state.visualSettings.boardTextColor);
   document.documentElement.style.setProperty("--board-drawn-color", state.visualSettings.boardDrawnColor);
