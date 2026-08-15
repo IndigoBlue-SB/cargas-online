@@ -394,6 +394,9 @@ function init() {
   renderBoard();
   renderAnnouncementMediaControls();
   bindEvents();
+  if (isLaunchedFromCargas()) {
+    els.backHomeBtn.textContent = "Volver a Cargas";
+  }
   restoreServerState().finally(() => {
     const params = new URLSearchParams(window.location.search);
     const eventId = params.get("eventId");
@@ -472,6 +475,10 @@ function bindEvents() {
   els.loadDesignCopyInput.addEventListener("change", updateLoadCreationChoices);
   els.loadDesignNewInput.addEventListener("change", updateLoadCreationChoices);
   els.backHomeBtn.addEventListener("click", () => {
+    if (isLaunchedFromCargas()) {
+      window.location.href = "/?page=bingo";
+      return;
+    }
     if (state.currentUser) {
       state.view = "user-events";
       render();
@@ -621,6 +628,10 @@ function bindEvents() {
   els.prizeReviewCloseBtn.addEventListener("click", () => els.prizeReviewDialog.close());
   els.nearFullDialogCloseBtn.addEventListener("click", () => els.nearFullDialog.close());
   els.nearFullListDialogCloseBtn.addEventListener("click", () => els.nearFullListDialog.close());
+}
+
+function isLaunchedFromCargas() {
+  return new URLSearchParams(window.location.search).get("from") === "cargas";
 }
 
 function renderBoard() {

@@ -1208,6 +1208,11 @@
         ? closure.soldUnits
         : unitsFromSales(eventData?.sales || []);
     }
+    function officialSoldUnitsTotal(eventData) {
+      const closure = ensureBingoControl(eventData);
+      if (closure?.status === 'confirmed' && Number.isFinite(Number(closure.soldUnitsTotal))) return Number(closure.soldUnitsTotal);
+      return totalsFor(officialSales(eventData), eventData).units;
+    }
     function activeBingoEvent() { return events.find(event => event.id === activeBingoEventId); }
     function numberRange(start, end) { return Array.from({ length: end - start + 1 }, (_, index) => start + index); }
     function shuffleValues(values, random = Math.random) {
@@ -1753,12 +1758,15 @@
       }
       $('bingoEventsList').innerHTML = confirmedEvents.length ? confirmedEvents.map(event => {
         const units = officialSoldUnits(event);
+        const soldTotal = officialSoldUnitsTotal(event);
+        const uniqueNote = soldTotal !== units.length ? ` - ${num(units.length)} unicas para jugar` : '';
         const game = bingoGame(event);
         return `
           <button type="button" class="bingo-event-button ${event.id === activeBingoEventId ? 'active' : ''}" data-open-bingo="${event.id}">
             <strong>${escapeAttr(event.name)}</strong>
             <span>${shortDate(event.date)} - ${escapeAttr(event.town || '')}</span>
-            <span>${num(units.length)} series/cartones - ${num(units.length * 6)} cartones</span>
+            <span>${num(soldTotal)} series/cartones vendidas${uniqueNote}</span>
+            <span>${num(units.length * 6)} cartones en juego</span>
             <span>${num(game.drawn.length)} bolillas cantadas</span>
             <span>Entrar a configurar este panel</span>
           </button>
@@ -1773,13 +1781,14 @@
       const game = hasEvent ? bingoGame(eventData) : { drawn: [], winners: [] };
       const drawnSet = new Set(game.drawn.map(Number));
       const soldUnits = hasEvent ? officialSoldUnits(eventData) : [];
+      const soldTotal = hasEvent ? officialSoldUnitsTotal(eventData) : 0;
       $('bingoEventName').textContent = hasEvent ? eventData.name : 'Sin evento';
-      $('bingoSoldUnits').textContent = hasEvent ? num(soldUnits.length) : '0';
+      $('bingoSoldUnits').textContent = hasEvent ? num(soldTotal) : '0';
       $('bingoPlayableCards').textContent = num(soldUnits.length * 6);
       $('openAdvancedBingo').disabled = !hasEvent;
       if ($('bingoSelectedInfo')) {
         $('bingoSelectedInfo').textContent = hasEvent
-          ? `${num(soldUnits.length)} series/cartones confirmados. Entra a Configuracion de Panel de Bingo para editar logos, colores, fuentes, premios, tiras y luego jugar ese evento.`
+          ? `${num(soldTotal)} series/cartones vendidas${soldTotal !== soldUnits.length ? ` (${num(soldUnits.length)} unicas para jugar)` : ''}. Entra a Configuracion de Panel de Bingo para editar logos, colores, fuentes, premios, tiras y luego jugar ese evento.`
           : 'Selecciona un evento confirmado de la columna izquierda.';
       }
     }
@@ -1919,7 +1928,7 @@
       const advancedEvent = buildBingo90Event(eventData);
       const saved = loadBingo90Events().filter(item => item && item.id !== advancedEvent.id);
       localStorage.setItem(bingo90StorageKey, JSON.stringify([advancedEvent, ...saved].slice(0, 30)));
-      window.location.href = `/bingo90/index.html?eventId=${encodeURIComponent(advancedEvent.id)}&mode=config`;
+      window.location.href = `/bingo90/index.html?eventId=${encodeURIComponent(advancedEvent.id)}&mode=config&from=cargas`;
     }
 
     function defaultAccountingCategories() {
@@ -1967,7 +1976,7 @@
         ...eventData,
         sales,
         bingoClosure: isBingoLoadConfirmed(eventData)
-          ? { ...(eventData.bingoClosure || {}), soldUnits: unitsFromSales(sales), snapshotSales: sales }
+          ? { ...(eventData.bingoClosure || {}), soldUnits: unitsFromSales(sales), soldUnitsTotal: totalsFor(sales, eventData).units, snapshotSales: sales }
           : eventData.bingoClosure,
         balance: eventData.balance ? { ...eventData.balance } : null
       };
@@ -2651,8 +2660,9 @@
       if (!eventData) return;
       ensureBingoControl(eventData);
       const soldUnits = unitsFromSales(eventData.sales || []);
+      const soldUnitsTotal = totalsFor(eventData.sales || [], eventData).units;
       if (!soldUnits.length) return alert('No hay series/cartones cargados para confirmar.');
-      const message = `Confirmar ${num(soldUnits.length)} series/cartones para Balance, Contable y Bingo? Luego la carga queda bloqueada.`;
+      const message = `Confirmar ${num(soldUnitsTotal)} series/cartones vendidas para Balance, Contable y Bingo? Luego la carga queda bloqueada.`;
       if (!confirm(message)) return;
       eventData.bingoClosure = {
         status: 'confirmed',
@@ -2660,6 +2670,7 @@
         confirmedBy: currentUser?.name || (isAdmin() ? 'Administrador' : 'Usuario'),
         mode: 'series',
         soldUnits,
+        soldUnitsTotal,
         soldCardsCount: soldUnits.length,
         snapshotSales: clonePlain(eventData.sales || [])
       };
@@ -3022,7 +3033,7 @@
       const openAccounting = event.target.closest('[data-open-accounting]');
       if (openAccounting) { activeAccountingEventId = openAccounting.dataset.openAccounting; renderAccounting(); }
       const openBingo = event.target.closest('[data-open-bingo]');
-      if (openBingo) { activeBingoEventId = openBingo.dataset.openBingo; openAdvancedBingo(); }
+      if (openBingo) { activeBingoEventId = openBingo.dataset.openBingo; renderBingo(); }
       const editSheetButton = event.target.closest('[data-edit-sheet]');
       if (editSheetButton) editSheet(editSheetButton.dataset.editSheet);
       const deleteSheetButton = event.target.closest('[data-delete-sheet]');
@@ -3529,6 +3540,7 @@
     });
 
     async function bootstrap() {
+      const requestedPage = new URLSearchParams(window.location.search).get('page');
       $('eventDate').valueAsDate = new Date();
       await loadAccounts().catch(() => {});
       const sessionData = await api('/api/session').catch(() => ({ session: null }));
@@ -3537,6 +3549,7 @@
       applySettings();
       updatePreview();
       applySession();
+      if (currentUser && requestedPage && canUsePage(requestedPage)) go(requestedPage);
     }
     bootstrap();
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
