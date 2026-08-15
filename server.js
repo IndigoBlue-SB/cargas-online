@@ -11,7 +11,7 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 const BUNDLED_DB_FILE = path.join(ROOT, 'data', 'db.json');
 const BUNDLE_DATA_VERSION = '2026-06-23-03';
 const sessions = new Map();
-const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], balance: [], accounting: [], settings: [] };
+const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], sheets: [], balance: [], accounting: [], settings: [] };
 
 const defaultDb = {
   events: [],
@@ -103,7 +103,8 @@ function mergeBundledDb(db) {
 function readDb() {
   ensureDb();
   try {
-    return mergeBundledDb({ ...defaultDb, ...JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) });
+    const raw = fs.readFileSync(DB_FILE, 'utf8').replace(/^\uFEFF/, '');
+    return mergeBundledDb({ ...defaultDb, ...JSON.parse(raw) });
   } catch {
     return structuredClone(defaultDb);
   }

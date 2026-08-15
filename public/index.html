@@ -178,6 +178,9 @@
     #page-balance-detail .balance-add-button { margin-top: 8px; }
     .balance-line { display: grid; grid-template-columns: minmax(70px, 1fr) 82px 64px; gap: 4px; align-items: end; }
     .balance-admin-line { display: grid; grid-template-columns: minmax(82px, 1fr) 50px 44px 72px 74px 54px; gap: 4px; align-items: end; }
+    .balance-total-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(78px, 112px); gap: 5px; align-items: center; margin-top: 5px; }
+    .balance-total-line strong, .balance-total-line span { min-height: 28px; display: flex; align-items: center; border-radius: 5px; padding: 5px 8px; background: var(--button-bg); color: #fff; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
+    .balance-total-line span { justify-content: flex-end; font-weight: 800; }
     .balance-accounts { display: grid; gap: 5px; }
     .balance-account-row { display: grid; grid-template-columns: minmax(106px, 1fr) minmax(78px, 102px); gap: 4px; align-items: center; }
     .balance-account-row span:first-child { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); font-weight: 700; padding: 5px 6px; border-radius: 5px; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
@@ -212,6 +215,10 @@
     .accounting-toggle { width: 34px; min-height: 34px; padding: 0; background: #eef2ed; color: #26312f; text-align: center; }
     .accounting-category-body { display: grid; gap: 8px; }
     .accounting-category.collapsed .accounting-category-body { display: none; }
+    .sheets-layout { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 10px; align-items: start; }
+    .sheets-summary { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); gap: 8px; }
+    .sheet-prize-line { display: grid; grid-template-columns: minmax(120px, 1fr) 120px 64px; gap: 6px; align-items: end; }
+    .sheet-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; border-top: 1px solid var(--line); background: #fbfcfa; }
     .floating-modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; z-index: 30; padding: 20px; }
     .floating-modal .modal-card { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; display: grid; gap: 10px; }
 
@@ -225,7 +232,7 @@
       .app, .event-layout { grid-template-columns: 1fr; }
       .cards, .grid-4 { grid-template-columns: repeat(2, 1fr); }
       .toolbar { grid-template-columns: 1fr 1fr; }
-      .balance-grid, .accounting-layout, .accounting-workspace { grid-template-columns: 1fr; }
+      .balance-grid, .accounting-layout, .accounting-workspace, .sheets-layout, .sheet-footer { grid-template-columns: 1fr; }
       .balance-side, .balance-admins { border-left: 0; padding-left: 0; }
       .settings-grid { grid-template-columns: repeat(3, 1fr); }
       .settings-users { grid-template-columns: 1fr 1fr auto; }
@@ -235,7 +242,7 @@
     @media (max-width: 680px) {
       .main, .sidebar { padding: 16px; }
       .cards, .grid-2, .grid-3, .grid-4, .toolbar, .settings-grid, .preview-meta, .accounting-summary-cards { grid-template-columns: 1fr; }
-      .balance-line, .balance-admin-line, .accounting-detail-line, .accounting-category-head { grid-template-columns: 1fr; }
+      .balance-line, .balance-admin-line, .accounting-detail-line, .accounting-category-head, .sheet-prize-line, .sheets-summary { grid-template-columns: 1fr; }
       .topbar { align-items: flex-start; flex-direction: column; }
     }
   </style>
@@ -283,6 +290,7 @@
         <button type="button" data-page="stats" data-admin-only>ESTADISTICAS</button>
         <button type="button" data-page="delete" data-admin-only>ELIMINAR EVENTO</button>
         <button type="button" data-page="events">EVENTOS</button>
+        <button type="button" data-page="sheets" data-admin-only>PLANILLAS</button>
         <button type="button" data-page="balance">BALANCE</button>
                 <button type="button" data-page="accounting">CONTABLE</button>
         <button type="button" data-page="settings" data-admin-only>CONFIGURACIONES</button>
@@ -302,6 +310,7 @@
           <button type="button" class="event-card" data-page-shortcut="stats" data-admin-only><h3>ESTADISTICAS</h3><span class="muted">Ver totales generales y por evento.</span></button>
           <button type="button" class="event-card" data-page-shortcut="delete" data-admin-only><h3>ELIMINAR EVENTO</h3><span class="muted">Borrar eventos que ya no se necesiten.</span></button>
           <button type="button" class="event-card" data-page-shortcut="events"><h3>EVENTOS</h3><span class="muted">Entrar a eventos creados para cargar ventas.</span></button>
+          <button type="button" class="event-card" data-page-shortcut="sheets" data-admin-only><h3>PLANILLAS</h3><span class="muted">Anotar entregas, vendedor, telefono, venta y deuda.</span></button>
           <button type="button" class="event-card" data-page-shortcut="balance"><h3>BALANCE</h3><span class="muted">Revisar premios, comisiones, recaudacion y gastos.</span></button>
                   <button type="button" class="event-card" data-page-shortcut="accounting"><h3>CONTABLE</h3><span class="muted">Control semanal desde INDIGO BLUE por evento.</span></button>
         </div>
@@ -386,6 +395,59 @@
       <section id="page-delete" data-screen class="hidden">
         <div class="topbar"><h2>Eliminar evento</h2></div>
         <div id="deleteList" class="event-list"></div>
+      </section>
+
+      <section id="page-sheets" data-screen class="hidden">
+        <div class="topbar">
+          <div><h2>Planillas</h2><p class="muted">Control de planillas entregadas, vendedores, ventas, deuda y premios.</p></div>
+        </div>
+        <div class="sheets-summary">
+          <div class="stat"><span>Planillas</span><strong id="sheetCount">0</strong></div>
+          <div class="stat"><span>Total vendido</span><strong id="sheetSoldTotal">$0</strong></div>
+          <div class="stat"><span>Total debe</span><strong id="sheetDebtTotal">$0</strong></div>
+          <div class="stat"><span>Premios</span><strong id="sheetPrizeTotal">$0</strong></div>
+        </div>
+        <div class="sheets-layout">
+          <form id="sheetForm" class="panel form-grid">
+            <div class="grid-2">
+              <label>Planilla entregada<input id="sheetNumber" inputmode="numeric" type="number" min="1" step="1" required placeholder="Ej: 137"></label>
+              <label>Serie detectada<input id="sheetSeries" readonly placeholder="Automatico"></label>
+            </div>
+            <div class="grid-2">
+              <label>Vendedor<input id="sheetSeller" required autocomplete="off" placeholder="Nombre del vendedor"></label>
+              <label>Telefono<input id="sheetPhone" inputmode="tel" autocomplete="off" placeholder="Ej: 3492..."></label>
+            </div>
+            <div class="grid-2">
+              <label>Vendio<input id="sheetSold" inputmode="decimal" autocomplete="off" value="0"></label>
+              <label>Entrego / pago<input id="sheetPaid" inputmode="decimal" autocomplete="off" value="0"></label>
+            </div>
+            <label>Observaciones<textarea id="sheetNotes" rows="2" placeholder="Detalle interno"></textarea></label>
+            <div class="actions">
+              <button type="submit" id="saveSheetButton">Guardar planilla</button>
+              <button type="button" class="light" id="clearSheetForm">Limpiar</button>
+            </div>
+            <hr>
+            <h3>Configuracion</h3>
+            <div class="grid-2">
+              <label>Planillas por serie<input id="sheetsPerSeries" type="number" min="1" step="1" value="50"></label>
+              <label>Serie inicial<input id="sheetStartSeries" type="number" min="1" step="1" value="1"></label>
+            </div>
+            <label>Premios</label>
+            <div id="sheetPrizesList" class="form-grid"></div>
+            <div class="actions">
+              <button type="button" class="light" id="addSheetPrize">Agregar premio</button>
+              <button type="button" id="saveSheetConfig">Guardar configuracion</button>
+            </div>
+          </form>
+          <section class="table-wrap">
+            <div class="table-head"><h3>Planillas cargadas</h3><span id="sheetVisibleCount" class="muted">0 planillas</span></div>
+            <div class="scroll"><table><thead><tr><th>Planilla</th><th>Serie</th><th>Vendedor</th><th>Telefono</th><th>Vendio</th><th>Entrego</th><th>Debe</th><th>Acciones</th></tr></thead><tbody id="sheetsTable"></tbody></table><div id="sheetsEmpty" class="empty">Todavia no hay planillas cargadas.</div></div>
+            <div class="sheet-footer">
+              <div class="stat"><span>Suma de lo vendido</span><strong id="sheetFooterSold">$0</strong></div>
+              <div class="stat"><span>Suma de lo que debe</span><strong id="sheetFooterDebt">$0</strong></div>
+            </div>
+          </section>
+        </div>
       </section>
 
       <section id="page-balance" data-screen class="hidden">
@@ -699,8 +761,8 @@
   <div id="printArea" class="hidden"></div>
 
   <script>
-    const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], balance: [], accounting: [], settings: [] };
-    const functionLabels = { home: 'Inicio', create: 'Crear evento', stats: 'Estadisticas', delete: 'Eliminar evento', events: 'Eventos', balance: 'Balance', accounting: 'Contable', settings: 'Configuraciones' };
+    const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], sheets: [], balance: [], accounting: [], settings: [] };
+    const functionLabels = { home: 'Inicio', create: 'Crear evento', stats: 'Estadisticas', delete: 'Eliminar evento', events: 'Eventos', sheets: 'Planillas', balance: 'Balance', accounting: 'Contable', settings: 'Configuraciones' };
     const userDefaultPages = ['home', 'events', 'balance', 'accounting'];
     const defaultSettings = { font: 'Arial, Helvetica, sans-serif', size: 15, buttonSize: 15, totalSize: 22, brand: '#0f766e', buttonBg: '#0f766e', navButtonBg: '#2b7bbb', navButtonActiveBg: '#0f766e', navButtonColor: '#ffffff', homeCardTitleColor: '#0f766e', membreteColor: '#202426', eventInfoColor: '#667078', eventInfoFont: 'Arial, Helvetica, sans-serif', bg: '#f4f6f2', panel: '#ffffff', splash: '#123f8c', side: '#18312d', radius: '8px', mainLogo: '', mainLogoSize: 180, eventLogoLeft: '', eventLogoRight: '', eventLogoLeftSize: 86, eventLogoRightSize: 86, adminPassword: 'admin123', functionPermissions: defaultFunctionPermissions };
     let events = [];
@@ -717,6 +779,7 @@
     let selectedDraftId = null;
     let editingLoadId = null;
     let editingEventId = null;
+    let editingSheetId = null;
     let splashDone = false;
     let lastPaymentSource = 'cash';
     let accountingWeekStart = '';
@@ -798,6 +861,143 @@
       input.addEventListener('blur', () => { input.value = formatInputAmount(parseAmount(input.value)); });
       input.addEventListener('focus', () => input.select());
     }
+    function defaultSheetSettings() {
+      return {
+        perSeries: 50,
+        startSeries: 1,
+        prizes: [
+          { id: crypto.randomUUID(), name: 'Cuaterno', amount: 0 },
+          { id: crypto.randomUUID(), name: 'Linea', amount: 0 },
+          { id: crypto.randomUUID(), name: 'Bingo', amount: 0 }
+        ],
+        records: []
+      };
+    }
+    function sheetState() {
+      if (!settings.sheetSales) settings.sheetSales = defaultSheetSettings();
+      settings.sheetSales.perSeries = Math.max(Number(settings.sheetSales.perSeries) || 50, 1);
+      settings.sheetSales.startSeries = Math.max(Number(settings.sheetSales.startSeries) || 1, 1);
+      settings.sheetSales.prizes = Array.isArray(settings.sheetSales.prizes) ? settings.sheetSales.prizes.map(prize => ({
+        id: prize.id || crypto.randomUUID(),
+        name: prize.name || 'Premio',
+        amount: Number(prize.amount) || 0
+      })) : defaultSheetSettings().prizes;
+      settings.sheetSales.records = Array.isArray(settings.sheetSales.records) ? settings.sheetSales.records.map(record => ({
+        id: record.id || crypto.randomUUID(),
+        createdAt: Number(record.createdAt) || Date.now(),
+        number: Number(record.number) || 0,
+        series: Number(record.series) || sheetSeriesFor(record.number),
+        seller: record.seller || '',
+        phone: record.phone || '',
+        sold: Number(record.sold) || 0,
+        paid: Number(record.paid) || 0,
+        notes: record.notes || ''
+      })) : [];
+      return settings.sheetSales;
+    }
+    function sheetSeriesFor(number) {
+      const state = settings.sheetSales || defaultSheetSettings();
+      const perSeries = Math.max(Number(state.perSeries) || 50, 1);
+      const startSeries = Math.max(Number(state.startSeries) || 1, 1);
+      const sheetNumber = Math.max(Number(number) || 0, 0);
+      return sheetNumber ? startSeries + Math.floor((sheetNumber - 1) / perSeries) : '';
+    }
+    function sheetPrizeTotal() {
+      return sheetState().prizes.reduce((sum, prize) => sum + (Number(prize.amount) || 0), 0);
+    }
+    function sheetTotals() {
+      return sheetState().records.reduce((acc, record) => {
+        acc.sold += Number(record.sold) || 0;
+        acc.paid += Number(record.paid) || 0;
+        acc.debt += Math.max((Number(record.sold) || 0) - (Number(record.paid) || 0), 0);
+        return acc;
+      }, { sold: 0, paid: 0, debt: 0 });
+    }
+    function saveSheetSettings() {
+      sheetState();
+      saveSettingsData();
+      renderSheets();
+    }
+    function resetSheetForm() {
+      editingSheetId = null;
+      $('sheetForm').reset();
+      $('sheetSold').value = '0';
+      $('sheetPaid').value = '0';
+      $('sheetSeries').value = '';
+      $('saveSheetButton').textContent = 'Guardar planilla';
+    }
+    function sheetFromForm() {
+      const number = Number($('sheetNumber').value) || 0;
+      return {
+        id: editingSheetId || crypto.randomUUID(),
+        createdAt: editingSheetId ? (sheetState().records.find(record => record.id === editingSheetId)?.createdAt || Date.now()) : Date.now(),
+        number,
+        series: sheetSeriesFor(number),
+        seller: $('sheetSeller').value.trim(),
+        phone: $('sheetPhone').value.trim(),
+        sold: parseAmount($('sheetSold').value),
+        paid: parseAmount($('sheetPaid').value),
+        notes: $('sheetNotes').value.trim()
+      };
+    }
+    function readSheetConfigFromForm() {
+      const state = sheetState();
+      state.perSeries = Math.max(Number($('sheetsPerSeries').value) || 50, 1);
+      state.startSeries = Math.max(Number($('sheetStartSeries').value) || 1, 1);
+      state.prizes = [...document.querySelectorAll('[data-sheet-prize]')].map(row => ({
+        id: row.dataset.sheetPrize,
+        name: row.querySelector('[data-sheet-prize-name]').value.trim() || 'Premio',
+        amount: parseAmount(row.querySelector('[data-sheet-prize-amount]').value)
+      }));
+      state.records = state.records.map(record => ({ ...record, series: sheetSeriesFor(record.number) }));
+      return state;
+    }
+    function renderSheetPrizes() {
+      const state = sheetState();
+      $('sheetPrizesList').innerHTML = state.prizes.map(prize => `
+        <div class="sheet-prize-line" data-sheet-prize="${prize.id}">
+          <label>Premio<input data-sheet-prize-name value="${escapeAttr(prize.name)}"></label>
+          <label>Importe<input data-sheet-prize-amount inputmode="decimal" autocomplete="off" value="${formatInputAmount(prize.amount)}"></label>
+          <button type="button" class="danger" data-delete-sheet-prize>Quitar</button>
+        </div>
+      `).join('');
+      [...$('sheetPrizesList').querySelectorAll('[data-sheet-prize-amount]')].forEach(bindAmountFormatting);
+    }
+    function renderSheets() {
+      if (!canUsePage('sheets')) return;
+      const state = sheetState();
+      const totals = sheetTotals();
+      $('sheetsPerSeries').value = state.perSeries;
+      $('sheetStartSeries').value = state.startSeries;
+      $('sheetCount').textContent = num(state.records.length);
+      $('sheetSoldTotal').textContent = money(totals.sold);
+      $('sheetDebtTotal').textContent = money(totals.debt);
+      $('sheetPrizeTotal').textContent = money(sheetPrizeTotal());
+      $('sheetFooterSold').textContent = money(totals.sold);
+      $('sheetFooterDebt').textContent = money(totals.debt);
+      $('sheetVisibleCount').textContent = `${state.records.length} planillas`;
+      renderSheetPrizes();
+      const rows = [...state.records].sort((a, b) => b.createdAt - a.createdAt);
+      $('sheetsEmpty').classList.toggle('hidden', rows.length > 0);
+      $('sheetsTable').innerHTML = rows.map(record => {
+        const debt = Math.max((Number(record.sold) || 0) - (Number(record.paid) || 0), 0);
+        return `<tr><td class="number">${num(record.number)}</td><td class="number">${num(record.series)}</td><td><strong>${escapeAttr(record.seller)}</strong></td><td>${escapeAttr(record.phone)}</td><td class="money">${money(record.sold)}</td><td class="money">${money(record.paid)}</td><td class="money">${money(debt)}</td><td><div class="table-actions"><button type="button" class="light" data-edit-sheet="${record.id}">Editar</button><button type="button" class="danger" data-delete-sheet="${record.id}">Borrar</button></div></td></tr>`;
+      }).join('');
+    }
+    function editSheet(sheetId) {
+      const record = sheetState().records.find(item => item.id === sheetId);
+      if (!record) return;
+      editingSheetId = sheetId;
+      $('sheetNumber').value = record.number || '';
+      $('sheetSeries').value = record.series || sheetSeriesFor(record.number);
+      $('sheetSeller').value = record.seller || '';
+      $('sheetPhone').value = record.phone || '';
+      $('sheetSold').value = formatInputAmount(record.sold);
+      $('sheetPaid').value = formatInputAmount(record.paid);
+      $('sheetNotes').value = record.notes || '';
+      $('saveSheetButton').textContent = 'Actualizar planilla';
+      $('sheetNumber').focus();
+    }
     function localDateIso(date = new Date()) {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -878,7 +1078,7 @@
       return userDefaultPages.includes(page);
     }
     function firstAllowedPage() {
-      return ['home', 'events', 'balance', 'accounting', 'stats', 'create', 'delete', 'settings'].find(canUsePage) || 'events';
+      return ['home', 'events', 'sheets', 'balance', 'accounting', 'stats', 'create', 'delete', 'settings'].find(canUsePage) || 'events';
     }
     function selectedFunctionPermissions() {
       const permissions = Object.fromEntries(Object.keys(defaultFunctionPermissions).map(page => [page, []]));
@@ -1047,16 +1247,18 @@
       const sellerCommission = pct(gross, balance.sellerPercent);
       const adminGeneralCommission = balanceCartonPercentAmount(balance, balance.adminPercent);
       const adminsCommission = (balance.admins || []).reduce((sum, item) => sum + balanceAdminAmount(balance, item), 0);
-      const commissions = sellerCommission + adminGeneralCommission + adminsCommission;
+      const commissions = sellerCommission + adminsCommission;
+      const realAdministrators = adminsCommission;
       const prizes = prizesTotal(balance);
       const expenses = (balance.expenses || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-      const subtotal = gross - commissions - prizes - expenses;
-      const noeAmount = pct(subtotal, balance.noePercent);
-      const afterNoe = subtotal - noeAmount;
+      const income = gross - sellerCommission - realAdministrators - prizes - expenses;
+      const subtotal = income;
+      const noeAmount = pct(income, balance.noePercent);
+      const afterNoe = income - noeAmount;
       const giseAmount = pct(afterNoe, balance.gisePercent);
       const laureanoAmount = pct(afterNoe, balance.laureanoPercent);
       const extraPercents = giseAmount + laureanoAmount;
-      return { gross, sellerCommission, adminGeneralCommission, adminsCommission, commissions, prizes, expenses, subtotal, noeAmount, afterNoe, giseAmount, laureanoAmount, extraPercents, result: afterNoe - extraPercents };
+      return { gross, sellerCommission, adminGeneralCommission, adminsCommission, commissions, prizes, expenses, income, subtotal, noeAmount, afterNoe, giseAmount, laureanoAmount, extraPercents, result: afterNoe - extraPercents };
     }
     function setImage(image, value) {
       image.classList.toggle('hidden', !value);
@@ -1582,16 +1784,16 @@
         ['Valor del Bingo', money(balance.price)],
         ['Recaudado', money(totals.gross)],
         ['Vendedores', money(totals.sellerCommission)],
-        ['Administrador Gral', money(totals.adminGeneralCommission)],
         ['Administradores', money(totals.adminsCommission)],
-        ['Total de Premios', money(totals.prizes)],
-        ['Total de Gastos', money(totals.expenses)],
-        ['Sub-Total', money(totals.subtotal)]
+        ['Premios', money(totals.prizes)],
+        ['Gastos', money(totals.expenses)],
+        ['INGRESOS', money(totals.income)]
       ];
       if (showPrivate) {
         rows.push(
           [`% Noe (${num(balance.noePercent)}%)`, money(totals.noeAmount)],
-          [`INDIGO BLUE`, money(totals.afterNoe)],
+          ['Sub Total', money(totals.afterNoe)],
+          ['INDIGO BLUE', money(totals.result)],
           [`% Gise (${num(balance.gisePercent)}%)`, money(totals.giseAmount)],
           [`% Laureano (${num(balance.laureanoPercent)}%)`, money(totals.laureanoAmount)]
         );
@@ -1605,7 +1807,7 @@
     }
 
     function renderBalanceAdmins(admins, balance = balanceFromForm()) {
-      $('balanceAdminsList').innerHTML = (admins || []).map(item => {
+      const rows = (admins || []).map(item => {
         const units = Number(item.units) || 0;
         const percent = Number(item.percent) || 0;
         const fixed = Number(item.fixed) || 0;
@@ -1621,6 +1823,12 @@
           </div>
         `;
       }).join('');
+      const total = (admins || []).reduce((sum, item) => sum + balanceAdminAmount(balance, item), 0);
+      $('balanceAdminsList').innerHTML = `${rows}
+        <div class="balance-total-line">
+          <strong>TOTAL ADMINISTRADORES</strong>
+          <span data-balance-admins-total>${money(total)}</span>
+        </div>`;
       [...$('balanceAdminsList').querySelectorAll('[data-admin-name], [data-admin-units], [data-admin-percent], [data-admin-fixed]')].forEach(input => input.addEventListener('input', updateBalancePreview));
       [...$('balanceAdminsList').querySelectorAll('[data-admin-fixed]')].forEach(bindAmountFormatting);
     }
@@ -1635,26 +1843,48 @@
       });
     }
 
+    function updateBalanceColumnTotals(balance) {
+      const totals = balanceTotals(balance);
+      const adminsTotal = document.querySelector('[data-balance-admins-total]');
+      const expensesTotal = document.querySelector('[data-balance-expenses-total]');
+      const prizesColumnTotal = document.querySelector('[data-balance-prizes-total]');
+      if (adminsTotal) adminsTotal.textContent = money(totals.adminsCommission);
+      if (expensesTotal) expensesTotal.textContent = money(totals.expenses);
+      if (prizesColumnTotal) prizesColumnTotal.textContent = money(totals.prizes);
+    }
+
     function renderBalanceExpenses(expenses) {
-      $('balanceExpenses').innerHTML = (expenses || []).map(item => `
+      const total = (expenses || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      const rows = (expenses || []).map(item => `
         <div class="balance-line" data-balance-expense="${item.id || crypto.randomUUID()}">
           <label>Detalle<input data-expense-name autocomplete="off" value="${String(item.name || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}"></label>
           <label>Importe<input data-expense-amount inputmode="decimal" autocomplete="off" value="${formatInputAmount(item.amount)}"></label>
           <div class="actions"><button type="button" class="danger" data-delete-expense>Eliminar</button></div>
         </div>
       `).join('');
+      $('balanceExpenses').innerHTML = `${rows}
+        <div class="balance-total-line">
+          <strong>TOTAL DE GASTOS</strong>
+          <span data-balance-expenses-total>${money(total)}</span>
+        </div>`;
       [...$('balanceExpenses').querySelectorAll('input')].forEach(input => input.addEventListener('input', updateBalancePreview));
       [...$('balanceExpenses').querySelectorAll('[data-expense-amount]')].forEach(bindAmountFormatting);
     }
 
     function renderBalancePrizes(prizes) {
-      $('balancePrizesList').innerHTML = (prizes || []).map(item => `
+      const total = prizesTotal({ prizesList: prizes || [] });
+      const rows = (prizes || []).map(item => `
         <div class="balance-line" data-balance-prize="${item.id || crypto.randomUUID()}">
           <label>Premio<input data-prize-name autocomplete="off" value="${String(item.name || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}"></label>
           <label>Importe<input data-prize-amount inputmode="decimal" autocomplete="off" value="${formatInputAmount(item.amount)}"></label>
           <div class="actions"><button type="button" class="danger" data-delete-prize>Eliminar</button></div>
         </div>
       `).join('');
+      $('balancePrizesList').innerHTML = `${rows}
+        <div class="balance-total-line">
+          <strong>TOTAL DE PREMIOS</strong>
+          <span data-balance-prizes-total>${money(total)}</span>
+        </div>`;
       [...$('balancePrizesList').querySelectorAll('input')].forEach(input => input.addEventListener('input', updateBalancePreview));
       [...$('balancePrizesList').querySelectorAll('[data-prize-amount]')].forEach(bindAmountFormatting);
     }
@@ -1691,7 +1921,9 @@
     }
 
     function updateBalancePreview() {
-      setBalanceSummary(balanceFromForm());
+      const balance = balanceFromForm();
+      setBalanceSummary(balance);
+      updateBalanceColumnTotals(balance);
     }
 
     function renderBalanceDetail() {
@@ -2130,19 +2362,18 @@
         ['Valor del bingo', money(balance.price)],
         ['Recaudado', money(totals.gross)],
         ['Vendedores', money(totals.sellerCommission)],
-        ['Administrador Gral', money(totals.adminGeneralCommission)],
         ['Administradores', money(totals.adminsCommission)],
-        ['Total de premios', money(totals.prizes)],
-        ['Total de gastos', money(totals.expenses)],
-        ['Sub-Total', money(totals.subtotal)]
+        ['Premios', money(totals.prizes)],
+        ['Gastos', money(totals.expenses)],
+        ['INGRESOS', money(totals.income)]
       ];
       if (canSeePrivateBalance(activeBalanceEvent())) {
         rows.push(
           [`Noe ${num(balance.noePercent)}%`, money(totals.noeAmount)],
-          ['INDIGO BLUE', money(totals.afterNoe)],
+          ['Sub Total', money(totals.afterNoe)],
+          ['INDIGO BLUE', money(totals.result)],
           [`Gise ${num(balance.gisePercent)}%`, money(totals.giseAmount)],
-          [`Laureano ${num(balance.laureanoPercent)}%`, money(totals.laureanoAmount)],
-          ['Resultado', money(totals.result)]
+          [`Laureano ${num(balance.laureanoPercent)}%`, money(totals.laureanoAmount)]
         );
       } else {
         rows.push(['Resultado', money(totals.subtotal)]);
@@ -2173,6 +2404,9 @@
       ]);
       const expenseRows = (balance.expenses || []).map(item => [item.name, money(item.amount)]);
       const prizeRows = (balance.prizesList || []).map(item => [item.name, money(item.amount)]);
+      adminRows.push(['TOTAL ADMINISTRADORES', '', '', '', money(totals.adminsCommission)]);
+      expenseRows.push(['TOTAL DE GASTOS', money(totals.expenses)]);
+      prizeRows.push(['TOTAL DE PREMIOS', money(totals.prizes)]);
       $('printArea').classList.remove('hidden');
       $('printArea').innerHTML = `
         <style>
@@ -2249,6 +2483,7 @@
       renderUsers();
       renderEventCards();
       renderDeleteList();
+      if (activePage === 'sheets') renderSheets();
       renderBalanceEvents();
       if (activePage === 'accounting') renderAccounting();
       renderStats();
@@ -2317,6 +2552,21 @@
       }
       const openAccounting = event.target.closest('[data-open-accounting]');
       if (openAccounting) { activeAccountingEventId = openAccounting.dataset.openAccounting; renderAccounting(); }
+      const editSheetButton = event.target.closest('[data-edit-sheet]');
+      if (editSheetButton) editSheet(editSheetButton.dataset.editSheet);
+      const deleteSheetButton = event.target.closest('[data-delete-sheet]');
+      if (deleteSheetButton && confirm('Borrar esta planilla?')) {
+        const state = sheetState();
+        state.records = state.records.filter(record => record.id !== deleteSheetButton.dataset.deleteSheet);
+        if (editingSheetId === deleteSheetButton.dataset.deleteSheet) resetSheetForm();
+        saveSheetSettings();
+      }
+      const deleteSheetPrize = event.target.closest('[data-delete-sheet-prize]');
+      if (deleteSheetPrize) {
+        deleteSheetPrize.closest('[data-sheet-prize]')?.remove();
+        readSheetConfigFromForm();
+        saveSheetSettings();
+      }
       const includeAccounting = event.target.closest('[data-accounting-include]');
       if (includeAccounting) { setAccountingEventIncluded(includeAccounting.dataset.accountingInclude, includeAccounting.checked); }
       const toggleAccountingCategory = event.target.closest('[data-toggle-accounting-category]');
@@ -2560,6 +2810,48 @@
       lastPaymentSource = 'transfer';
       syncPaymentFrom('transfer');
     });
+    $('sheetNumber').addEventListener('input', () => { $('sheetSeries').value = sheetSeriesFor($('sheetNumber').value); });
+    $('sheetsPerSeries').addEventListener('input', () => {
+      readSheetConfigFromForm();
+      $('sheetSeries').value = sheetSeriesFor($('sheetNumber').value);
+      renderSheets();
+    });
+    $('sheetStartSeries').addEventListener('input', () => {
+      readSheetConfigFromForm();
+      $('sheetSeries').value = sheetSeriesFor($('sheetNumber').value);
+      renderSheets();
+    });
+    bindAmountFormatting($('sheetSold'));
+    bindAmountFormatting($('sheetPaid'));
+    $('clearSheetForm').addEventListener('click', resetSheetForm);
+    $('sheetForm').addEventListener('submit', event => {
+      event.preventDefault();
+      if (!canUsePage('sheets')) return;
+      readSheetConfigFromForm();
+      const payload = sheetFromForm();
+      if (!payload.number || !payload.seller) {
+        alert('Cargue numero de planilla y vendedor.');
+        return;
+      }
+      const state = sheetState();
+      const duplicated = state.records.find(record => record.id !== payload.id && Number(record.number) === Number(payload.number));
+      if (duplicated && !confirm('Ya existe una planilla con ese numero. Guardar igual?')) return;
+      state.records = editingSheetId
+        ? state.records.map(record => record.id === editingSheetId ? payload : record)
+        : [...state.records, payload];
+      saveSheetSettings();
+      resetSheetForm();
+    });
+    $('addSheetPrize').addEventListener('click', () => {
+      const state = readSheetConfigFromForm();
+      state.prizes.push({ id: crypto.randomUUID(), name: 'Nuevo premio', amount: 0 });
+      renderSheetPrizes();
+    });
+    $('saveSheetConfig').addEventListener('click', () => {
+      readSheetConfigFromForm();
+      saveSheetSettings();
+      alert('Configuracion de planillas guardada.');
+    });
     [$('search'), $('filterLocalidad'), $('filterProvincia'), $('filterVendedor')].forEach(input => input.addEventListener('input', renderActiveEvent));
     viewButtons.forEach(button => button.addEventListener('click', () => { currentView = button.dataset.view; viewButtons.forEach(item => item.classList.toggle('active', item === button)); renderActiveEvent(); }));
     document.addEventListener('dblclick', event => {
@@ -2678,6 +2970,7 @@
     $('openExport').addEventListener('click', exportRows);
     $('exportBalancePdf').addEventListener('click', exportBalancePdf);
     $('applySettingsButton').addEventListener('click', async () => {
+      const preservedSheetSales = settings.sheetSales;
       settings = {
         font: $('settingFont').value,
         size: Number($('settingSize').value),
@@ -2700,7 +2993,8 @@
         mainLogoSize: Number($('settingMainLogoSize').value) || defaultSettings.mainLogoSize,
         radius: $('settingRadius').value,
         adminPassword: $('settingAdminPassword').value || settings.adminPassword,
-        functionPermissions: selectedFunctionPermissions()
+        functionPermissions: selectedFunctionPermissions(),
+        sheetSales: preservedSheetSales
       };
       if (!saveSettingsData()) return;
       applySettings();
