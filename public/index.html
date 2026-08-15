@@ -1749,7 +1749,7 @@
       if (!canUsePage('bingo')) return;
       const confirmedEvents = visibleEvents().filter(isBingoLoadConfirmed);
       if (!activeBingoEventId || !confirmedEvents.some(event => event.id === activeBingoEventId)) {
-        activeBingoEventId = confirmedEvents[0]?.id || null;
+        activeBingoEventId = null;
       }
       $('bingoEventsList').innerHTML = confirmedEvents.length ? confirmedEvents.map(event => {
         const units = officialSoldUnits(event);
@@ -1760,6 +1760,7 @@
             <span>${shortDate(event.date)} - ${escapeAttr(event.town || '')}</span>
             <span>${num(units.length)} series/cartones - ${num(units.length * 6)} cartones</span>
             <span>${num(game.drawn.length)} bolillas cantadas</span>
+            <span>Entrar a configurar este panel</span>
           </button>
         `;
       }).join('') : '<div class="empty">No hay cargas confirmadas para jugar.</div>';
@@ -1853,8 +1854,10 @@
     }
 
     function bingo90TemplateFor(eventId) {
-      const previous = loadBingo90Events().filter(item => item && item.id !== eventId);
-      return previous.find(item => item.stripDesign || item.visualSettings || item.cardDesign || item.projectionSettings) || {};
+      const saved = loadBingo90Events().filter(Boolean);
+      return saved.find(item => item.id === eventId)
+        || saved.find(item => item.stripDesign || item.visualSettings || item.cardDesign || item.projectionSettings)
+        || {};
     }
 
     function buildBingo90Event(eventData) {
@@ -1864,7 +1867,12 @@
       const rangeEnd = Math.max(15000, Number(eventData.bingoRangeEnd) || 0, maxSold);
       const game = bingoGame(eventData);
       const template = bingo90TemplateFor(eventData.id);
+      const existingEvent = template.id === eventData.id ? template : {};
+      const drawn = Array.isArray(existingEvent.drawn)
+        ? existingEvent.drawn
+        : (Array.isArray(game.drawn) ? game.drawn.map(Number).filter(Number.isFinite) : []);
       return {
+        ...existingEvent,
         id: eventData.id,
         name: eventData.name || 'Evento confirmado',
         eventCreated: true,
@@ -1883,15 +1891,15 @@
         salesDraftUnits: soldUnits,
         completedGames: Array.isArray(template.completedGames) ? template.completedGames : [],
         savedAt: new Date().toISOString(),
-        drawn: Array.isArray(game.drawn) ? game.drawn.map(Number).filter(Number.isFinite) : [],
-        prizeResults: [],
-        pausedForWinner: false,
-        pendingWinners: [],
-        gameFinished: false,
-        extraStartBallIndex: null,
-        recapShown: false,
-        pozoVacancyShown: false,
-        extraVacancyShown: false,
+        drawn,
+        prizeResults: Array.isArray(existingEvent.prizeResults) ? existingEvent.prizeResults : [],
+        pausedForWinner: !!existingEvent.pausedForWinner,
+        pendingWinners: Array.isArray(existingEvent.pendingWinners) ? existingEvent.pendingWinners : [],
+        gameFinished: !!existingEvent.gameFinished,
+        extraStartBallIndex: existingEvent.extraStartBallIndex ?? null,
+        recapShown: !!existingEvent.recapShown,
+        pozoVacancyShown: !!existingEvent.pozoVacancyShown,
+        extraVacancyShown: !!existingEvent.extraVacancyShown,
         prizeEnabled: template.prizeEnabled,
         prizeAmounts: template.prizeAmounts,
         prizeSettings: template.prizeSettings,
@@ -3014,7 +3022,7 @@
       const openAccounting = event.target.closest('[data-open-accounting]');
       if (openAccounting) { activeAccountingEventId = openAccounting.dataset.openAccounting; renderAccounting(); }
       const openBingo = event.target.closest('[data-open-bingo]');
-      if (openBingo) { activeBingoEventId = openBingo.dataset.openBingo; renderBingo(); }
+      if (openBingo) { activeBingoEventId = openBingo.dataset.openBingo; openAdvancedBingo(); }
       const editSheetButton = event.target.closest('[data-edit-sheet]');
       if (editSheetButton) editSheet(editSheetButton.dataset.editSheet);
       const deleteSheetButton = event.target.closest('[data-delete-sheet]');
