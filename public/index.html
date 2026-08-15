@@ -482,11 +482,9 @@
 
       <section id="page-bingo" data-screen class="hidden">
         <div class="topbar">
-          <div><h2>INDIGO BINGO</h2><p class="muted">Sorteo con eventos confirmados y cartones oficiales.</p></div>
+          <div><h2>INDIGO BINGO</h2><p class="muted">Elegi un evento confirmado para configurar su panel de bingo.</p></div>
           <div class="actions">
             <button type="button" class="secondary" id="openAdvancedBingo">Configuracion de Panel de Bingo</button>
-            <button type="button" class="light" id="resetBingoGame">Reiniciar sorteo</button>
-            <button type="button" id="drawBingoBall">Sortear bolilla</button>
           </div>
         </div>
         <div class="bingo-layout">
@@ -494,25 +492,17 @@
             <h3>Eventos confirmados</h3>
             <div id="bingoEventsList" class="bingo-event-list"></div>
           </aside>
-          <section class="bingo-stage">
+          <section class="panel bingo-stage">
+            <div class="table-head">
+              <h3>Evento seleccionado</h3>
+              <span class="muted">Solo se habilita con una carga confirmada.</span>
+            </div>
             <div class="cards">
               <div class="stat"><span>Evento</span><strong id="bingoEventName">Sin evento</strong></div>
               <div class="stat"><span>Series/cartones</span><strong id="bingoSoldUnits">0</strong></div>
               <div class="stat"><span>Cartones en juego</span><strong id="bingoPlayableCards">0</strong></div>
-              <div class="stat"><span>Bolillas cantadas</span><strong id="bingoDrawCount">0</strong></div>
-              <div class="stat"><span>Ganadores</span><strong id="bingoWinnerCount">0</strong></div>
             </div>
-            <div class="bingo-hero">
-              <div class="bingo-last-ball" id="bingoLastBall">--</div>
-              <div class="panel">
-                <h3>Bolillero</h3>
-                <div id="bingoBoard" class="bingo-board"></div>
-              </div>
-            </div>
-            <section class="panel">
-              <div class="table-head"><h3>Ganadores detectados</h3><span id="bingoWinnerInfo" class="muted">Sin ganadores todavia.</span></div>
-              <div id="bingoWinnersList" class="bingo-winner-list"></div>
-            </section>
+            <div id="bingoSelectedInfo" class="empty">Selecciona un evento confirmado de la columna izquierda.</div>
           </section>
         </div>
       </section>
@@ -1785,15 +1775,12 @@
       $('bingoEventName').textContent = hasEvent ? eventData.name : 'Sin evento';
       $('bingoSoldUnits').textContent = hasEvent ? num(soldUnits.length) : '0';
       $('bingoPlayableCards').textContent = num(soldUnits.length * 6);
-      $('bingoDrawCount').textContent = num(game.drawn.length);
-      $('bingoWinnerCount').textContent = num(game.winners.length);
-      $('bingoLastBall').textContent = game.drawn.at(-1) || '--';
-      $('drawBingoBall').disabled = !hasEvent || game.drawn.length >= 90;
-      $('resetBingoGame').disabled = !hasEvent || (!game.drawn.length && !game.winners.length);
       $('openAdvancedBingo').disabled = !hasEvent;
-      $('bingoBoard').innerHTML = numberRange(1, 90).map(number => `<div class="bingo-ball ${drawnSet.has(number) ? 'drawn' : ''}">${number}</div>`).join('');
-      $('bingoWinnerInfo').textContent = game.winners.length ? `${num(game.winners.length)} cartones completos detectados.` : 'Sin ganadores todavia.';
-      $('bingoWinnersList').innerHTML = game.winners.length ? game.winners.map(winner => renderBingoWinner(winner, drawnSet)).join('') : '<div class="empty">Los ganadores apareceran automaticamente al completar carton.</div>';
+      if ($('bingoSelectedInfo')) {
+        $('bingoSelectedInfo').textContent = hasEvent
+          ? `${num(soldUnits.length)} series/cartones confirmados. Entra a Configuracion de Panel de Bingo para editar logos, colores, fuentes, premios, tiras y luego jugar ese evento.`
+          : 'Selecciona un evento confirmado de la columna izquierda.';
+      }
     }
 
     function renderBingoWinner(winner, drawnSet) {
@@ -1924,7 +1911,7 @@
       const advancedEvent = buildBingo90Event(eventData);
       const saved = loadBingo90Events().filter(item => item && item.id !== advancedEvent.id);
       localStorage.setItem(bingo90StorageKey, JSON.stringify([advancedEvent, ...saved].slice(0, 30)));
-      window.location.href = `/bingo90/index.html?eventId=${encodeURIComponent(advancedEvent.id)}`;
+      window.location.href = `/bingo90/index.html?eventId=${encodeURIComponent(advancedEvent.id)}&mode=config`;
     }
 
     function defaultAccountingCategories() {
@@ -3364,8 +3351,8 @@
     $('clearDraftRanges').addEventListener('click', () => { if (draftRanges.length && confirm('Eliminar toda la lista previa?')) { draftRanges = []; selectedDraftId = null; renderDraft(); } });
     $('clearSaleForm').addEventListener('click', resetSaleForm);
     $('openAdvancedBingo').addEventListener('click', openAdvancedBingo);
-    $('drawBingoBall').addEventListener('click', drawBingoBall);
-    $('resetBingoGame').addEventListener('click', resetBingoGame);
+    $('drawBingoBall')?.addEventListener('click', drawBingoBall);
+    $('resetBingoGame')?.addEventListener('click', resetBingoGame);
     $('clearEventForm').addEventListener('click', resetEventForm);
     ['balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent', 'balanceNoePercent', 'balanceIndigoPercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => $(id).addEventListener('input', updateBalancePreview));
     bindAmountFormatting($('balancePrice'));

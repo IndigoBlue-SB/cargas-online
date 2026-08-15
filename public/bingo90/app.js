@@ -390,9 +390,14 @@ function init() {
   renderAnnouncementMediaControls();
   bindEvents();
   restoreServerState().finally(() => {
-    const eventId = new URLSearchParams(window.location.search).get("eventId");
+    const params = new URLSearchParams(window.location.search);
+    const eventId = params.get("eventId");
+    const mode = params.get("mode");
     if (eventId && loadSavedEvents().some((event) => event.id === eventId)) {
-      loadEvent(eventId);
+      loadEvent(eventId, { stayHome: mode === "config" });
+      if (mode === "config") {
+        window.setTimeout(openEventConfiguration, 250);
+      }
     }
     render();
   });
