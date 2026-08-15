@@ -168,6 +168,22 @@
     .bingo-closure-panel h3 { margin: 0 0 3px; font-size: 16px; }
     .bingo-closure-panel p { margin: 0; color: var(--muted); font-size: 13px; }
     .bingo-closure-panel .actions { justify-content: flex-end; }
+    .bingo-layout { display: grid; grid-template-columns: minmax(230px, 320px) minmax(0, 1fr); gap: 10px; align-items: start; }
+    .bingo-event-list { display: grid; gap: 8px; max-height: calc(100vh - 190px); overflow-y: auto; }
+    .bingo-event-button { width: 100%; color: var(--ink); background: #fbfcfa; border: 1px solid var(--line); text-align: left; display: grid; gap: 4px; padding: 9px; }
+    .bingo-event-button.active { border-color: var(--brand); background: var(--soft); }
+    .bingo-stage { display: grid; gap: 10px; }
+    .bingo-hero { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr); gap: 10px; align-items: stretch; }
+    .bingo-last-ball { min-height: 170px; border-radius: var(--radius); display: grid; place-items: center; background: #061b2b; color: #fff; font-size: 82px; font-weight: 800; line-height: 1; box-shadow: var(--shadow); }
+    .bingo-board { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; }
+    .bingo-ball { min-height: 34px; display: grid; place-items: center; border-radius: 6px; background: #eef2ed; color: #26312f; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .bingo-ball.drawn { background: var(--brand); color: #fff; }
+    .bingo-winner-list { display: grid; gap: 8px; max-height: 280px; overflow-y: auto; }
+    .bingo-winner-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; background: #fbfcfa; display: grid; gap: 6px; }
+    .bingo-card-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; }
+    .bingo-card-cell { min-height: 24px; display: grid; place-items: center; border-radius: 4px; background: #eef2ed; font-size: 12px; font-weight: 700; }
+    .bingo-card-cell.empty-cell { background: #f8faf8; }
+    .bingo-card-cell.hit { background: #0f766e; color: #fff; }
     .balance-grid { display: grid; grid-template-columns: minmax(190px, 225px) minmax(420px, 460px) minmax(245px, 1fr) minmax(245px, 1fr); gap: 12px; align-items: start; width: 100%; }
     .balance-accounts, .balance-admins, .balance-main, .balance-side { min-width: 0; }
     .balance-side, .balance-admins { border-left: 1px solid var(--line); padding-left: 8px; display: grid; gap: 5px; }
@@ -295,6 +311,7 @@
         <button type="button" data-page="stats" data-admin-only>ESTADISTICAS</button>
         <button type="button" data-page="delete" data-admin-only>ELIMINAR EVENTO</button>
         <button type="button" data-page="events">EVENTOS</button>
+        <button type="button" data-page="bingo">BINGO</button>
         <button type="button" data-page="sheets" data-admin-only>PLANILLAS</button>
         <button type="button" data-page="balance">BALANCE</button>
                 <button type="button" data-page="accounting">CONTABLE</button>
@@ -315,6 +332,7 @@
           <button type="button" class="event-card" data-page-shortcut="stats" data-admin-only><h3>ESTADISTICAS</h3><span class="muted">Ver totales generales y por evento.</span></button>
           <button type="button" class="event-card" data-page-shortcut="delete" data-admin-only><h3>ELIMINAR EVENTO</h3><span class="muted">Borrar eventos que ya no se necesiten.</span></button>
           <button type="button" class="event-card" data-page-shortcut="events"><h3>EVENTOS</h3><span class="muted">Entrar a eventos creados para cargar ventas.</span></button>
+          <button type="button" class="event-card" data-page-shortcut="bingo"><h3>BINGO</h3><span class="muted">Jugar con cargas confirmadas y cartones oficiales.</span></button>
           <button type="button" class="event-card" data-page-shortcut="sheets" data-admin-only><h3>PLANILLAS</h3><span class="muted">Anotar entregas, vendedor, telefono, venta y deuda.</span></button>
           <button type="button" class="event-card" data-page-shortcut="balance"><h3>BALANCE</h3><span class="muted">Revisar premios, comisiones, recaudacion y gastos.</span></button>
                   <button type="button" class="event-card" data-page-shortcut="accounting"><h3>CONTABLE</h3><span class="muted">Control semanal desde INDIGO BLUE por evento.</span></button>
@@ -460,6 +478,42 @@
           <div><h2>Balance</h2><p class="muted">Elegir un evento para trabajar su balance.</p></div>
         </div>
         <div id="balanceEventsList" class="event-list"></div>
+      </section>
+
+      <section id="page-bingo" data-screen class="hidden">
+        <div class="topbar">
+          <div><h2>INDIGO BINGO</h2><p class="muted">Sorteo con eventos confirmados y cartones oficiales.</p></div>
+          <div class="actions">
+            <button type="button" class="light" id="resetBingoGame">Reiniciar sorteo</button>
+            <button type="button" id="drawBingoBall">Sortear bolilla</button>
+          </div>
+        </div>
+        <div class="bingo-layout">
+          <aside class="panel">
+            <h3>Eventos confirmados</h3>
+            <div id="bingoEventsList" class="bingo-event-list"></div>
+          </aside>
+          <section class="bingo-stage">
+            <div class="cards">
+              <div class="stat"><span>Evento</span><strong id="bingoEventName">Sin evento</strong></div>
+              <div class="stat"><span>Series/cartones</span><strong id="bingoSoldUnits">0</strong></div>
+              <div class="stat"><span>Cartones en juego</span><strong id="bingoPlayableCards">0</strong></div>
+              <div class="stat"><span>Bolillas cantadas</span><strong id="bingoDrawCount">0</strong></div>
+              <div class="stat"><span>Ganadores</span><strong id="bingoWinnerCount">0</strong></div>
+            </div>
+            <div class="bingo-hero">
+              <div class="bingo-last-ball" id="bingoLastBall">--</div>
+              <div class="panel">
+                <h3>Bolillero</h3>
+                <div id="bingoBoard" class="bingo-board"></div>
+              </div>
+            </div>
+            <section class="panel">
+              <div class="table-head"><h3>Ganadores detectados</h3><span id="bingoWinnerInfo" class="muted">Sin ganadores todavia.</span></div>
+              <div id="bingoWinnersList" class="bingo-winner-list"></div>
+            </section>
+          </section>
+        </div>
       </section>
 
       <section id="page-accounting" data-screen class="hidden">
@@ -776,9 +830,9 @@
   <div id="printArea" class="hidden"></div>
 
   <script>
-    const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], sheets: [], balance: [], accounting: [], settings: [] };
-    const functionLabels = { home: 'Inicio', create: 'Crear evento', stats: 'Estadisticas', delete: 'Eliminar evento', events: 'Eventos', sheets: 'Planillas', balance: 'Balance', accounting: 'Contable', settings: 'Configuraciones' };
-    const userDefaultPages = ['home', 'events', 'balance', 'accounting'];
+    const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], bingo: [], sheets: [], balance: [], accounting: [], settings: [] };
+    const functionLabels = { home: 'Inicio', create: 'Crear evento', stats: 'Estadisticas', delete: 'Eliminar evento', events: 'Eventos', bingo: 'Bingo', sheets: 'Planillas', balance: 'Balance', accounting: 'Contable', settings: 'Configuraciones' };
+    const userDefaultPages = ['home', 'events', 'bingo', 'balance', 'accounting'];
     const defaultSettings = { font: 'Arial, Helvetica, sans-serif', size: 15, buttonSize: 15, totalSize: 22, brand: '#0f766e', buttonBg: '#0f766e', navButtonBg: '#2b7bbb', navButtonActiveBg: '#0f766e', navButtonColor: '#ffffff', homeCardTitleColor: '#0f766e', membreteColor: '#202426', eventInfoColor: '#667078', eventInfoFont: 'Arial, Helvetica, sans-serif', bg: '#f4f6f2', panel: '#ffffff', splash: '#123f8c', side: '#18312d', radius: '8px', mainLogo: '', mainLogoSize: 180, eventLogoLeft: '', eventLogoRight: '', eventLogoLeftSize: 86, eventLogoRightSize: 86, adminPassword: 'admin123', functionPermissions: defaultFunctionPermissions };
     let events = [];
     let settings = { ...defaultSettings };
@@ -788,6 +842,7 @@
     let activePage = 'home';
     let activeEventId = null;
     let activeBalanceEventId = null;
+    let activeBingoEventId = null;
     let activeAccountingEventId = null;
     let currentView = 'detalle';
     let draftRanges = [];
@@ -801,6 +856,7 @@
     let accountingWeekEnd = '';
     const openAccountingCategories = new Set();
     const pendingLogos = { mainLogo: null, eventLogoLeft: null, eventLogoRight: null, balanceBgImage: null };
+    const bingoCardsCache = new Map();
 
     const $ = id => document.getElementById(id);
     const screens = document.querySelectorAll('[data-screen]');
@@ -1098,7 +1154,7 @@
       return userDefaultPages.includes(page);
     }
     function firstAllowedPage() {
-      return ['home', 'events', 'sheets', 'balance', 'accounting', 'stats', 'create', 'delete', 'settings'].find(canUsePage) || 'events';
+      return ['home', 'events', 'bingo', 'sheets', 'balance', 'accounting', 'stats', 'create', 'delete', 'settings'].find(canUsePage) || 'events';
     }
     function selectedFunctionPermissions() {
       const permissions = Object.fromEntries(Object.keys(defaultFunctionPermissions).map(page => [page, []]));
@@ -1159,6 +1215,108 @@
       return closure?.status === 'confirmed' && Array.isArray(closure.soldUnits)
         ? closure.soldUnits
         : unitsFromSales(eventData?.sales || []);
+    }
+    function activeBingoEvent() { return events.find(event => event.id === activeBingoEventId); }
+    function numberRange(start, end) { return Array.from({ length: end - start + 1 }, (_, index) => start + index); }
+    function shuffleValues(values, random = Math.random) {
+      const copy = [...values];
+      for (let index = copy.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(random() * (index + 1));
+        [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+      }
+      return copy;
+    }
+    function weightedPick(candidates, weights, random = Math.random) {
+      const total = candidates.reduce((sum, column) => sum + weights[column], 0);
+      let pick = random() * total;
+      for (const column of candidates) {
+        pick -= weights[column];
+        if (pick <= 0) return column;
+      }
+      return candidates.at(-1);
+    }
+    function createSeededRandom(seedText) {
+      let seed = 2166136261;
+      for (const character of String(seedText || '')) {
+        seed ^= character.charCodeAt(0);
+        seed = Math.imul(seed, 16777619);
+      }
+      return () => {
+        seed += 0x6d2b79f5;
+        let value = seed;
+        value = Math.imul(value ^ (value >>> 15), value | 1);
+        value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+        return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function createFallbackSeriesPattern() {
+      return Array.from({ length: 18 }, (_, rowIndex) => {
+        const row = Array(9).fill(false);
+        for (let offset = 0; offset < 5; offset += 1) row[(rowIndex * 5 + offset) % 9] = true;
+        return row;
+      });
+    }
+    function createSeriesPattern(random) {
+      for (let attempt = 0; attempt < 500; attempt += 1) {
+        const columnQuotas = Array(9).fill(10);
+        const rows = [];
+        let failed = false;
+        for (let rowIndex = 0; rowIndex < 18; rowIndex += 1) {
+          const row = Array(9).fill(false);
+          const rowsLeftAfter = 17 - rowIndex;
+          const requiredColumns = numberRange(0, 8).filter(column => columnQuotas[column] > rowsLeftAfter);
+          if (requiredColumns.length > 5) { failed = true; break; }
+          requiredColumns.forEach(column => { row[column] = true; columnQuotas[column] -= 1; });
+          while (row.filter(Boolean).length < 5) {
+            const candidates = numberRange(0, 8).filter(column => !row[column] && columnQuotas[column] > 0);
+            if (!candidates.length) { failed = true; break; }
+            const column = weightedPick(candidates, columnQuotas, random);
+            row[column] = true;
+            columnQuotas[column] -= 1;
+          }
+          if (failed) break;
+          rows.push(row);
+        }
+        if (!failed && columnQuotas.every(quota => quota === 0)) return rows;
+      }
+      return createFallbackSeriesPattern();
+    }
+    function firstCardNumberForSeries(seriesNumber) { return ((Number(seriesNumber) || 1) - 1) * 6 + 1; }
+    function createBingoSeries(eventSeed, seriesNumber) {
+      const random = createSeededRandom(`${eventSeed}:series:${seriesNumber}:v0`);
+      const pattern = createSeriesPattern(random);
+      const columns = Array.from({ length: 9 }, (_, column) => {
+        const start = column * 10 + 1;
+        return shuffleValues(numberRange(start, start + 9), random);
+      });
+      const firstCardNumber = firstCardNumberForSeries(seriesNumber);
+      return Array.from({ length: 6 }, (_, cardIndex) => {
+        const rows = Array.from({ length: 3 }, (_, rowIndex) => {
+          const sourceRow = pattern[cardIndex * 3 + rowIndex];
+          return sourceRow.map((hasNumber, column) => hasNumber ? columns[column].shift() : null);
+        });
+        return { series: Number(seriesNumber), cardNumber: firstCardNumber + cardIndex, cardPositionInSeries: cardIndex + 1, rows };
+      });
+    }
+    function bingoGame(eventData) {
+      if (!eventData.bingoGame) eventData.bingoGame = { drawn: [], winners: [], startedAt: null };
+      eventData.bingoGame.drawn = Array.isArray(eventData.bingoGame.drawn) ? eventData.bingoGame.drawn : [];
+      eventData.bingoGame.winners = Array.isArray(eventData.bingoGame.winners) ? eventData.bingoGame.winners : [];
+      return eventData.bingoGame;
+    }
+    function playableBingoCards(eventData) {
+      const units = officialSoldUnits(eventData);
+      const cacheKey = `${eventData.id}|${eventData.bingoSeed}|${units.join(',')}`;
+      if (!bingoCardsCache.has(cacheKey)) {
+        bingoCardsCache.set(cacheKey, units.flatMap(series => createBingoSeries(eventData.bingoSeed, series)));
+      }
+      return bingoCardsCache.get(cacheKey);
+    }
+    function cardNumbers(card) {
+      return card.rows.flat().filter(number => Number(number));
+    }
+    function cardIsComplete(card, drawnSet) {
+      return cardNumbers(card).every(number => drawnSet.has(Number(number)));
     }
     function saleTotal(item, event = activeEvent()) { return rangeCount(item) * (Number(event?.price) || 0); }
     function pct(amount, percent) { return (Number(amount) || 0) * (Number(percent) || 0) / 100; }
@@ -1593,6 +1751,106 @@
         card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${event.town}, ${event.province}</span><span>${num(totals.units)} bingos vendidos</span><span>Resultado ${money(visibleResult)}</span></div><div class="actions"><button type="button" data-open-balance="${event.id}">Entrar al balance</button></div>`;
         list.appendChild(card);
       });
+    }
+
+    function renderBingo() {
+      if (!canUsePage('bingo')) return;
+      const confirmedEvents = visibleEvents().filter(isBingoLoadConfirmed);
+      if (!activeBingoEventId || !confirmedEvents.some(event => event.id === activeBingoEventId)) {
+        activeBingoEventId = confirmedEvents[0]?.id || null;
+      }
+      $('bingoEventsList').innerHTML = confirmedEvents.length ? confirmedEvents.map(event => {
+        const units = officialSoldUnits(event);
+        const game = bingoGame(event);
+        return `
+          <button type="button" class="bingo-event-button ${event.id === activeBingoEventId ? 'active' : ''}" data-open-bingo="${event.id}">
+            <strong>${escapeAttr(event.name)}</strong>
+            <span>${shortDate(event.date)} - ${escapeAttr(event.town || '')}</span>
+            <span>${num(units.length)} series/cartones - ${num(units.length * 6)} cartones</span>
+            <span>${num(game.drawn.length)} bolillas cantadas</span>
+          </button>
+        `;
+      }).join('') : '<div class="empty">No hay cargas confirmadas para jugar.</div>';
+      renderBingoGame();
+    }
+
+    function renderBingoGame() {
+      const eventData = activeBingoEvent();
+      const hasEvent = Boolean(eventData);
+      const game = hasEvent ? bingoGame(eventData) : { drawn: [], winners: [] };
+      const drawnSet = new Set(game.drawn.map(Number));
+      const soldUnits = hasEvent ? officialSoldUnits(eventData) : [];
+      $('bingoEventName').textContent = hasEvent ? eventData.name : 'Sin evento';
+      $('bingoSoldUnits').textContent = hasEvent ? num(soldUnits.length) : '0';
+      $('bingoPlayableCards').textContent = num(soldUnits.length * 6);
+      $('bingoDrawCount').textContent = num(game.drawn.length);
+      $('bingoWinnerCount').textContent = num(game.winners.length);
+      $('bingoLastBall').textContent = game.drawn.at(-1) || '--';
+      $('drawBingoBall').disabled = !hasEvent || game.drawn.length >= 90;
+      $('resetBingoGame').disabled = !hasEvent || (!game.drawn.length && !game.winners.length);
+      $('bingoBoard').innerHTML = numberRange(1, 90).map(number => `<div class="bingo-ball ${drawnSet.has(number) ? 'drawn' : ''}">${number}</div>`).join('');
+      $('bingoWinnerInfo').textContent = game.winners.length ? `${num(game.winners.length)} cartones completos detectados.` : 'Sin ganadores todavia.';
+      $('bingoWinnersList').innerHTML = game.winners.length ? game.winners.map(winner => renderBingoWinner(winner, drawnSet)).join('') : '<div class="empty">Los ganadores apareceran automaticamente al completar carton.</div>';
+    }
+
+    function renderBingoWinner(winner, drawnSet) {
+      const rows = (winner.rows || []).map(row => row.map(number => {
+        const classes = ['bingo-card-cell'];
+        if (!number) classes.push('empty-cell');
+        if (number && drawnSet.has(Number(number))) classes.push('hit');
+        return `<div class="${classes.join(' ')}">${number || ''}</div>`;
+      }).join('')).join('');
+      return `
+        <article class="bingo-winner-card">
+          <strong>Serie ${num(winner.series)} - Carton ${num(winner.cardNumber)}</strong>
+          <span class="muted">Detectado con bolilla ${num(winner.drawnAt)} a las ${formatDateTime(winner.detectedAt)}</span>
+          <div class="bingo-card-grid">${rows}</div>
+        </article>
+      `;
+    }
+
+    function detectBingoWinners(eventData) {
+      const game = bingoGame(eventData);
+      const drawnSet = new Set(game.drawn.map(Number));
+      const existing = new Set(game.winners.map(winner => `${winner.series}|${winner.cardNumber}`));
+      const next = playableBingoCards(eventData)
+        .filter(card => cardIsComplete(card, drawnSet))
+        .filter(card => !existing.has(`${card.series}|${card.cardNumber}`))
+        .map(card => ({
+          series: card.series,
+          cardNumber: card.cardNumber,
+          cardPositionInSeries: card.cardPositionInSeries,
+          rows: card.rows,
+          drawnAt: game.drawn.at(-1),
+          detectedAt: new Date().toISOString()
+        }));
+      if (next.length) game.winners.push(...next);
+      return next;
+    }
+
+    function drawBingoBall() {
+      const eventData = activeBingoEvent();
+      if (!eventData) return alert('Primero elegi un evento confirmado.');
+      const game = bingoGame(eventData);
+      const remaining = numberRange(1, 90).filter(number => !game.drawn.includes(number));
+      if (!remaining.length) return alert('Ya salieron las 90 bolillas.');
+      const random = createSeededRandom(`${eventData.bingoSeed}:draw:${game.drawn.length}:${Date.now()}`);
+      const nextBall = shuffleValues(remaining, random)[0];
+      if (!game.startedAt) game.startedAt = new Date().toISOString();
+      game.drawn.push(nextBall);
+      const winners = detectBingoWinners(eventData);
+      saveEvents();
+      renderBingo();
+      if (winners.length) alert(`Ganador detectado: ${winners.length} carton(es) completo(s).`);
+    }
+
+    function resetBingoGame() {
+      const eventData = activeBingoEvent();
+      if (!eventData) return;
+      if (!confirm('Reiniciar el sorteo de este evento? Se borran bolillas cantadas y ganadores detectados.')) return;
+      eventData.bingoGame = { drawn: [], winners: [], startedAt: null, resetAt: new Date().toISOString(), resetBy: currentUser?.name || 'Usuario' };
+      saveEvents();
+      renderBingo();
     }
 
     function defaultAccountingCategories() {
@@ -2624,6 +2882,7 @@
       renderUsers();
       renderEventCards();
       renderDeleteList();
+      if (activePage === 'bingo') renderBingo();
       if (activePage === 'sheets') renderSheets();
       renderBalanceEvents();
       if (activePage === 'accounting') renderAccounting();
@@ -2693,6 +2952,8 @@
       }
       const openAccounting = event.target.closest('[data-open-accounting]');
       if (openAccounting) { activeAccountingEventId = openAccounting.dataset.openAccounting; renderAccounting(); }
+      const openBingo = event.target.closest('[data-open-bingo]');
+      if (openBingo) { activeBingoEventId = openBingo.dataset.openBingo; renderBingo(); }
       const editSheetButton = event.target.closest('[data-edit-sheet]');
       if (editSheetButton) editSheet(editSheetButton.dataset.editSheet);
       const deleteSheetButton = event.target.closest('[data-delete-sheet]');
@@ -3028,6 +3289,8 @@
     $('deleteSelectedRange').addEventListener('click', () => { draftRanges = draftRanges.filter(r => r.id !== selectedDraftId); selectedDraftId = draftRanges.at(-1)?.id || null; renderDraft(); });
     $('clearDraftRanges').addEventListener('click', () => { if (draftRanges.length && confirm('Eliminar toda la lista previa?')) { draftRanges = []; selectedDraftId = null; renderDraft(); } });
     $('clearSaleForm').addEventListener('click', resetSaleForm);
+    $('drawBingoBall').addEventListener('click', drawBingoBall);
+    $('resetBingoGame').addEventListener('click', resetBingoGame);
     $('clearEventForm').addEventListener('click', resetEventForm);
     ['balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent', 'balanceNoePercent', 'balanceIndigoPercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => $(id).addEventListener('input', updateBalancePreview));
     bindAmountFormatting($('balancePrice'));
