@@ -1,0 +1,1275 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sistema de Bingo 90</title>
+    <link rel="stylesheet" href="styles.css?v=user-selector-20260803">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section id="landingScreen" class="landing-screen">
+        <div class="brand-mark">
+          <span>IB</span>
+        </div>
+        <p class="eyebrow">Sistema de Bingo 90</p>
+        <h1>Indigo Blue</h1>
+        <p class="setup-copy">Gestion de eventos, diseno de cartones, sorteos y reportes para bingo de 90 bolillas.</p>
+        <div class="landing-actions">
+          <button id="adminAccessBtn" class="primary-button" type="button">Ingresar administrador</button>
+          <button id="userAccessBtn" class="ghost-button" type="button">Ingresar usuarios</button>
+        </div>
+      </section>
+
+      <section id="homeScreen" class="home-screen hidden">
+        <div>
+          <p class="eyebrow">Administrador</p>
+          <h1>Panel de administracion</h1>
+          <p class="setup-copy">Crea eventos, configura la estetica general y disena la tira imprimible de 6 cartones por serie.</p>
+        </div>
+        <div class="home-actions">
+          <button id="createFirstEventBtn" class="primary-button" type="button">Cargar evento</button>
+          <button id="designHomeBtn" class="ghost-button" type="button">Configurar evento</button>
+          <button id="salesHomeBtn" class="ghost-button" type="button">Cargar ventas</button>
+          <button id="stripDesignerBtn" class="ghost-button" type="button">Disenar tira de 6 cartones</button>
+          <button id="exportCardsPdfBtn" class="ghost-button" type="button">PDF cartones/tiras</button>
+          <button id="adminPlayBtn" class="ghost-button" type="button">Jugar bingo</button>
+          <button id="homeSaveEventBtn" class="ghost-button" type="button">Guardar evento</button>
+          <button id="homeExportReportBtn" class="ghost-button" type="button">Guardar reporte PDF</button>
+          <button id="homeResetGameBtn" class="danger-button" type="button">Reiniciar partida</button>
+          <button id="usersAdminBtn" class="ghost-button" type="button">Usuarios</button>
+          <button id="exportBackupBtn" class="ghost-button" type="button">Exportar respaldo</button>
+          <button id="importBackupBtn" class="ghost-button" type="button">Importar respaldo</button>
+          <input id="importBackupInput" class="hidden" type="file" accept=".json,application/json">
+          <button id="landingBackBtn" class="ghost-button" type="button">Volver al inicio</button>
+        </div>
+        <section class="home-events">
+          <div class="section-heading">
+            <div>
+              <h2>Eventos guardados</h2>
+              <p class="small-note">Selecciona un evento para continuar su partida o revisar sus cartones.</p>
+            </div>
+          </div>
+          <div id="homeSavedEventsList" class="saved-events-list"></div>
+          <div class="home-stats-block">
+            <h2>Estadisticas del evento seleccionado</h2>
+            <div id="statsList" class="stats-list home-stats-list"></div>
+          </div>
+        </section>
+      </section>
+
+      <section id="userEventsScreen" class="home-screen hidden">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Usuario</p>
+            <h1 id="userEventsTitle">Eventos habilitados</h1>
+            <p class="setup-copy">Solo aparecen los eventos permitidos por el administrador.</p>
+          </div>
+          <button id="userLogoutBtn" class="ghost-button" type="button">Volver al inicio</button>
+        </div>
+        <div id="userEventsList" class="saved-events-list"></div>
+      </section>
+
+      <section id="loadScreen" class="home-screen hidden">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Paso 3</p>
+            <h1>Carga del evento</h1>
+            <p class="setup-copy">Define el nombre del evento y el rango de series o cartones a generar.</p>
+          </div>
+          <button id="loadBackAdminBtn" class="ghost-button" type="button">Volver al administrador</button>
+        </div>
+        <form id="loadEventForm" class="load-card">
+          <div class="form-grid">
+            <label>
+              Nombre del evento
+              <input id="loadEventNameInput" type="text" placeholder="Ej: Gran Bingo Indigo Blue">
+            </label>
+            <label>
+              Detalle
+              <input id="loadEventDetailInput" type="text" placeholder="Fecha, lugar o descripcion">
+            </label>
+          </div>
+          <div class="creation-choice-grid">
+            <section class="creation-choice-card">
+              <h2>Combinaciones</h2>
+              <label>
+                <input id="loadCombinationNewInput" name="loadCombinationMode" type="radio" value="new" checked>
+                <span>
+                  <strong>COMBINACIONES NUEVAS</strong>
+                  <small>Genera cartones propios para este evento.</small>
+                </span>
+              </label>
+              <label>
+                <input id="loadCombinationExistingInput" name="loadCombinationMode" type="radio" value="existing">
+                <span>
+                  <strong>COMBINACIONES CREADAS</strong>
+                  <small>Usa una combinacion central ya generada.</small>
+                </span>
+              </label>
+              <select id="loadCombinationSourceInput" disabled>
+                <option value="">Seleccionar combinacion creada</option>
+              </select>
+            </section>
+            <section class="creation-choice-card">
+              <h2>Diseno</h2>
+              <label>
+                <input id="loadDesignCopyInput" name="loadDesignMode" type="radio" value="copy">
+                <span>
+                  <strong>COPIAR DISEÑO</strong>
+                  <small>Copia estetica, logos, bolillas y tira imprimible.</small>
+                </span>
+              </label>
+              <label>
+                <input id="loadDesignNewInput" name="loadDesignMode" type="radio" value="new" checked>
+                <span>
+                  <strong>DISEÑO NUEVO</strong>
+                  <small>Arranca limpio para configurar desde cero.</small>
+                </span>
+              </label>
+              <select id="loadDesignSourceInput" disabled>
+                <option value="">Seleccionar diseno a copiar</option>
+              </select>
+            </section>
+          </div>
+          <div class="mode-row">
+            <label>
+              <input id="loadModeSeriesInput" name="loadMode" type="radio" value="series" checked>
+              Cargar por series de 6 cartones
+            </label>
+            <label>
+              <input id="loadModeIndividualInput" name="loadMode" type="radio" value="individual">
+              Cargar cartones individuales
+            </label>
+          </div>
+          <div class="form-grid">
+            <label>
+              Desde
+              <input id="loadRangeStartInput" type="number" min="1" max="20000" value="1">
+            </label>
+            <label>
+              Hasta
+              <input id="loadRangeEndInput" type="number" min="1" max="20000" value="5">
+            </label>
+            <label>
+              Cartones estimados
+              <input id="loadCardsTotalInput" type="number" readonly value="30">
+            </label>
+          </div>
+          <div class="button-row end">
+            <button class="ghost-button" type="button" id="loadGoConfigBtn">Ir a configuraciones</button>
+            <button class="primary-button" type="submit">Generar carga y configurar</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="salesScreen" class="home-screen hidden">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Paso 5</p>
+            <h1>Carga de ventas</h1>
+            <p class="setup-copy">Carga las series o cartones vendidos. Solo lo vendido participa en el sorteo.</p>
+          </div>
+          <button id="salesBackAdminBtn" class="ghost-button" type="button">Volver al administrador</button>
+        </div>
+        <div class="load-card sales-card">
+          <div id="salesSummary" class="sales-summary"></div>
+          <div class="sales-entry-layout">
+            <div class="sales-entry-panel">
+              <form id="salesManualForm" class="manual-form">
+                <h2>Carga manual</h2>
+                <div class="sales-range-inputs">
+                  <label>
+                    Desde
+                    <input id="salesFromInput" type="number" min="1" max="20000" value="1">
+                  </label>
+                  <label>
+                    Hasta
+                    <input id="salesToInput" type="number" min="1" max="20000" value="1">
+                  </label>
+                </div>
+                <button class="primary-button full-button" type="submit">Agregar venta</button>
+              </form>
+              <div>
+                <h2>Ventas cargadas para activar</h2>
+                <div id="salesList" class="sales-list compact-sales-list"></div>
+              </div>
+            </div>
+            <div class="sales-side-panel">
+              <form id="salesRemoveForm" class="manual-form">
+                <h2>Eliminar venta</h2>
+                <div class="input-row">
+                  <input id="salesRemoveInput" type="text" inputmode="numeric" placeholder="Ej: 22 o 35-150">
+                  <button class="ghost-button" type="submit">Eliminar</button>
+                </div>
+              </form>
+              <div class="sales-tools">
+                <div>
+                  <h2>Archivo TXT o DAT</h2>
+                  <p class="small-note">Acepta numeros separados por coma, espacio o salto de linea. Tambien rangos como 1-120 o 1 al 120.</p>
+                </div>
+                <input id="salesImportInput" class="hidden" type="file" accept=".txt,.dat,text/plain">
+                <div class="button-row">
+                  <button id="salesImportBtn" class="ghost-button" type="button">Importar ventas</button>
+                  <button id="salesExportBtn" class="ghost-button" type="button">Exportar ventas</button>
+                  <button id="salesClearBtn" class="danger-button" type="button">Limpiar ventas</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="button-row end">
+            <button id="salesContinueBtn" class="primary-button" type="button">Activar ventas</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="gameScreen" class="game-screen hidden">
+
+        <section id="generationNotice" class="generation-notice hidden">
+          <strong>Generando cartones</strong>
+          <span id="generationProgressText">Preparando evento...</span>
+        </section>
+
+      <section id="gameArea" class="dashboard-grid">
+        <aside class="control-panel">
+          <div class="game-logo-slot bingo-logo-slot">
+            <img id="gameBingoLogo" alt="Logo del bingo">
+            <span>Logo bingo</span>
+          </div>
+          <div class="panel-section game-command-panel">
+            <h2>Comandos</h2>
+            <div class="topbar-actions side-actions">
+              <button id="backHomeBtn" class="ghost-button" type="button">Panel principal</button>
+              <button id="newEventBtn" class="ghost-button hidden" type="button">Configurar evento</button>
+              <button id="saveEventStateBtn" class="ghost-button hidden" type="button">Guardar evento</button>
+              <button id="exportReportBtn" class="ghost-button hidden" type="button">Guardar reporte PDF</button>
+              <button id="resetGameBtn" class="danger-button hidden" type="button">Reiniciar partida</button>
+            </div>
+          </div>
+          <div class="panel-section">
+            <h2>Bolillero</h2>
+            <div class="button-row">
+              <button id="drawBallBtn" class="primary-button" type="button">Sortear</button>
+              <button id="undoBallBtn" class="ghost-button" type="button">Deshacer</button>
+            </div>
+            <form id="manualBallForm" class="manual-form">
+              <label for="manualBallInput">Carga manual</label>
+              <div class="input-row">
+                <input id="manualBallInput" type="number" min="1" max="90" placeholder="1-90">
+                <button type="submit">Cargar</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="panel-section">
+            <h2>Premio en juego</h2>
+            <div id="currentPrizeBox" class="current-prize-box"></div>
+            <form id="prizeSettingsForm" class="manual-form">
+              <label for="pozoLimitInput">Bolilla tope del pozo</label>
+              <div class="input-row">
+                <input id="pozoLimitInput" type="number" min="30" max="90" value="37">
+                <button type="submit">Aplicar</button>
+              </div>
+            </form>
+            <div class="balls-out-counter">
+              <span>Bolillas que salieron</span>
+              <strong id="ballsOutCount">0</strong>
+            </div>
+          </div>
+
+          <div class="panel-section near-full-panel">
+            <h2>Cartones cerca del bingo</h2>
+            <div id="nearFullSummary" class="near-full-summary"></div>
+            <div id="nearFullList" class="near-full-list"></div>
+            <div class="legacy-card-tools hidden">
+              <form id="seriesForm" class="manual-form">
+                <label for="seriesCountInput">Series a generar</label>
+                <div class="input-row">
+                  <input id="seriesCountInput" type="number" min="1" max="200" value="5">
+                  <button type="submit">Generar</button>
+                </div>
+              </form>
+              <button id="clearCardsBtn" class="ghost-button" type="button">Limpiar</button>
+            </div>
+          </div>
+
+        </aside>
+
+        <section class="main-board">
+          <div class="game-brand-main">
+            <p class="eyebrow">Bingo 90</p>
+            <h1 id="eventTitle">Sin evento activo</h1>
+            <div class="status-pill" id="gameStatus">Partida en espera</div>
+          </div>
+          <div class="board-header">
+            <div>
+              <h2>Tablero de 90 numeros</h2>
+              <p id="drawCount">0 bolillas cantadas</p>
+            </div>
+          </div>
+          <div id="numberBoard" class="number-board" aria-label="Tablero de numeros"></div>
+        </section>
+
+        <aside class="result-panel">
+          <div class="game-logo-slot indigo-logo-slot">
+            <img id="gameIndigoLogo" alt="Logo Indigo Blue">
+            <span>Indigo Blue</span>
+          </div>
+          <div class="panel-section live-ball-panel">
+            <h2>Bolilla cantada</h2>
+            <div class="last-ball" aria-live="polite">
+              <img id="lastBallImage" alt="Bolilla cantada">
+              <span>Bolilla personalizada</span>
+            </div>
+            <div class="last-ball-number">
+              <span>Ultima bolilla</span>
+              <strong id="lastBall">--</strong>
+            </div>
+          </div>
+          <div class="panel-section">
+            <h2>Ganadores detectados</h2>
+            <div id="winnerList" class="winner-list"></div>
+          </div>
+          <div class="panel-section">
+            <h2>Historial</h2>
+            <div id="historyList" class="history-list"></div>
+          </div>
+        </aside>
+      </section>
+
+      </section>
+    </main>
+
+    <dialog id="eventDialog">
+      <form id="eventForm" class="dialog-card">
+        <h2>Configuraciones del evento</h2>
+        <div class="tabs" role="tablist" aria-label="Configuracion del evento">
+          <button class="tab-button active" data-tab="general" type="button">General</button>
+          <button class="tab-button" data-tab="estetica" type="button">Estetica</button>
+          <button class="tab-button" data-tab="premios" type="button">Premios</button>
+          <button class="tab-button" data-tab="cartones" type="button">Cartones</button>
+          <button class="tab-button" data-tab="proyeccion" type="button">Proyeccion</button>
+          <button class="tab-button gear-tab" data-tab="tipografia" type="button" title="Configuracion de textos">&#9881; Textos</button>
+        </div>
+        <div class="tab-panel active" data-panel="general">
+          <label for="eventNameInput">Nombre del evento</label>
+          <input id="eventNameInput" type="text" value="">
+          <label for="eventDetailInput">Detalle</label>
+          <input id="eventDetailInput" type="text" placeholder="Ej: Gran bingo aniversario">
+          <div class="mode-row">
+            <label>
+              <input id="eventModeSeriesInput" name="eventCardMode" type="radio" value="series" checked>
+              Por series de 6 cartones
+            </label>
+            <label>
+              <input id="eventModeIndividualInput" name="eventCardMode" type="radio" value="individual">
+              Cartones individuales
+            </label>
+          </div>
+          <div class="form-grid">
+            <label>
+              Desde
+              <input id="eventRangeStartInput" type="number" min="1" max="20000" value="1">
+            </label>
+            <label>
+              Hasta
+              <input id="eventRangeEndInput" type="number" min="1" max="20000" value="5">
+            </label>
+            <label>
+              Cartones estimados
+              <input id="eventCardsTotalInput" type="number" readonly value="30">
+            </label>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="estetica">
+          <div class="form-grid">
+            <label>
+              Color principal del panel
+              <input id="eventAccentColorInput" type="color" value="#d1223b">
+            </label>
+            <label>
+              Color de paneles
+              <input id="eventPanelColorInput" type="color" value="#17212b">
+            </label>
+            <label>
+              Tamano de bolilla principal
+              <input id="eventBallSizeInput" type="number" min="36" max="96" value="74">
+            </label>
+            <label>
+              Redondez de botones
+              <input id="eventButtonRadiusInput" type="number" min="0" max="24" value="8">
+            </label>
+            <label>
+              Margen superior pantalla
+              <input id="eventScreenMarginTopInput" type="number" min="0" max="120" value="0">
+            </label>
+            <label>
+              Margen inferior pantalla
+              <input id="eventScreenMarginBottomInput" type="number" min="0" max="120" value="16">
+            </label>
+            <label>
+              Margen izquierdo pantalla
+              <input id="eventScreenMarginLeftInput" type="number" min="0" max="160" value="0">
+            </label>
+            <label>
+              Margen derecho pantalla
+              <input id="eventScreenMarginRightInput" type="number" min="0" max="160" value="0">
+            </label>
+            <label>
+              Logo del bingo
+              <input id="eventBingoLogoInput" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+              <span id="eventBingoLogoStatus" class="file-status">Sin logo cargado.</span>
+            </label>
+            <label>
+              Logo Indigo Blue
+              <input id="eventIndigoLogoInput" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+              <span id="eventIndigoLogoStatus" class="file-status">Sin logo cargado.</span>
+            </label>
+            <label>
+              Carpeta de bolillas 1-90
+              <input id="eventBallImagesInput" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple webkitdirectory directory>
+              <span id="eventBallImagesStatus" class="file-status">Sin bolillas personalizadas.</span>
+            </label>
+            <label>
+              Fuente numeros tablero
+              <select id="eventBoardFontFamilyInput">
+                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                <option value="'Courier New', monospace">Digital / Mono</option>
+              </select>
+            </label>
+            <label>
+              Tamano fuente numeros
+              <input id="eventBoardFontSizeInput" type="number" min="12" max="200" value="22">
+            </label>
+            <label>
+              Color boton sin marcar
+              <input id="eventBoardButtonColorInput" type="color" value="#1f2933">
+            </label>
+            <label>
+              Color numero sin marcar
+              <input id="eventBoardTextColorInput" type="color" value="#bcd7f3">
+            </label>
+            <label>
+              Color boton marcado
+              <input id="eventBoardDrawnColorInput" type="color" value="#ffcb45">
+            </label>
+            <label>
+              Color numero marcado
+              <input id="eventBoardDrawnTextColorInput" type="color" value="#111111">
+            </label>
+            <label class="check-field">
+              <input id="eventBoardShadowInput" type="checkbox" checked>
+              Sombreado en botones
+            </label>
+            <label class="check-field">
+              <input id="eventBoardNumberShadowInput" type="checkbox">
+              Sombreado en numeros
+            </label>
+            <label class="check-field">
+              <input id="eventBoardNeonInput" type="checkbox">
+              Efecto neon moderno
+            </label>
+          </div>
+          <p class="small-note">Los margenes de pantalla forman el marco negro exterior. Al cambiarlos, el panel completo se comprime o se expande dentro del espacio disponible.</p>
+        </div>
+        <div class="tab-panel prize-settings-panel" data-panel="premios">
+          <div class="form-grid">
+            <label>
+              Bolilla tope del pozo
+              <input id="eventPozoLimitInput" type="number" min="30" max="90" value="37">
+            </label>
+            <label>
+              Bolilla inicio pozo
+              <input id="eventPozoBaseLimitInput" type="number" min="30" max="90" value="37">
+            </label>
+            <label>
+              Incremento de bolilla
+              <input id="eventPozoLimitIncrementInput" type="number" min="1" max="20" value="1">
+            </label>
+            <label>
+              Premio cuaterno
+              <input id="eventCuaternoPrizeInput" type="text" inputmode="numeric" value="0">
+            </label>
+            <label class="check-field">
+              <input id="eventCuaternoEnabledInput" type="checkbox" checked>
+              Jugar cuaterno
+            </label>
+            <label>
+              Premio linea
+              <input id="eventLineaPrizeInput" type="text" inputmode="numeric" value="0">
+            </label>
+            <label class="check-field">
+              <input id="eventLineaEnabledInput" type="checkbox" checked>
+              Jugar linea
+            </label>
+            <label>
+              Premio segunda linea
+              <input id="eventSegundaLineaPrizeInput" type="text" inputmode="numeric" value="0">
+            </label>
+            <label class="check-field">
+              <input id="eventSegundaLineaEnabledInput" type="checkbox" checked>
+              Jugar segunda linea
+            </label>
+            <label>
+              Premio pozo
+              <input id="eventPozoPrizeInput" type="text" inputmode="numeric" value="0">
+            </label>
+            <label>
+              Premio base pozo
+              <input id="eventPozoBasePrizeInput" type="text" inputmode="numeric" value="0">
+            </label>
+            <label class="check-field">
+              <input id="eventPozoEnabledInput" type="checkbox" checked>
+              Jugar pozo acumulado
+            </label>
+            <label>
+              Incremento premio pozo
+              <input id="eventPozoPrizeIncrementInput" type="text" inputmode="numeric" value="0">
+            </label>
+            <label>
+              Premio bingo
+              <input id="eventBingoPrizeInput" type="text" inputmode="numeric" value="0">
+            </label>
+            <label class="check-field">
+              <input id="eventBingoEnabledInput" type="checkbox" checked>
+              Jugar bingo
+            </label>
+            <label>
+              Premio carton extra
+              <input id="eventExtraPrizeInput" type="text" inputmode="numeric" value="0">
+            </label>
+            <label>
+              Premio base extra
+              <input id="eventExtraBasePrizeInput" type="text" inputmode="numeric" value="0">
+            </label>
+            <label class="check-field">
+              <input id="eventExtraEnabledInput" type="checkbox" checked>
+              Jugar carton extra
+            </label>
+            <label>
+              Incremento premio extra
+              <input id="eventExtraPrizeIncrementInput" type="text" inputmode="numeric" value="0">
+            </label>
+            <label>
+              Bolillas adicionales para Extra
+              <input id="eventExtraBallsInput" type="number" min="1" max="90" value="5">
+            </label>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="cartones">
+          <div class="form-grid">
+            <label>
+              Titulo impreso
+              <input id="eventCardTitleInput" type="text" placeholder="Nombre visible en carton">
+            </label>
+            <label>
+              Color principal del carton
+              <input id="eventCardAccentInput" type="color" value="#d1223b">
+            </label>
+            <label>
+              Color de fondo del carton
+              <input id="eventCardBgInput" type="color" value="#ffffff">
+            </label>
+            <label>
+              Texto inferior
+              <input id="eventCardFooterInput" type="text" placeholder="Organizacion, fecha o slogan">
+            </label>
+          </div>
+          <p class="small-note">Esta base queda preparada para sumar logo, QR, codigo de barras y edicion completa del diseno.</p>
+        </div>
+        <div class="tab-panel" data-panel="proyeccion">
+          <h3>Repaso antes del pozo</h3>
+          <div class="form-grid">
+            <label>
+              Avisar cuando falten estas bolillas para el tope
+              <input id="eventRecapLeadBallsInput" type="number" min="0" max="30" value="3">
+            </label>
+            <label>
+              Segundos de imagen de repaso
+              <input id="eventRecapSecondsInput" type="number" min="1" max="120" value="8">
+            </label>
+            <label class="wide-field">
+              Imagen o video para el repaso
+              <input id="eventRecapMediaInput" type="file" accept=".jpg,.jpeg,.png,.mp4,image/jpeg,image/png,video/mp4">
+              <span id="eventRecapMediaStatus" class="file-status">Se usara la placa predeterminada del sistema.</span>
+            </label>
+          </div>
+          <h3>Cortina antes de mostrar premios</h3>
+          <div class="form-grid">
+            <label>
+              Segundos de imagen o video
+              <input id="eventWinnerMediaSecondsInput" type="number" min="1" max="120" value="5">
+            </label>
+          </div>
+          <div id="eventPrizeMediaList" class="media-config-list"></div>
+          <p class="small-note">Formatos admitidos: JPG, JPEG, PNG y MP4. Los archivos quedan guardados en este navegador para volver a usarlos al abrir el evento.</p>
+        </div>
+        <div class="tab-panel" data-panel="tipografia">
+          <h3>Premios del panel de juego</h3>
+          <div class="form-grid">
+            <label>
+              Fuente nombre y monto del premio
+              <select id="eventPrizeFontFamilyInput">
+                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                <option value="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif">Impact</option>
+                <option value="'Courier New', monospace">Digital / Mono</option>
+              </select>
+            </label>
+            <label>
+              Tamano nombre del premio
+              <input id="eventPrizeNameSizeInput" type="number" min="12" max="200" value="16">
+            </label>
+            <label>
+              Color nombre del premio
+              <input id="eventPrizeNameColorInput" type="color" value="#2fbf71">
+            </label>
+            <label>
+              Tamano monto del premio
+              <input id="eventPrizeAmountSizeInput" type="number" min="12" max="200" value="18">
+            </label>
+            <label>
+              Color monto del premio
+              <input id="eventPrizeAmountColorInput" type="color" value="#ffcb45">
+            </label>
+          </div>
+          <h3>Encabezado del juego</h3>
+          <div class="form-grid">
+            <label>
+              Fuente nombre del bingo
+              <select id="eventHeaderFontFamilyInput">
+                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                <option value="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif">Impact</option>
+                <option value="'Courier New', monospace">Digital / Mono</option>
+              </select>
+            </label>
+            <label>
+              Tamano nombre del juego
+              <input id="eventHeaderTitleSizeInput" type="number" min="18" max="200" value="26">
+            </label>
+            <label>
+              Color nombre del juego
+              <input id="eventHeaderTitleColorInput" type="color" value="#ffffff">
+            </label>
+            <label>
+              Fuente premio que se esta jugando
+              <select id="eventHeaderPrizeFontFamilyInput">
+                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                <option value="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif">Impact</option>
+                <option value="'Courier New', monospace">Digital / Mono</option>
+              </select>
+            </label>
+            <label>
+              Tamano premio que se esta jugando
+              <input id="eventHeaderPrizeSizeInput" type="number" min="12" max="200" value="16">
+            </label>
+            <label>
+              Color premio que se esta jugando
+              <input id="eventHeaderPrizeColorInput" type="color" value="#ffcb45">
+            </label>
+            <label>
+              Color titulos de paneles
+              <input id="eventPanelHeadingColorInput" type="color" value="#ffffff">
+            </label>
+            <label>
+              Color textos secundarios
+              <input id="eventPanelTextColorInput" type="color" value="#c7d7ea">
+            </label>
+          </div>
+          <h3>Textos de placas y proyeccion</h3>
+          <div class="form-grid">
+            <label>
+              Fuente proyeccion
+              <select id="eventProjectionFontFamilyInput">
+                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                <option value="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif">Impact</option>
+                <option value="'Courier New', monospace">Digital / Mono</option>
+              </select>
+            </label>
+            <label>
+              Tamano titulo proyeccion
+              <input id="eventProjectionTitleSizeInput" type="number" min="36" max="200" value="80">
+            </label>
+            <label>
+              Color titulo proyeccion
+              <input id="eventProjectionTitleColorInput" type="color" value="#ffffff">
+            </label>
+            <label>
+              Color detalle proyeccion
+              <input id="eventProjectionDetailColorInput" type="color" value="#e2e7ee">
+            </label>
+          </div>
+          <div class="button-row">
+            <button id="eventProjectionPreviewBtn" class="ghost-button" type="button">Vista previa de proyeccion</button>
+          </div>
+          <p class="small-note">Estos ajustes cambian los textos principales del tablero, el premio visible arriba y las placas predeterminadas de repaso o premios.</p>
+        </div>
+        <p class="small-note">Al generar un evento se crean las series de 6 cartones y se inicia una partida nueva.</p>
+        <div class="button-row end">
+          <button id="cancelEventBtn" class="ghost-button" type="button">Cancelar</button>
+          <button id="saveEventBtn" class="primary-button" type="submit">Generar evento</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="settingsDialog">
+      <form method="dialog" class="dialog-card">
+        <h2>Configuracion visual</h2>
+        <label for="accentColorInput">Color principal</label>
+        <input id="accentColorInput" type="color" value="#d1223b">
+        <label for="panelColorInput">Color de panel</label>
+        <input id="panelColorInput" type="color" value="#17212b">
+        <p class="small-note">Este panel queda como base para imagenes, videos y temas por evento.</p>
+        <div class="button-row end">
+          <button value="cancel" class="ghost-button" type="submit">Cerrar</button>
+          <button id="applyThemeBtn" value="default" class="primary-button" type="submit">Aplicar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="adminLoginDialog">
+      <form id="adminLoginForm" class="dialog-card">
+        <h2>Ingreso administrador</h2>
+        <label for="adminPasswordInput">Clave</label>
+        <input id="adminPasswordInput" type="password" autocomplete="current-password" placeholder="Clave de administrador">
+        <p class="small-note">Clave inicial: 1234. Luego podes cambiarla desde Usuarios.</p>
+        <div class="button-row end">
+          <button id="adminLoginCancelBtn" class="ghost-button" type="button">Cancelar</button>
+          <button class="primary-button" type="submit">Ingresar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="userLoginDialog">
+      <form id="userLoginForm" class="dialog-card">
+        <h2>Ingreso usuarios</h2>
+        <label for="userLoginNameInput">Usuario</label>
+        <select id="userLoginNameInput" autocomplete="username">
+          <option value="">Seleccionar usuario</option>
+        </select>
+        <label for="userLoginPasswordInput">Contrasena</label>
+        <input id="userLoginPasswordInput" type="password" autocomplete="current-password" placeholder="Contrasena">
+        <div class="button-row end">
+          <button id="userLoginCancelBtn" class="ghost-button" type="button">Cancelar</button>
+          <button class="primary-button" type="submit">Ingresar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="usersDialog">
+      <section class="dialog-card users-admin-card">
+        <h2>Usuarios y permisos</h2>
+        <form id="adminPasswordForm" class="manual-form">
+          <h3>Clave de administrador</h3>
+          <div class="input-row">
+            <input id="newAdminPasswordInput" type="password" placeholder="Nueva clave">
+            <button class="ghost-button" type="submit">Cambiar clave</button>
+          </div>
+        </form>
+        <form id="userCreateForm" class="manual-form">
+          <h3>Crear usuario</h3>
+          <div class="form-grid">
+            <label>
+              Usuario
+              <input id="newUserNameInput" type="text" placeholder="Ej: vendedor1">
+            </label>
+            <label>
+              Contrasena
+              <input id="newUserPasswordInput" type="password" placeholder="Clave del usuario">
+            </label>
+          </div>
+          <h3>Eventos permitidos</h3>
+          <div id="newUserEventsList" class="permission-list"></div>
+          <div class="button-row end">
+            <button class="primary-button" type="submit">Guardar usuario</button>
+          </div>
+        </form>
+        <h3>Usuarios creados</h3>
+        <div id="usersList" class="saved-events-list users-list"></div>
+        <div class="button-row end">
+          <button id="usersCloseBtn" class="ghost-button" type="button">Cerrar</button>
+        </div>
+      </section>
+    </dialog>
+
+    <dialog id="salesDuplicateDialog">
+      <section class="dialog-card sales-duplicate-card">
+        <h2>Venta repetida detectada</h2>
+        <p id="salesDuplicateMessage" class="small-note">Revisa la carga antes de activar ventas.</p>
+        <div id="salesDuplicateList" class="sales-duplicate-list"></div>
+        <div class="button-row end">
+          <button id="salesDuplicateCloseBtn" class="primary-button" type="button">Entendido</button>
+        </div>
+      </section>
+    </dialog>
+
+    <dialog id="stripDesignerDialog">
+      <section class="dialog-card strip-designer-card">
+        <header class="review-header">
+          <div>
+            <h2>Diseno de tira de 6 cartones</h2>
+            <p class="small-note">Cada serie conserva numeracion correlativa: serie 1 cartones 1 al 6, serie 2 cartones 7 al 12.</p>
+          </div>
+          <button id="stripDesignerCloseBtn" class="close-button" type="button" aria-label="Cerrar">x</button>
+        </header>
+        <div class="strip-designer-layout">
+          <form id="stripDesignerForm" class="designer-controls">
+            <section class="designer-control-section">
+              <h3>1. Papel</h3>
+              <div class="form-grid">
+                <label>
+                  Tamano de papel
+                  <select id="stripPaperSizeInput">
+                    <option value="a4">A4</option>
+                    <option value="a5">A5</option>
+                    <option value="legal">Legal</option>
+                  </select>
+                </label>
+                <label>
+                  Orientacion
+                  <select id="stripOrientationInput">
+                    <option value="landscape">Horizontal</option>
+                    <option value="portrait">Vertical</option>
+                  </select>
+                </label>
+                <label>
+                  Alto reservado para membrete
+                  <input id="stripHeaderHeightInput" type="number" min="0" max="180" value="68">
+                </label>
+                <label>
+                  Color de fondo
+                  <input id="stripBgInput" type="color" value="#ffffff">
+                </label>
+                <label class="wide-field">
+                  Imagen de fondo de la tira
+                  <input id="stripBgImageInput" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+                  <span id="stripBgImageStatus" class="file-status">Sin imagen de fondo.</span>
+                </label>
+              </div>
+            </section>
+
+            <section class="designer-control-section">
+              <h3>2. Cantidad y distribucion</h3>
+              <div class="form-grid">
+                <label>
+                  Tipo de diseno
+                  <select id="stripContentModeInput">
+                    <option value="strip">Tira de 6 cartones</option>
+                    <option value="single">Un carton repetido</option>
+                  </select>
+                </label>
+                <label>
+                  Tiras/cartones por hoja
+                  <input id="stripItemsPerPageInput" type="number" min="1" max="24" value="1">
+                </label>
+                <label>
+                  Columnas en hoja
+                  <input id="stripColumnsInput" type="number" min="1" max="6" value="1">
+                </label>
+                <label>
+                  Orden de impresion
+                  <select id="stripOrderModeInput">
+                    <option value="consecutive">Correlativo por hoja</option>
+                    <option value="columnar">Una debajo de otra por bloques</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <section class="designer-control-section">
+              <h3>3. Tiras, separaciones y posicion</h3>
+              <div class="form-grid">
+                <label>
+                  Separacion horizontal entre tiras
+                  <input id="stripGapInput" type="number" min="0" max="1000" value="8">
+                </label>
+                <label>
+                  Separacion vertical entre cartones
+                  <input id="stripRowGapInput" type="number" min="0" max="1000" value="8">
+                </label>
+                <label>
+                  Mover horizontal
+                  <input id="stripOffsetXInput" type="number" min="-120" max="120" value="0">
+                </label>
+                <label>
+                  Mover vertical
+                  <input id="stripOffsetYInput" type="number" min="-120" max="120" value="0">
+                </label>
+                <label>
+                  Ancho de cartones (%)
+                  <input id="stripCardScaleInput" type="number" min="60" max="160" value="100">
+                </label>
+                <label>
+                  Tamano recuadro numeros
+                  <input id="stripCellSizeInput" type="number" min="12" max="42" value="18">
+                </label>
+              </div>
+            </section>
+
+            <section class="designer-control-section">
+              <h3>4. Fuente, colores y detalles</h3>
+              <div class="form-grid">
+                <label>
+                  Tamano de fuente
+                  <input id="stripFontSizeInput" type="number" min="10" max="200" value="16">
+                </label>
+                <label>
+                  Fuente
+                  <select id="stripFontFamilyInput">
+                    <option value="Arial, Helvetica, sans-serif">Arial</option>
+                    <option value="'Times New Roman', serif">Times</option>
+                    <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                    <option value="'Courier New', monospace">Courier</option>
+                  </select>
+                </label>
+                <label>
+                  Color de numeros
+                  <input id="stripNumberColorInput" type="color" value="#111827">
+                </label>
+                <label>
+                  Color principal
+                  <input id="stripAccentInput" type="color" value="#d1223b">
+                </label>
+                <label>
+                  Forma del recuadro
+                  <select id="stripCellShapeInput">
+                    <option value="square">Cuadrado</option>
+                    <option value="rounded">Redondeado</option>
+                    <option value="circle">Redondo</option>
+                  </select>
+                </label>
+                <label>
+                  Color de borde
+                  <input id="stripCellBorderColorInput" type="color" value="#111827">
+                </label>
+                <label class="check-field">
+                  <input id="stripCellBgEnabledInput" type="checkbox">
+                  Fondo en numeros
+                </label>
+                <label>
+                  Color fondo de numeros
+                  <input id="stripCellBgColorInput" type="color" value="#ffffff">
+                </label>
+                <label>
+                  Texto de serie
+                  <input id="stripSeriesLabelInput" type="text" value="Serie Nro.">
+                </label>
+                <label>
+                  Tamano texto serie
+                  <input id="stripSeriesFontSizeInput" type="number" min="8" max="200" value="13">
+                </label>
+                <label>
+                  Fuente texto serie
+                  <select id="stripSeriesFontFamilyInput">
+                    <option value="Arial, Helvetica, sans-serif">Arial</option>
+                    <option value="'Times New Roman', serif">Times</option>
+                    <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                    <option value="'Courier New', monospace">Courier</option>
+                  </select>
+                </label>
+                <label>
+                  Color texto serie
+                  <input id="stripSeriesColorInput" type="color" value="#111827">
+                </label>
+                <label>
+                  Mover serie horizontal
+                  <input id="stripSeriesOffsetXInput" type="number" min="-300" max="300" value="0">
+                </label>
+                <label>
+                  Mover serie vertical
+                  <input id="stripSeriesOffsetYInput" type="number" min="-120" max="120" value="0">
+                </label>
+              </div>
+            </section>
+
+            <section class="designer-control-section">
+              <h3>5. Series y exportacion</h3>
+              <div class="form-grid">
+                <label>
+                  Serie de muestra
+                  <input id="stripSeriesInput" type="number" min="1" max="20000" value="1">
+                </label>
+                <label>
+                  Exportar PDF desde
+                  <input id="stripExportFromInput" type="number" min="1" max="20000" value="1">
+                </label>
+                <label>
+                  Exportar PDF hasta
+                  <input id="stripExportToInput" type="number" min="1" max="20000" value="1">
+                </label>
+                <label>
+                  Maximo por PDF / parte ZIP (0 = automatico)
+                  <input id="stripExportLimitInput" type="number" min="0" max="20000" value="300">
+                </label>
+              </div>
+            </section>
+            <template id="oldStripDesignerControls">
+            <div class="form-grid legacy-strip-controls">
+              <label>
+                Alto reservado para membrete
+                <input id="stripHeaderHeightInput" type="number" min="0" max="180" value="68">
+              </label>
+              <label>
+                Serie de muestra
+                <input id="stripSeriesInput" type="number" min="1" max="20000" value="1">
+              </label>
+              <label>
+                Exportar PDF desde
+                <input id="stripExportFromInput" type="number" min="1" max="20000" value="1">
+              </label>
+              <label>
+                Exportar PDF hasta
+                <input id="stripExportToInput" type="number" min="1" max="20000" value="1">
+              </label>
+              <label>
+                Maximo por PDF / parte ZIP (0 = automatico)
+                <input id="stripExportLimitInput" type="number" min="0" max="20000" value="300">
+              </label>
+              <label>
+                Tamano de papel
+                <select id="stripPaperSizeInput">
+                  <option value="a4">A4</option>
+                  <option value="a5">A5</option>
+                  <option value="legal">Legal</option>
+                </select>
+              </label>
+              <label>
+                Orientacion
+                <select id="stripOrientationInput">
+                  <option value="landscape">Horizontal</option>
+                  <option value="portrait">Vertical</option>
+                </select>
+              </label>
+              <label>
+                Tipo de diseno
+                <select id="stripContentModeInput">
+                  <option value="strip">Tira de 6 cartones</option>
+                  <option value="single">Un carton repetido</option>
+                </select>
+              </label>
+              <label>
+                Tiras/cartones por hoja
+                <input id="stripItemsPerPageInput" type="number" min="1" max="24" value="1">
+              </label>
+              <label>
+                Orden de impresion
+                <select id="stripOrderModeInput">
+                  <option value="consecutive">Correlativo por hoja</option>
+                  <option value="columnar">Una debajo de otra por bloques</option>
+                </select>
+              </label>
+              <label>
+                Columnas en hoja
+                <input id="stripColumnsInput" type="number" min="1" max="6" value="1">
+              </label>
+              <label>
+                Separacion horizontal entre tiras
+                <input id="stripGapInput" type="number" min="0" max="1000" value="8">
+              </label>
+              <label>
+                Separacion vertical entre cartones
+                <input id="stripRowGapInput" type="number" min="0" max="1000" value="8">
+              </label>
+              <label>
+                Mover horizontal
+                <input id="stripOffsetXInput" type="number" min="-120" max="120" value="0">
+              </label>
+              <label>
+                Mover vertical
+                <input id="stripOffsetYInput" type="number" min="-120" max="120" value="0">
+              </label>
+              <label>
+                Tamano de fuente
+                <input id="stripFontSizeInput" type="number" min="10" max="200" value="16">
+              </label>
+              <label>
+                Fuente
+                <select id="stripFontFamilyInput">
+                  <option value="Arial, Helvetica, sans-serif">Arial</option>
+                  <option value="'Times New Roman', serif">Times</option>
+                  <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                  <option value="'Courier New', monospace">Courier</option>
+                </select>
+              </label>
+              <label>
+                Texto de serie
+                <input id="stripSeriesLabelInput" type="text" value="Serie N°">
+              </label>
+              <label>
+                Tamano texto serie
+                <input id="stripSeriesFontSizeInput" type="number" min="8" max="200" value="13">
+              </label>
+              <label>
+                Mover serie horizontal
+                <input id="stripSeriesOffsetXInput" type="number" min="-300" max="300" value="0">
+              </label>
+              <label>
+                Mover serie vertical
+                <input id="stripSeriesOffsetYInput" type="number" min="-120" max="120" value="0">
+              </label>
+              <label>
+                Fuente texto serie
+                <select id="stripSeriesFontFamilyInput">
+                  <option value="Arial, Helvetica, sans-serif">Arial</option>
+                  <option value="'Times New Roman', serif">Times</option>
+                  <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                  <option value="'Courier New', monospace">Courier</option>
+                </select>
+              </label>
+              <label>
+                Color texto serie
+                <input id="stripSeriesColorInput" type="color" value="#111827">
+              </label>
+              <label>
+                Color de numeros
+                <input id="stripNumberColorInput" type="color" value="#111827">
+              </label>
+              <label>
+                Ancho de cartones (%)
+                <input id="stripCardScaleInput" type="number" min="60" max="160" value="100">
+              </label>
+              <label>
+                Tamano recuadro numeros
+                <input id="stripCellSizeInput" type="number" min="12" max="42" value="18">
+              </label>
+              <label>
+                Forma del recuadro
+                <select id="stripCellShapeInput">
+                  <option value="square">Cuadrado</option>
+                  <option value="rounded">Redondeado</option>
+                  <option value="circle">Redondo</option>
+                </select>
+              </label>
+              <label>
+                Color de borde
+                <input id="stripCellBorderColorInput" type="color" value="#111827">
+              </label>
+              <label class="check-field">
+                <input id="stripCellBgEnabledInput" type="checkbox">
+                Fondo en numeros
+              </label>
+              <label>
+                Color fondo de numeros
+                <input id="stripCellBgColorInput" type="color" value="#ffffff">
+              </label>
+              <label>
+                Color principal
+                <input id="stripAccentInput" type="color" value="#d1223b">
+              </label>
+              <label>
+                Color de fondo
+                <input id="stripBgInput" type="color" value="#ffffff">
+              </label>
+            </div>
+            <label>
+              Imagen de fondo de la tira
+              <input id="stripBgImageInput" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+              <span id="stripBgImageStatus" class="file-status">Sin imagen de fondo.</span>
+            </label>
+            </template>
+            <div class="button-row designer-action-buttons">
+              <button id="stripPreviewBtn" class="ghost-button" type="submit">Actualizar vista</button>
+              <button id="stripSaveDesignBtn" class="ghost-button" type="button">Guardar diseno</button>
+              <button id="stripExportPdfBtn" class="primary-button" type="button">Descargar PDF</button>
+              <button id="stripExportZipBtn" class="ghost-button" type="button">Descargar ZIP HTML exacto</button>
+            </div>
+          </form>
+          <div id="stripPreviewShell" class="strip-preview-shell">
+            <div id="stripPreview" class="strip-preview"></div>
+          </div>
+        </div>
+      </section>
+    </dialog>
+
+    <dialog id="winnerDialog" class="winner-dialog">
+      <div class="winner-stage">
+        <header>
+          <div>
+            <strong id="winnerCardTitle">Carton ganador</strong>
+            <span id="winnerCardSubtitle">Serie - Carton</span>
+          </div>
+          <div id="winnerPrizeTitle">Premio</div>
+        </header>
+        <div id="winnerCardPreview" class="winner-card-preview"></div>
+        <footer>
+          <div>
+            <strong id="winnerCountText">Ganador detectado</strong>
+            <span id="winnerPositionText" class="winner-position">1 de 1</span>
+          </div>
+          <div class="button-row end">
+            <button id="winnerPrevBtn" class="winner-nav-button" type="button">Anterior</button>
+            <button id="winnerNextBtn" class="winner-nav-button" type="button">Siguiente</button>
+            <button id="winnerContinueBtn" class="primary-button" type="button">Continuar juego</button>
+            <button id="winnerCloseBtn" class="ghost-button" type="button">Cerrar</button>
+          </div>
+        </footer>
+      </div>
+    </dialog>
+
+    <dialog id="prizeReviewDialog">
+      <section class="dialog-card prize-review-card">
+        <header class="review-header">
+          <div>
+            <h2 id="prizeReviewTitle">Cartones ganadores</h2>
+            <p id="prizeReviewSubtitle" class="small-note"></p>
+          </div>
+          <button id="prizeReviewCloseBtn" class="close-button" type="button" aria-label="Cerrar">x</button>
+        </header>
+        <div id="prizeReviewList" class="prize-review-list"></div>
+      </section>
+    </dialog>
+
+    <dialog id="nearFullDialog">
+      <section class="dialog-card near-full-dialog-card">
+        <header class="review-header">
+          <div>
+            <h2 id="nearFullDialogTitle">Carton cerca del bingo</h2>
+            <p id="nearFullDialogSubtitle" class="small-note"></p>
+          </div>
+          <button id="nearFullDialogCloseBtn" class="close-button" type="button" aria-label="Cerrar">x</button>
+        </header>
+        <div id="nearFullDialogMissing" class="near-full-missing"></div>
+      </section>
+    </dialog>
+
+    <dialog id="nearFullListDialog">
+      <section class="dialog-card near-full-list-dialog-card">
+        <header class="review-header">
+          <div>
+            <h2 id="nearFullListDialogTitle">Cartones cerca del bingo</h2>
+            <p class="small-note">Toca un carton para ver serie y numeros faltantes.</p>
+          </div>
+          <button id="nearFullListDialogCloseBtn" class="close-button" type="button" aria-label="Cerrar">x</button>
+        </header>
+        <div id="nearFullListDialogList" class="near-full-dialog-list"></div>
+      </section>
+    </dialog>
+
+    <dialog id="projectionDialog" class="projection-dialog">
+      <section class="projection-stage">
+        <img id="projectionImage" class="projection-media hidden" alt="">
+        <video id="projectionVideo" class="projection-media hidden" muted autoplay playsinline></video>
+        <div id="projectionDefault" class="projection-default hidden">
+          <span>Pozo acumulado</span>
+          <strong>Es hora de repasar</strong>
+          <p>Revisamos las bolillas cantadas antes de continuar.</p>
+        </div>
+        <div class="projection-caption">
+          <strong id="projectionTitle">Es hora de repasar</strong>
+          <span id="projectionCountdown"></span>
+        </div>
+      </section>
+    </dialog>
+
+    <script src="app.js?v=user-selector-20260803"></script>
+  </body>
+</html>

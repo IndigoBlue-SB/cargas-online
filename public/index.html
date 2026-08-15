@@ -484,6 +484,7 @@
         <div class="topbar">
           <div><h2>INDIGO BINGO</h2><p class="muted">Sorteo con eventos confirmados y cartones oficiales.</p></div>
           <div class="actions">
+            <button type="button" class="secondary" id="openAdvancedBingo">Abrir Bingo avanzado</button>
             <button type="button" class="light" id="resetBingoGame">Reiniciar sorteo</button>
             <button type="button" id="drawBingoBall">Sortear bolilla</button>
           </div>
@@ -857,6 +858,7 @@
     const openAccountingCategories = new Set();
     const pendingLogos = { mainLogo: null, eventLogoLeft: null, eventLogoRight: null, balanceBgImage: null };
     const bingoCardsCache = new Map();
+    const bingo90StorageKey = 'bingo90.events.v1';
 
     const $ = id => document.getElementById(id);
     const screens = document.querySelectorAll('[data-screen]');
@@ -1788,6 +1790,7 @@
       $('bingoLastBall').textContent = game.drawn.at(-1) || '--';
       $('drawBingoBall').disabled = !hasEvent || game.drawn.length >= 90;
       $('resetBingoGame').disabled = !hasEvent || (!game.drawn.length && !game.winners.length);
+      $('openAdvancedBingo').disabled = !hasEvent;
       $('bingoBoard').innerHTML = numberRange(1, 90).map(number => `<div class="bingo-ball ${drawnSet.has(number) ? 'drawn' : ''}">${number}</div>`).join('');
       $('bingoWinnerInfo').textContent = game.winners.length ? `${num(game.winners.length)} cartones completos detectados.` : 'Sin ganadores todavia.';
       $('bingoWinnersList').innerHTML = game.winners.length ? game.winners.map(winner => renderBingoWinner(winner, drawnSet)).join('') : '<div class="empty">Los ganadores apareceran automaticamente al completar carton.</div>';
@@ -1851,6 +1854,77 @@
       eventData.bingoGame = { drawn: [], winners: [], startedAt: null, resetAt: new Date().toISOString(), resetBy: currentUser?.name || 'Usuario' };
       saveEvents();
       renderBingo();
+    }
+
+    function loadBingo90Events() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(bingo90StorageKey) || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function bingo90TemplateFor(eventId) {
+      const previous = loadBingo90Events().filter(item => item && item.id !== eventId);
+      return previous.find(item => item.stripDesign || item.visualSettings || item.cardDesign || item.projectionSettings) || {};
+    }
+
+    function buildBingo90Event(eventData) {
+      const soldUnits = officialSoldUnits(eventData).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+      const maxSold = Math.max(0, ...soldUnits);
+      const rangeStart = 1;
+      const rangeEnd = Math.max(15000, Number(eventData.bingoRangeEnd) || 0, maxSold);
+      const game = bingoGame(eventData);
+      const template = bingo90TemplateFor(eventData.id);
+      return {
+        id: eventData.id,
+        name: eventData.name || 'Evento confirmado',
+        eventCreated: true,
+        eventSeed: eventData.bingoSeed || eventData.id,
+        eventDetail: [eventData.date, eventData.town, eventData.province].filter(Boolean).join(' - '),
+        combinationMode: 'new',
+        combinationSourceEventId: '',
+        designMode: template.id ? 'copy' : 'new',
+        designSourceEventId: template.id || '',
+        cardMode: 'series',
+        rangeStart,
+        rangeEnd,
+        configuredSeriesCount: rangeEnd - rangeStart + 1,
+        salesLoaded: true,
+        soldUnits,
+        salesDraftUnits: soldUnits,
+        completedGames: Array.isArray(template.completedGames) ? template.completedGames : [],
+        savedAt: new Date().toISOString(),
+        drawn: Array.isArray(game.drawn) ? game.drawn.map(Number).filter(Number.isFinite) : [],
+        prizeResults: [],
+        pausedForWinner: false,
+        pendingWinners: [],
+        gameFinished: false,
+        extraStartBallIndex: null,
+        recapShown: false,
+        pozoVacancyShown: false,
+        extraVacancyShown: false,
+        prizeEnabled: template.prizeEnabled,
+        prizeAmounts: template.prizeAmounts,
+        prizeSettings: template.prizeSettings,
+        cardDesign: template.cardDesign,
+        visualSettings: template.visualSettings,
+        stripDesign: template.stripDesign,
+        projectionSettings: template.projectionSettings,
+        stats: { series: rangeEnd, cards: rangeEnd * 6, soldCards: soldUnits.length * 6 }
+      };
+    }
+
+    function openAdvancedBingo() {
+      const eventData = activeBingoEvent();
+      if (!eventData) return alert('Primero elegi un evento confirmado.');
+      const soldUnits = officialSoldUnits(eventData);
+      if (!soldUnits.length) return alert('Este evento confirmado no tiene series/cartones vendidos.');
+      const advancedEvent = buildBingo90Event(eventData);
+      const saved = loadBingo90Events().filter(item => item && item.id !== advancedEvent.id);
+      localStorage.setItem(bingo90StorageKey, JSON.stringify([advancedEvent, ...saved].slice(0, 30)));
+      window.location.href = `/bingo90/index.html?eventId=${encodeURIComponent(advancedEvent.id)}`;
     }
 
     function defaultAccountingCategories() {
@@ -3289,6 +3363,7 @@
     $('deleteSelectedRange').addEventListener('click', () => { draftRanges = draftRanges.filter(r => r.id !== selectedDraftId); selectedDraftId = draftRanges.at(-1)?.id || null; renderDraft(); });
     $('clearDraftRanges').addEventListener('click', () => { if (draftRanges.length && confirm('Eliminar toda la lista previa?')) { draftRanges = []; selectedDraftId = null; renderDraft(); } });
     $('clearSaleForm').addEventListener('click', resetSaleForm);
+    $('openAdvancedBingo').addEventListener('click', openAdvancedBingo);
     $('drawBingoBall').addEventListener('click', drawBingoBall);
     $('resetBingoGame').addEventListener('click', resetBingoGame);
     $('clearEventForm').addEventListener('click', resetEventForm);
