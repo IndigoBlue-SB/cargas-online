@@ -1258,11 +1258,11 @@
       const noeAmount = pct(income, balance.noePercent);
       const afterNoe = income - noeAmount;
       const indigoAmount = pct(afterNoe, balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent);
-      const afterIndigo = afterNoe - indigoAmount;
-      const giseAmount = pct(afterIndigo, balance.gisePercent);
-      const laureanoAmount = pct(afterIndigo, balance.laureanoPercent);
+      const institutionAmount = afterNoe - indigoAmount;
+      const giseAmount = pct(indigoAmount, balance.gisePercent);
+      const laureanoAmount = pct(indigoAmount, balance.laureanoPercent);
       const extraPercents = giseAmount + laureanoAmount;
-      return { gross, sellerCommission, adminGeneralCommission, adminsCommission, commissions, prizes, expenses, income, subtotal, noeAmount, afterNoe, indigoAmount, afterIndigo, giseAmount, laureanoAmount, extraPercents, result: afterIndigo - extraPercents };
+      return { gross, sellerCommission, adminGeneralCommission, adminsCommission, commissions, prizes, expenses, income, subtotal, noeAmount, afterNoe, indigoAmount, institutionAmount, giseAmount, laureanoAmount, extraPercents, result: indigoAmount - extraPercents };
     }
     function setImage(image, value) {
       image.classList.toggle('hidden', !value);
@@ -1799,7 +1799,7 @@
           [`% Noe (${num(balance.noePercent)}%)`, money(totals.noeAmount)],
           ['Sub Total', money(totals.afterNoe)],
           [`INDIGO BLUE (${num(balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent)}%)`, money(totals.indigoAmount)],
-          ['Resto Gise/Laureano', money(totals.afterIndigo)],
+          [`Institucion (${num(100 - (balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent))}%)`, money(totals.institutionAmount)],
           [`% Gise (${num(balance.gisePercent)}%)`, money(totals.giseAmount)],
           [`% Laureano (${num(balance.laureanoPercent)}%)`, money(totals.laureanoAmount)]
         );
@@ -2379,7 +2379,7 @@
           [`Noe ${num(balance.noePercent)}%`, money(totals.noeAmount)],
           ['Sub Total', money(totals.afterNoe)],
           [`INDIGO BLUE ${num(balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent)}%`, money(totals.indigoAmount)],
-          ['Resto Gise/Laureano', money(totals.afterIndigo)],
+          [`Institucion ${num(100 - (balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent))}%`, money(totals.institutionAmount)],
           [`Gise ${num(balance.gisePercent)}%`, money(totals.giseAmount)],
           [`Laureano ${num(balance.laureanoPercent)}%`, money(totals.laureanoAmount)]
         );
