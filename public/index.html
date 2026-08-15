@@ -163,7 +163,7 @@
     #activeEventTitle { color: var(--membrete-color); }
     #activeEventInfo { color: var(--event-info-color); font-family: var(--event-info-font-family); }
     .event-logo { object-fit: contain; max-width: 220px; }
-    .balance-grid { display: grid; grid-template-columns: minmax(205px, 240px) minmax(338px, 360px) minmax(255px, 300px) minmax(285px, 330px); gap: 10px; align-items: start; width: 100%; }
+    .balance-grid { display: grid; grid-template-columns: minmax(190px, 225px) minmax(420px, 460px) minmax(245px, 1fr) minmax(245px, 1fr); gap: 12px; align-items: start; width: 100%; }
     .balance-accounts, .balance-admins, .balance-main, .balance-side { min-width: 0; }
     .balance-side, .balance-admins { border-left: 1px solid var(--line); padding-left: 8px; display: grid; gap: 5px; }
     .balance-side h3, .balance-main h3, .balance-accounts h3, .balance-admins h3 { margin: 1px 0 0; color: var(--balance-heading-color, var(--ink)); font-size: min(var(--balance-heading-size, 22px), 21px); line-height: 1.05; }
@@ -177,7 +177,7 @@
     #page-balance-detail .form-grid { gap: 5px; }
     #page-balance-detail .balance-add-button { margin-top: 8px; }
     .balance-line { display: grid; grid-template-columns: minmax(70px, 1fr) 82px 64px; gap: 4px; align-items: end; }
-    .balance-admin-line { display: grid; grid-template-columns: minmax(82px, 1fr) 50px 44px 72px 74px 54px; gap: 4px; align-items: end; }
+    .balance-admin-line { display: grid; grid-template-columns: minmax(104px, 1fr) 56px 52px 70px 82px 58px; gap: 4px; align-items: end; }
     .balance-total-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(78px, 112px); gap: 5px; align-items: center; margin-top: 5px; }
     .balance-total-line strong, .balance-total-line span { min-height: 28px; display: flex; align-items: center; border-radius: 5px; padding: 5px 8px; background: var(--button-bg); color: #fff; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
     .balance-total-line span { justify-content: flex-end; font-weight: 800; }
@@ -525,9 +525,9 @@
           </div>
           <div class="grid-4 private-balance-fields">
             <label>% Noe<input id="balanceNoePercent" inputmode="decimal" autocomplete="off" value="0"></label>
+            <label>% Indigo Blue<input id="balanceIndigoPercent" inputmode="decimal" autocomplete="off" value="50"></label>
             <label>% Gise<input id="balanceGisePercent" inputmode="decimal" autocomplete="off" value="0"></label>
             <label>% Laureano<input id="balanceLaureanoPercent" inputmode="decimal" autocomplete="off" value="0"></label>
-            <span></span>
           </div>
           <div class="balance-grid">
             <div class="balance-accounts">
@@ -1208,6 +1208,7 @@
           sellerPercent: Number(eventData.sellerPercent) || 0,
           adminPercent: Number(eventData.adminPercent) || 0,
           noePercent: 0,
+          indigoPercent: 50,
           gisePercent: 0,
           laureanoPercent: 0,
           admins: defaultBalanceAdmins(),
@@ -1223,6 +1224,7 @@
       }
       if (!Array.isArray(eventData.balance.expenses)) eventData.balance.expenses = defaultBalanceExpenses();
       if (!Array.isArray(eventData.balance.admins)) eventData.balance.admins = defaultBalanceAdmins();
+      if (eventData.balance.indigoPercent === undefined || eventData.balance.indigoPercent === null) eventData.balance.indigoPercent = 50;
       eventData.balance.admins = automaticBalanceAdmins(eventData);
       eventData.balance.style = { ...defaultBalanceStyle(), ...(eventData.balance.style || {}) };
       return eventData.balance;
@@ -1255,10 +1257,12 @@
       const subtotal = income;
       const noeAmount = pct(income, balance.noePercent);
       const afterNoe = income - noeAmount;
-      const giseAmount = pct(afterNoe, balance.gisePercent);
-      const laureanoAmount = pct(afterNoe, balance.laureanoPercent);
+      const indigoAmount = pct(afterNoe, balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent);
+      const afterIndigo = afterNoe - indigoAmount;
+      const giseAmount = pct(afterIndigo, balance.gisePercent);
+      const laureanoAmount = pct(afterIndigo, balance.laureanoPercent);
       const extraPercents = giseAmount + laureanoAmount;
-      return { gross, sellerCommission, adminGeneralCommission, adminsCommission, commissions, prizes, expenses, income, subtotal, noeAmount, afterNoe, giseAmount, laureanoAmount, extraPercents, result: afterNoe - extraPercents };
+      return { gross, sellerCommission, adminGeneralCommission, adminsCommission, commissions, prizes, expenses, income, subtotal, noeAmount, afterNoe, indigoAmount, afterIndigo, giseAmount, laureanoAmount, extraPercents, result: afterIndigo - extraPercents };
     }
     function setImage(image, value) {
       image.classList.toggle('hidden', !value);
@@ -1567,7 +1571,7 @@
     }
     function accountingEventBase(eventData) {
       const balance = eventBalance(accountingEventForWeek(eventData));
-      return balanceTotals(balance).afterNoe;
+      return balanceTotals(balance).indigoAmount;
     }
     function accountingSalesForWeek(eventData) {
       ensureAccountingWeek();
@@ -1649,7 +1653,7 @@
       if (!activeAccountingEventId && selected) activeAccountingEventId = selected.id;
       const totals = includedEvents.reduce((acc, eventData) => {
         const balance = eventBalance(accountingEventForWeek(eventData));
-        const base = balanceTotals(balance).afterNoe;
+        const base = balanceTotals(balance).indigoAmount;
         const spent = accountingEventSpent(eventData);
         acc.base += base;
         acc.spent += spent;
@@ -1688,7 +1692,7 @@
         return;
       }
       const balance = eventBalance(accountingEventForWeek(eventData));
-      const base = balanceTotals(balance).afterNoe;
+      const base = balanceTotals(balance).indigoAmount;
       const accounting = { categories: accountingCategoriesForRange(eventData) };
       const spent = accountingEventSpent(eventData);
       $('accountingEventTitle').textContent = eventData.name;
@@ -1745,6 +1749,7 @@
         sellerPercent: parseAmount($('balanceSellerPercent').value),
         adminPercent: parseAmount($('balanceAdminPercent').value),
         noePercent: parseAmount($('balanceNoePercent').value),
+        indigoPercent: parseAmount($('balanceIndigoPercent').value),
         gisePercent: parseAmount($('balanceGisePercent').value),
         laureanoPercent: parseAmount($('balanceLaureanoPercent').value),
         admins: [...document.querySelectorAll('[data-balance-admin]')].map(row => ({
@@ -1793,7 +1798,8 @@
         rows.push(
           [`% Noe (${num(balance.noePercent)}%)`, money(totals.noeAmount)],
           ['Sub Total', money(totals.afterNoe)],
-          ['INDIGO BLUE', money(totals.result)],
+          [`INDIGO BLUE (${num(balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent)}%)`, money(totals.indigoAmount)],
+          ['Resto Gise/Laureano', money(totals.afterIndigo)],
           [`% Gise (${num(balance.gisePercent)}%)`, money(totals.giseAmount)],
           [`% Laureano (${num(balance.laureanoPercent)}%)`, money(totals.laureanoAmount)]
         );
@@ -1942,10 +1948,11 @@
       $('balanceSellerPercent').value = Number(balance.sellerPercent) || 0;
       $('balanceAdminPercent').value = Number(balance.adminPercent) || 0;
       $('balanceNoePercent').value = Number(balance.noePercent) || 0;
+      $('balanceIndigoPercent').value = balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : Number(balance.indigoPercent) || 0;
       $('balanceGisePercent').value = Number(balance.gisePercent) || 0;
       $('balanceLaureanoPercent').value = Number(balance.laureanoPercent) || 0;
       const showPrivate = canSeePrivateBalance(eventData);
-      ['balanceNoePercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => {
+      ['balanceNoePercent', 'balanceIndigoPercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => {
         const label = $(id).closest('label');
         if (label) label.classList.toggle('hidden', !showPrivate);
       });
@@ -2371,7 +2378,8 @@
         rows.push(
           [`Noe ${num(balance.noePercent)}%`, money(totals.noeAmount)],
           ['Sub Total', money(totals.afterNoe)],
-          ['INDIGO BLUE', money(totals.result)],
+          [`INDIGO BLUE ${num(balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent)}%`, money(totals.indigoAmount)],
+          ['Resto Gise/Laureano', money(totals.afterIndigo)],
           [`Gise ${num(balance.gisePercent)}%`, money(totals.giseAmount)],
           [`Laureano ${num(balance.laureanoPercent)}%`, money(totals.laureanoAmount)]
         );
@@ -2873,7 +2881,7 @@
     $('clearDraftRanges').addEventListener('click', () => { if (draftRanges.length && confirm('Eliminar toda la lista previa?')) { draftRanges = []; selectedDraftId = null; renderDraft(); } });
     $('clearSaleForm').addEventListener('click', resetSaleForm);
     $('clearEventForm').addEventListener('click', resetEventForm);
-    ['balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent', 'balanceNoePercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => $(id).addEventListener('input', updateBalancePreview));
+    ['balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent', 'balanceNoePercent', 'balanceIndigoPercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => $(id).addEventListener('input', updateBalancePreview));
     bindAmountFormatting($('balancePrice'));
     bindAmountFormatting(fields.saleAdminFixed);
     $('openBalanceConfig').addEventListener('click', () => {
