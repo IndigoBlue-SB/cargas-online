@@ -1768,7 +1768,7 @@
             <span>${num(soldTotal)} series/cartones vendidas${uniqueNote}</span>
             <span>${num(units.length * 6)} cartones en juego</span>
             <span>${num(game.drawn.length)} bolillas cantadas</span>
-            <span>Entrar a configurar este panel</span>
+            <span>${event.id === activeBingoEventId ? 'Seleccionado' : 'Tocar para seleccionar'}</span>
           </button>
         `;
       }).join('') : '<div class="empty">No hay cargas confirmadas para jugar.</div>';
@@ -1786,6 +1786,9 @@
       $('bingoSoldUnits').textContent = hasEvent ? num(soldTotal) : '0';
       $('bingoPlayableCards').textContent = num(soldUnits.length * 6);
       $('openAdvancedBingo').disabled = !hasEvent;
+      $('openAdvancedBingo').textContent = hasEvent
+        ? `Configuracion de Panel de Bingo: ${eventData.name}`
+        : 'Configuracion de Panel de Bingo';
       if ($('bingoSelectedInfo')) {
         $('bingoSelectedInfo').textContent = hasEvent
           ? `${num(soldTotal)} series/cartones vendidas${soldTotal !== soldUnits.length ? ` (${num(soldUnits.length)} unicas para jugar)` : ''}. Entra a Configuracion de Panel de Bingo para editar logos, colores, fuentes, premios, tiras y luego jugar ese evento.`
