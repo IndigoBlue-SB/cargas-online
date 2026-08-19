@@ -531,6 +531,10 @@ function bindEvents() {
   els.eventIndigoLogoInput.addEventListener("change", () => handleEventLogoSelection("indigo"));
   els.eventBallImagesInput.addEventListener("change", handleBallImagesFolderSelection);
   [
+    els.eventAccentColorInput,
+    els.eventPanelColorInput,
+    els.eventBallSizeInput,
+    els.eventButtonRadiusInput,
     els.eventBingoLogoSizeInput,
     els.eventIndigoLogoSizeInput,
     els.eventBoardPanelWidthInput,
@@ -1886,6 +1890,7 @@ function handleEventLogoSelection(kind) {
 }
 
 function previewBoardVisualSettings() {
+  readGeneralVisualSettingsFromForm();
   readScreenLayoutSettingsFromForm();
   readBoardVisualSettingsFromForm();
   applyVisualSettings();
@@ -1924,6 +1929,10 @@ function readBoardVisualSettingsFromForm() {
   state.visualSettings.boardShadow = els.eventBoardShadowInput.checked;
   state.visualSettings.boardNumberShadow = els.eventBoardNumberShadowInput.checked;
   state.visualSettings.boardNeon = els.eventBoardNeonInput.checked;
+}
+
+function readGeneralVisualSettingsFromForm() {
+  readGeneralVisualSettingsFromForm();
 }
 
 function readScreenLayoutSettingsFromForm() {
@@ -4137,6 +4146,7 @@ function saveCurrentEvent(options = {}) {
   const nextEvents = [payload, ...events.filter((event) => event.id !== state.eventId)].slice(0, 30);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(nextEvents));
   scheduleServerStateSave();
+  saveCargasBingoPanelSettings(payload);
   renderSavedEvents();
   renderHomeSavedEvents();
   if (options.manual && state.gameFinished && options.prepareNext !== false) {
@@ -4145,6 +4155,53 @@ function saveCurrentEvent(options = {}) {
     render();
     window.alert("Partida guardada. El sorteo quedo preparado para la proxima jugada.");
   }
+}
+
+function saveCargasBingoPanelSettings(eventPayload) {
+  if (!isLaunchedFromCargas() || !eventPayload?.id || optionsSavingToCargasDisabled()) return;
+  const panel = {
+    id: eventPayload.id,
+    name: eventPayload.name,
+    eventSeed: eventPayload.eventSeed,
+    eventDetail: eventPayload.eventDetail,
+    combinationMode: eventPayload.combinationMode,
+    combinationSourceEventId: eventPayload.combinationSourceEventId,
+    designMode: eventPayload.designMode,
+    designSourceEventId: eventPayload.designSourceEventId,
+    cardMode: eventPayload.cardMode,
+    rangeStart: eventPayload.rangeStart,
+    rangeEnd: eventPayload.rangeEnd,
+    configuredSeriesCount: eventPayload.configuredSeriesCount,
+    completedGames: eventPayload.completedGames,
+    drawn: eventPayload.drawn,
+    prizeResults: eventPayload.prizeResults,
+    pausedForWinner: eventPayload.pausedForWinner,
+    pendingWinners: eventPayload.pendingWinners,
+    gameFinished: eventPayload.gameFinished,
+    extraStartBallIndex: eventPayload.extraStartBallIndex,
+    recapShown: eventPayload.recapShown,
+    pozoVacancyShown: eventPayload.pozoVacancyShown,
+    extraVacancyShown: eventPayload.extraVacancyShown,
+    prizeEnabled: eventPayload.prizeEnabled,
+    prizeAmounts: eventPayload.prizeAmounts,
+    prizeSettings: eventPayload.prizeSettings,
+    cardDesign: eventPayload.cardDesign,
+    visualSettings: eventPayload.visualSettings,
+    stripDesign: eventPayload.stripDesign,
+    projectionSettings: eventPayload.projectionSettings,
+    stats: eventPayload.stats,
+    savedAt: eventPayload.savedAt,
+  };
+  fetch("/api/bingo-panel", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ eventId: eventPayload.id, panel }),
+  }).catch(() => {});
+}
+
+function optionsSavingToCargasDisabled() {
+  return location.protocol !== "http:" && location.protocol !== "https:";
 }
 
 function exportEventReport() {

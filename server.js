@@ -353,6 +353,27 @@ async function handleApi(req, res) {
     return sendJson(res, 200, { ok: true });
   }
 
+  if (url.pathname === '/api/bingo-panel' && req.method === 'PUT') {
+    const body = await readBody(req);
+    const eventId = String(body.eventId || '');
+    const eventIndex = (db.events || []).findIndex(event => String(event.id) === eventId);
+    if (eventIndex < 0) return sendJson(res, 404, { error: 'Evento no encontrado' });
+    const event = db.events[eventIndex];
+    const canAccess = session.role === 'admin' || visibleEventsFor(session, [event]).length > 0;
+    if (!canAccess) return sendJson(res, 403, { error: 'Sin permiso para este evento' });
+    const panel = body.panel && typeof body.panel === 'object' ? body.panel : {};
+    db.events[eventIndex] = {
+      ...event,
+      bingoPanelSettings: {
+        ...panel,
+        savedAt: new Date().toISOString(),
+        savedBy: session.name || (session.role === 'admin' ? 'Administrador' : 'Usuario')
+      }
+    };
+    writeDb(db);
+    return sendJson(res, 200, { ok: true });
+  }
+
   if (url.pathname === '/api/users' && req.method === 'PUT') {
     if (!hasFunctionPermission(session, db.settings, 'settings')) return sendJson(res, 403, { error: 'Sin permiso para configuraciones' });
     const body = await readBody(req);

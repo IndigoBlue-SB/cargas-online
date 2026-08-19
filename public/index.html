@@ -1865,9 +1865,19 @@
       }
     }
 
-    function bingo90TemplateFor(eventId) {
+    function newerBingoPanel(a = {}, b = {}) {
+      const aTime = new Date(a.savedAt || 0).getTime();
+      const bTime = new Date(b.savedAt || 0).getTime();
+      return aTime >= bTime ? a : b;
+    }
+    function bingo90TemplateFor(eventData) {
       const saved = loadBingo90Events().filter(Boolean);
-      return saved.find(item => item.id === eventId)
+      const localEvent = saved.find(item => item.id === eventData.id) || {};
+      const serverPanel = eventData.bingoPanelSettings || {};
+      const hasLocalPanel = Boolean(localEvent.id);
+      const hasServerPanel = Boolean(serverPanel.savedAt || serverPanel.visualSettings || serverPanel.stripDesign || serverPanel.cardDesign);
+      const sameEventPanel = hasLocalPanel && hasServerPanel ? newerBingoPanel(localEvent, serverPanel) : (hasLocalPanel ? localEvent : serverPanel);
+      return (hasLocalPanel || hasServerPanel ? sameEventPanel : null)
         || saved.find(item => item.stripDesign || item.visualSettings || item.cardDesign || item.projectionSettings)
         || {};
     }
@@ -1878,7 +1888,7 @@
       const rangeStart = 1;
       const rangeEnd = Math.max(15000, Number(eventData.bingoRangeEnd) || 0, maxSold);
       const game = bingoGame(eventData);
-      const template = bingo90TemplateFor(eventData.id);
+      const template = bingo90TemplateFor(eventData);
       const existingEvent = template.id === eventData.id ? template : {};
       const drawn = Array.isArray(existingEvent.drawn)
         ? existingEvent.drawn
