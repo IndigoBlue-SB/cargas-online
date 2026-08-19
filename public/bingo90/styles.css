@@ -725,6 +725,11 @@ h2 {
   font-weight: 700;
 }
 
+#saveEventBtn.primary-button {
+  background: linear-gradient(180deg, #0877ff, #0057d8);
+  box-shadow: 0 0 14px rgba(0, 102, 255, 0.28);
+}
+
 .ghost-button {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.05);
@@ -1598,8 +1603,8 @@ dialog::backdrop {
 }
 
 .saved-feedback {
-  border-color: rgba(47, 191, 113, 0.75);
-  background: linear-gradient(180deg, #2fbf71, #16884b);
+  border-color: rgba(0, 102, 255, 0.85);
+  background: linear-gradient(180deg, #1d8cff, #0057d8);
 }
 
 .tab-panel {
