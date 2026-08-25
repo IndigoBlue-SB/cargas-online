@@ -531,7 +531,7 @@
                 <p id="accountingEventInfo" class="muted"></p>
                 <div class="accounting-mini-stat"><span>Bingos</span><strong id="accountingEventUnits">0</strong></div>
                 <div class="accounting-mini-stat"><span>INDIGO BLUE</span><strong id="accountingEventBase">$0</strong></div>
-                <div class="accounting-mini-stat"><span>Gastos</span><strong id="accountingEventSpent">$0</strong></div>
+                <div class="accounting-mini-stat"><span>Extras contables</span><strong id="accountingEventSpent">$0</strong></div>
                 <div class="accounting-mini-stat"><span>Saldo</span><strong id="accountingEventNet">$0</strong></div>
               </aside>
               <div class="form-grid">
@@ -2093,7 +2093,7 @@
         matched.forEach(category => {
           const name = category.name || 'Categoria';
           const key = normalize(name);
-          if (!groups.has(key)) groups.set(key, { id: `range-${key}`, name, details: [] });
+          if (!groups.has(key)) groups.set(key, { id: `range-${key}`, name, source: category.source || '', details: [] });
           groups.get(key).details.push(...(category.details || []).map(detail => ({ ...detail, id: detail.id || crypto.randomUUID() })));
         });
         return [...groups.values()];
@@ -2101,7 +2101,12 @@
       return eventAccounting(eventData).categories;
     }
     function accountingEventSpent(eventData) {
-      return accountingCategoriesForRange(eventData).reduce((sum, category) => sum + accountingCategoryTotal(category), 0);
+      return accountingCategoriesForRange(eventData).reduce((sum, category) => {
+        if (category.source === 'balance') return sum;
+        return sum + (category.details || []).reduce((detailSum, detail) => (
+          detail.source === 'balance' ? detailSum : detailSum + (Number(detail.amount) || 0)
+        ), 0);
+      }, 0);
     }
     function activeAccountingEvent() {
       const availableEvents = accountingIncludedEvents();
