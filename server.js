@@ -41,7 +41,8 @@ const defaultDb = {
     eventLogoLeftSize: 86,
     eventLogoRightSize: 86,
     adminPassword: 'admin123',
-    functionPermissions: defaultFunctionPermissions
+    functionPermissions: defaultFunctionPermissions,
+    balanceTemplates: { prizesList: null, expenses: null }
   }
 };
 

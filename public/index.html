@@ -824,7 +824,7 @@
     const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], bingo: [], sheets: [], balance: [], accounting: [], settings: [] };
     const functionLabels = { home: 'Inicio', create: 'Crear evento', stats: 'Estadisticas', delete: 'Eliminar evento', events: 'Eventos', bingo: 'Bingo', sheets: 'Planillas', balance: 'Balance', accounting: 'Contable', settings: 'Configuraciones' };
     const userDefaultPages = ['home', 'events', 'bingo', 'balance', 'accounting'];
-    const defaultSettings = { font: 'Arial, Helvetica, sans-serif', size: 15, buttonSize: 15, totalSize: 22, brand: '#0f766e', buttonBg: '#0f766e', navButtonBg: '#2b7bbb', navButtonActiveBg: '#0f766e', navButtonColor: '#ffffff', homeCardTitleColor: '#0f766e', membreteColor: '#202426', eventInfoColor: '#667078', eventInfoFont: 'Arial, Helvetica, sans-serif', bg: '#f4f6f2', panel: '#ffffff', splash: '#123f8c', side: '#18312d', radius: '8px', mainLogo: '', mainLogoSize: 180, eventLogoLeft: '', eventLogoRight: '', eventLogoLeftSize: 86, eventLogoRightSize: 86, adminPassword: 'admin123', functionPermissions: defaultFunctionPermissions };
+    const defaultSettings = { font: 'Arial, Helvetica, sans-serif', size: 15, buttonSize: 15, totalSize: 22, brand: '#0f766e', buttonBg: '#0f766e', navButtonBg: '#2b7bbb', navButtonActiveBg: '#0f766e', navButtonColor: '#ffffff', homeCardTitleColor: '#0f766e', membreteColor: '#202426', eventInfoColor: '#667078', eventInfoFont: 'Arial, Helvetica, sans-serif', bg: '#f4f6f2', panel: '#ffffff', splash: '#123f8c', side: '#18312d', radius: '8px', mainLogo: '', mainLogoSize: 180, eventLogoLeft: '', eventLogoRight: '', eventLogoLeftSize: 86, eventLogoRightSize: 86, adminPassword: 'admin123', functionPermissions: defaultFunctionPermissions, balanceTemplates: { prizesList: null, expenses: null } };
     let events = [];
     let settings = { ...defaultSettings };
     if (!settings.adminPassword) settings.adminPassword = defaultSettings.adminPassword;
@@ -845,6 +845,7 @@
     let lastPaymentSource = 'cash';
     let accountingWeekStart = '';
     let accountingWeekEnd = '';
+    let balanceAutosaveTimer = null;
     const openAccountingCategories = new Set();
     const pendingLogos = { mainLogo: null, eventLogoLeft: null, eventLogoRight: null, balanceBgImage: null };
     const bingoCardsCache = new Map();
@@ -1350,7 +1351,7 @@
       if (load.transferAmount) parts.push(`Transferencia ${money(load.transferAmount)}`);
       return parts.join(' / ') || load.payment || 'Sin pago';
     }
-    function defaultBalanceExpenses() {
+    function fallbackBalanceExpenses() {
       return [
         { id: crypto.randomUUID(), name: 'Transmision', amount: 0 },
         { id: crypto.randomUUID(), name: 'Libreria', amount: 0 },
@@ -1358,7 +1359,7 @@
         { id: crypto.randomUUID(), name: 'Viaticos', amount: 0 }
       ];
     }
-    function defaultBalancePrizes() {
+    function fallbackBalancePrizes() {
       return [
         { id: crypto.randomUUID(), name: 'Cuaterno', amount: 0 },
         { id: crypto.randomUUID(), name: '1 linea', amount: 0 },
@@ -1369,6 +1370,31 @@
         { id: crypto.randomUUID(), name: 'Extra', amount: 0 },
         { id: crypto.randomUUID(), name: 'Sorteos', amount: 0 }
       ];
+    }
+    function normalizeBalanceLines(lines, fallback) {
+      const source = Array.isArray(lines) && lines.length ? lines : fallback();
+      return source.map(item => ({
+        id: item.id || crypto.randomUUID(),
+        name: item.name || item.detail || 'Detalle',
+        amount: Number(item.amount) || 0
+      }));
+    }
+    function defaultBalanceExpenses() {
+      return normalizeBalanceLines(settings.balanceTemplates?.expenses, fallbackBalanceExpenses);
+    }
+    function defaultBalancePrizes() {
+      return normalizeBalanceLines(settings.balanceTemplates?.prizesList, fallbackBalancePrizes);
+    }
+    function rememberBalanceTemplate(balance) {
+      settings = {
+        ...settings,
+        balanceTemplates: {
+          ...(settings.balanceTemplates || {}),
+          prizesList: normalizeBalanceLines(balance.prizesList, fallbackBalancePrizes),
+          expenses: normalizeBalanceLines(balance.expenses, fallbackBalanceExpenses)
+        }
+      };
+      saveSettingsData();
     }
     function defaultBalanceAdmins() {
       return [];
@@ -1427,12 +1453,18 @@
         };
       }
       eventData.balance.units = soldUnits;
-      if (!Array.isArray(eventData.balance.prizesList)) {
+      if (!Array.isArray(eventData.balance.prizesList) || !eventData.balance.prizesList.length) {
         const totalPrize = Number(eventData.balance.prizes) || 0;
         eventData.balance.prizesList = defaultBalancePrizes();
         if (totalPrize) eventData.balance.prizesList[0].amount = totalPrize;
+      } else {
+        eventData.balance.prizesList = normalizeBalanceLines(eventData.balance.prizesList, fallbackBalancePrizes);
       }
-      if (!Array.isArray(eventData.balance.expenses)) eventData.balance.expenses = defaultBalanceExpenses();
+      if (!Array.isArray(eventData.balance.expenses) || !eventData.balance.expenses.length) {
+        eventData.balance.expenses = defaultBalanceExpenses();
+      } else {
+        eventData.balance.expenses = normalizeBalanceLines(eventData.balance.expenses, fallbackBalanceExpenses);
+      }
       if (!Array.isArray(eventData.balance.admins)) eventData.balance.admins = defaultBalanceAdmins();
       if (eventData.balance.indigoPercent === undefined || eventData.balance.indigoPercent === null) eventData.balance.indigoPercent = 50;
       eventData.balance.admins = automaticBalanceAdmins(eventData);
@@ -2245,7 +2277,10 @@
           <strong>TOTAL ADMINISTRADORES</strong>
           <span data-balance-admins-total>${money(total)}</span>
         </div>`;
-      [...$('balanceAdminsList').querySelectorAll('[data-admin-name], [data-admin-units], [data-admin-percent], [data-admin-fixed]')].forEach(input => input.addEventListener('input', updateBalancePreview));
+      [...$('balanceAdminsList').querySelectorAll('[data-admin-name], [data-admin-units], [data-admin-percent], [data-admin-fixed]')].forEach(input => input.addEventListener('input', () => {
+        updateBalancePreview();
+        scheduleBalanceAutosave();
+      }));
       [...$('balanceAdminsList').querySelectorAll('[data-admin-fixed]')].forEach(bindAmountFormatting);
     }
 
@@ -2283,7 +2318,10 @@
           <strong>TOTAL DE GASTOS</strong>
           <span data-balance-expenses-total>${money(total)}</span>
         </div>`;
-      [...$('balanceExpenses').querySelectorAll('input')].forEach(input => input.addEventListener('input', updateBalancePreview));
+      [...$('balanceExpenses').querySelectorAll('input')].forEach(input => input.addEventListener('input', () => {
+        updateBalancePreview();
+        scheduleBalanceAutosave();
+      }));
       [...$('balanceExpenses').querySelectorAll('[data-expense-amount]')].forEach(bindAmountFormatting);
     }
 
@@ -2301,7 +2339,10 @@
           <strong>TOTAL DE PREMIOS</strong>
           <span data-balance-prizes-total>${money(total)}</span>
         </div>`;
-      [...$('balancePrizesList').querySelectorAll('input')].forEach(input => input.addEventListener('input', updateBalancePreview));
+      [...$('balancePrizesList').querySelectorAll('input')].forEach(input => input.addEventListener('input', () => {
+        updateBalancePreview();
+        scheduleBalanceAutosave();
+      }));
       [...$('balancePrizesList').querySelectorAll('[data-prize-amount]')].forEach(bindAmountFormatting);
     }
 
@@ -2340,6 +2381,20 @@
       const balance = balanceFromForm();
       setBalanceSummary(balance);
       updateBalanceColumnTotals(balance);
+    }
+
+    function persistBalanceFromForm(options = {}) {
+      const eventData = activeBalanceEvent();
+      if (!eventData || !canUsePage('balance')) return;
+      eventData.balance = balanceFromForm();
+      rememberBalanceTemplate(eventData.balance);
+      saveEvents();
+      if (options.renderList) renderBalanceEvents();
+    }
+
+    function scheduleBalanceAutosave() {
+      window.clearTimeout(balanceAutosaveTimer);
+      balanceAutosaveTimer = window.setTimeout(() => persistBalanceFromForm(), 800);
     }
 
     function renderBalanceDetail() {
@@ -3118,18 +3173,21 @@
         const row = deleteExpense.closest('[data-balance-expense]');
         if (row) row.remove();
         updateBalancePreview();
+        persistBalanceFromForm({ renderList: true });
       }
       const deletePrize = event.target.closest('[data-delete-prize]');
       if (deletePrize) {
         const row = deletePrize.closest('[data-balance-prize]');
         if (row) row.remove();
         updateBalancePreview();
+        persistBalanceFromForm({ renderList: true });
       }
       const deleteAdmin = event.target.closest('[data-delete-admin]');
       if (deleteAdmin) {
         const row = deleteAdmin.closest('[data-balance-admin]');
         if (row) row.remove();
         updateBalancePreview();
+        persistBalanceFromForm({ renderList: true });
       }
       const deleteAccountingDetail = event.target.closest('[data-delete-accounting-detail]');
       if (deleteAccountingDetail) { deleteAccountingDetail.closest('[data-accounting-detail]')?.remove(); saveAccountingFromForm(); }
@@ -3386,7 +3444,10 @@
     $('drawBingoBall')?.addEventListener('click', drawBingoBall);
     $('resetBingoGame')?.addEventListener('click', resetBingoGame);
     $('clearEventForm').addEventListener('click', resetEventForm);
-    ['balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent', 'balanceNoePercent', 'balanceIndigoPercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => $(id).addEventListener('input', updateBalancePreview));
+    ['balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent', 'balanceNoePercent', 'balanceIndigoPercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => $(id).addEventListener('input', () => {
+      updateBalancePreview();
+      scheduleBalanceAutosave();
+    }));
     bindAmountFormatting($('balancePrice'));
     bindAmountFormatting(fields.saleAdminFixed);
     $('openBalanceConfig').addEventListener('click', () => {
@@ -3434,6 +3495,7 @@
       current.expenses.push({ id: crypto.randomUUID(), name: 'Otro gasto', amount: 0 });
       renderBalanceExpenses(current.expenses);
       setBalanceSummary(current);
+      persistBalanceFromForm({ renderList: true });
     });
     $('addBalanceAdmin').addEventListener('click', () => {
       if (!isAdmin()) return;
@@ -3441,6 +3503,7 @@
       current.admins.push({ id: crypto.randomUUID(), name: 'Administrador', units: 0, percent: 0 });
       renderBalanceAdmins(current.admins, current);
       setBalanceSummary(current);
+      persistBalanceFromForm({ renderList: true });
     });
     $('addBalancePrize').addEventListener('click', () => {
       if (!isAdmin()) return;
@@ -3448,6 +3511,7 @@
       current.prizesList.push({ id: crypto.randomUUID(), name: 'Nuevo premio', amount: 0 });
       renderBalancePrizes(current.prizesList);
       setBalanceSummary(current);
+      persistBalanceFromForm({ renderList: true });
     });
     $('addAccountingCategory').addEventListener('click', () => {
       const eventData = activeAccountingEvent();
@@ -3473,8 +3537,7 @@
       event.preventDefault();
       const eventData = activeBalanceEvent();
       if (!eventData || !isAdmin()) return;
-      eventData.balance = balanceFromForm();
-      saveEvents();
+      persistBalanceFromForm({ renderList: true });
       renderBalanceEvents();
       renderBalanceDetail();
       alert('Balance guardado.');
