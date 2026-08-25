@@ -2006,7 +2006,7 @@
       };
     }
     function accountingCategoriesFromBalance(eventData) {
-      const balance = eventBalance(accountingEventForWeek(eventData));
+      const balance = eventBalance(eventData);
       const expenses = normalizeBalanceLines(balance.expenses, fallbackBalanceExpenses);
       const prizes = normalizeBalanceLines(balance.prizesList, fallbackBalancePrizes);
       const viaticos = expenses.filter(item => normalize(item.name).includes('viatic'));
@@ -2042,7 +2042,7 @@
       return syncAccountingWithBalance(eventData);
     }
     function accountingEventBase(eventData) {
-      const balance = eventBalance(accountingEventForWeek(eventData));
+      const balance = eventBalance(eventData);
       return balanceTotals(balance).indigoAmount;
     }
     function accountingSalesForWeek(eventData) {
@@ -2131,7 +2131,7 @@
       const selected = activeAccountingEvent();
       if (!activeAccountingEventId && selected) activeAccountingEventId = selected.id;
       const totals = includedEvents.reduce((acc, eventData) => {
-        const balance = eventBalance(accountingEventForWeek(eventData));
+        const balance = eventBalance(eventData);
         const base = balanceTotals(balance).indigoAmount;
         const spent = accountingEventSpent(eventData);
         acc.base += base;
@@ -2144,7 +2144,7 @@
       $('accountingEventsList').innerHTML = availableEvents.length ? availableEvents.map(eventData => {
         const base = accountingEventBase(eventData);
         const spent = accountingEventSpent(eventData);
-        const balance = eventBalance(accountingEventForWeek(eventData));
+        const balance = eventBalance(eventData);
         const included = isAccountingEventIncluded(eventData);
         return `
           <label class="accounting-event accounting-event-toggle ${eventData.id === activeAccountingEventId ? 'active' : ''}">
@@ -2170,7 +2170,7 @@
         $('accountingCategoriesList').innerHTML = '';
         return;
       }
-      const balance = eventBalance(accountingEventForWeek(eventData));
+      const balance = eventBalance(eventData);
       const base = balanceTotals(balance).indigoAmount;
       const accounting = { categories: accountingCategoriesForRange(eventData) };
       const spent = accountingEventSpent(eventData);
