@@ -395,7 +395,7 @@ function init() {
   renderAnnouncementMediaControls();
   bindEvents();
   if (isLaunchedFromCargas()) {
-    els.backHomeBtn.textContent = "Volver a Cargas";
+    els.backHomeBtn.textContent = "Volver a pagina principal";
   }
   restoreServerState().finally(() => {
     const params = new URLSearchParams(window.location.search);
@@ -476,7 +476,7 @@ function bindEvents() {
   els.loadDesignNewInput.addEventListener("change", updateLoadCreationChoices);
   els.backHomeBtn.addEventListener("click", () => {
     if (isLaunchedFromCargas()) {
-      window.location.href = "/?page=bingo";
+      window.location.href = "/?page=home";
       return;
     }
     if (state.currentUser) {
