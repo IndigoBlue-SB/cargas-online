@@ -1988,12 +1988,47 @@
       return source.map(category => ({
         id: category.id || crypto.randomUUID(),
         name: category.name || 'Categoria',
+        source: category.source || '',
         details: Array.isArray(category.details) ? category.details.map(detail => ({
           id: detail.id || crypto.randomUUID(),
           name: detail.name || '',
-          amount: Number(detail.amount) || 0
+          amount: Number(detail.amount) || 0,
+          source: detail.source || ''
         })) : []
       }));
+    }
+    function balanceCategoryDetail(item, prefix) {
+      return {
+        id: `${prefix}-${item.id || normalize(item.name) || crypto.randomUUID()}`,
+        name: item.name || 'Detalle',
+        amount: Number(item.amount) || 0,
+        source: 'balance'
+      };
+    }
+    function accountingCategoriesFromBalance(eventData) {
+      const balance = eventBalance(accountingEventForWeek(eventData));
+      const expenses = normalizeBalanceLines(balance.expenses, fallbackBalanceExpenses);
+      const prizes = normalizeBalanceLines(balance.prizesList, fallbackBalancePrizes);
+      const viaticos = expenses.filter(item => normalize(item.name).includes('viatic'));
+      const gastos = expenses.filter(item => !normalize(item.name).includes('viatic'));
+      return [
+        { id: 'balance-gastos', name: 'Gastos', source: 'balance', details: gastos.map(item => balanceCategoryDetail(item, 'balance-expense')) },
+        { id: 'balance-premios', name: 'Premios', source: 'balance', details: prizes.map(item => balanceCategoryDetail(item, 'balance-prize')) },
+        { id: 'balance-viaticos', name: 'Viaticos', source: 'balance', details: viaticos.map(item => balanceCategoryDetail(item, 'balance-viatico')) }
+      ];
+    }
+    function syncAccountingWithBalance(eventData) {
+      const key = accountingWeekKey();
+      if (!eventData.accountingByWeek) eventData.accountingByWeek = {};
+      const current = normalizeAccountingCategories(eventData.accountingByWeek[key]?.categories);
+      const balanceCategories = accountingCategoriesFromBalance(eventData);
+      const manualCategories = current.filter(category => {
+        if (category.source === 'balance') return false;
+        if (['gastos', 'premios', 'viaticos'].includes(normalize(category.name)) && !(category.details || []).length) return false;
+        return true;
+      });
+      eventData.accountingByWeek[key] = { categories: [...balanceCategories, ...manualCategories] };
+      return eventData.accountingByWeek[key];
     }
     function eventAccounting(eventData) {
       const key = accountingWeekKey();
@@ -2004,8 +2039,7 @@
           : null;
         eventData.accountingByWeek[key] = { categories: normalizeAccountingCategories(legacyCategories) };
       }
-      eventData.accountingByWeek[key].categories = normalizeAccountingCategories(eventData.accountingByWeek[key].categories);
-      return eventData.accountingByWeek[key];
+      return syncAccountingWithBalance(eventData);
     }
     function accountingEventBase(eventData) {
       const balance = eventBalance(accountingEventForWeek(eventData));
@@ -2049,6 +2083,7 @@
       return (category.details || []).reduce((sum, detail) => sum + (Number(detail.amount) || 0), 0);
     }
     function accountingCategoriesForRange(eventData) {
+      syncAccountingWithBalance(eventData);
       const byWeek = eventData.accountingByWeek || {};
       const matched = Object.entries(byWeek)
         .filter(([key]) => accountingPeriodOverlaps(key))
@@ -2079,10 +2114,12 @@
         categories: [...document.querySelectorAll('[data-accounting-category]')].map(categoryRow => ({
           id: categoryRow.dataset.accountingCategory,
           name: categoryRow.querySelector('[data-accounting-category-name]').value.trim() || 'Categoria',
+          source: categoryRow.dataset.accountingSource || '',
           details: [...categoryRow.querySelectorAll('[data-accounting-detail]')].map(detailRow => ({
             id: detailRow.dataset.accountingDetail,
             name: detailRow.querySelector('[data-accounting-detail-name]').value.trim() || 'Detalle',
-            amount: parseAmount(detailRow.querySelector('[data-accounting-detail-amount]').value)
+            amount: parseAmount(detailRow.querySelector('[data-accounting-detail-amount]').value),
+            source: detailRow.dataset.accountingDetailSource || ''
           }))
         }))
       };
@@ -2147,14 +2184,14 @@
         const total = accountingCategoryTotal(category);
         const isOpen = openAccountingCategories.has(category.id);
         const details = (category.details || []).map(detail => `
-          <div class="accounting-detail-line" data-accounting-detail="${detail.id || crypto.randomUUID()}">
+          <div class="accounting-detail-line" data-accounting-detail="${detail.id || crypto.randomUUID()}" data-accounting-detail-source="${escapeAttr(detail.source || '')}">
             <label>Detalle<input data-accounting-detail-name value="${escapeAttr(detail.name || '')}"></label>
             <label>Importe<input data-accounting-detail-amount inputmode="decimal" autocomplete="off" value="${formatInputAmount(detail.amount)}"></label>
             <button type="button" class="danger" data-delete-accounting-detail>Quitar</button>
           </div>
         `).join('');
         return `
-          <article class="panel accounting-category ${isOpen ? '' : 'collapsed'}" data-accounting-category="${category.id || crypto.randomUUID()}">
+          <article class="panel accounting-category ${isOpen ? '' : 'collapsed'}" data-accounting-category="${category.id || crypto.randomUUID()}" data-accounting-source="${escapeAttr(category.source || '')}">
             <div class="accounting-category-head">
               <button type="button" class="accounting-toggle" data-toggle-accounting-category>${isOpen ? 'v' : '>'}</button>
               <label>Categoria<input data-accounting-category-name value="${escapeAttr(category.name || 'Categoria')}"></label>
