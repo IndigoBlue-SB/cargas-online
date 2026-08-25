@@ -266,6 +266,7 @@ const els = {
   eventBoardTextColorInput: document.querySelector("#eventBoardTextColorInput"),
   eventBoardDrawnColorInput: document.querySelector("#eventBoardDrawnColorInput"),
   eventBoardDrawnTextColorInput: document.querySelector("#eventBoardDrawnTextColorInput"),
+  eventBoardMarkEffectInput: document.querySelector("#eventBoardMarkEffectInput"),
   eventBoardShadowInput: document.querySelector("#eventBoardShadowInput"),
   eventBoardNumberShadowInput: document.querySelector("#eventBoardNumberShadowInput"),
   eventBoardNeonInput: document.querySelector("#eventBoardNeonInput"),
@@ -546,6 +547,7 @@ function bindEvents() {
     els.eventBoardTextColorInput,
     els.eventBoardDrawnColorInput,
     els.eventBoardDrawnTextColorInput,
+    els.eventBoardMarkEffectInput,
     els.eventBoardShadowInput,
     els.eventBoardNumberShadowInput,
     els.eventBoardNeonInput,
@@ -1926,13 +1928,17 @@ function readBoardVisualSettingsFromForm() {
   state.visualSettings.boardTextColor = els.eventBoardTextColorInput.value;
   state.visualSettings.boardDrawnColor = els.eventBoardDrawnColorInput.value;
   state.visualSettings.boardDrawnTextColor = els.eventBoardDrawnTextColorInput.value;
+  state.visualSettings.boardMarkEffect = els.eventBoardMarkEffectInput.value;
   state.visualSettings.boardShadow = els.eventBoardShadowInput.checked;
   state.visualSettings.boardNumberShadow = els.eventBoardNumberShadowInput.checked;
   state.visualSettings.boardNeon = els.eventBoardNeonInput.checked;
 }
 
 function readGeneralVisualSettingsFromForm() {
-  readGeneralVisualSettingsFromForm();
+  state.visualSettings.accentColor = els.eventAccentColorInput.value;
+  state.visualSettings.panelColor = els.eventPanelColorInput.value;
+  state.visualSettings.ballSize = clamp(Number(els.eventBallSizeInput.value) || 74, 36, 96);
+  state.visualSettings.buttonRadius = clamp(Number(els.eventButtonRadiusInput.value) || 8, 0, 24);
 }
 
 function readScreenLayoutSettingsFromForm() {
@@ -3227,6 +3233,7 @@ function fillEventDialog(options = {}) {
   els.eventBoardTextColorInput.value = state.visualSettings.boardTextColor;
   els.eventBoardDrawnColorInput.value = state.visualSettings.boardDrawnColor;
   els.eventBoardDrawnTextColorInput.value = state.visualSettings.boardDrawnTextColor;
+  els.eventBoardMarkEffectInput.value = state.visualSettings.boardMarkEffect;
   els.eventBoardShadowInput.checked = !!state.visualSettings.boardShadow;
   els.eventBoardNumberShadowInput.checked = !!state.visualSettings.boardNumberShadow;
   els.eventBoardNeonInput.checked = !!state.visualSettings.boardNeon;
@@ -5088,6 +5095,7 @@ function createDefaultVisualSettings() {
     boardTextColor: "#bcd7f3",
     boardDrawnColor: "#ffcb45",
     boardDrawnTextColor: "#111111",
+    boardMarkEffect: "zoom",
     boardShadow: true,
     boardNumberShadow: false,
     boardNeon: false,
@@ -5119,6 +5127,7 @@ function normalizeVisualSettings(settings = {}) {
   next.boardFontSize = clamp(Number(next.boardFontSize) || 22, 12, 260);
   next.sideTitleSize = clamp(Number(next.sideTitleSize) || 19, 12, 120);
   next.sideTextSize = clamp(Number(next.sideTextSize) || 16, 12, 120);
+  if (!["none", "zoom", "spin", "sweep", "pulse"].includes(next.boardMarkEffect)) next.boardMarkEffect = "zoom";
   return next;
 }
 
@@ -5163,6 +5172,9 @@ function applyVisualSettings() {
   document.body.classList.toggle("board-shadow-off", !state.visualSettings.boardShadow);
   document.body.classList.toggle("board-number-shadow-on", !!state.visualSettings.boardNumberShadow);
   document.body.classList.toggle("board-neon-on", !!state.visualSettings.boardNeon);
+  ["none", "zoom", "spin", "sweep", "pulse"].forEach((effect) => {
+    document.body.classList.toggle(`board-mark-effect-${effect}`, state.visualSettings.boardMarkEffect === effect);
+  });
   updateHeaderLogo(els.gameBingoLogo, state.visualSettings.bingoLogoData);
   updateHeaderLogo(els.gameIndigoLogo, state.visualSettings.indigoLogoData);
 }

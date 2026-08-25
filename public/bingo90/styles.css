@@ -1042,6 +1042,7 @@ select {
 
 .number-cell {
   display: grid;
+  position: relative;
   place-items: center;
   aspect-ratio: 1;
   border: 1px solid var(--line);
@@ -1052,6 +1053,8 @@ select {
   font-family: var(--board-font-family, Arial, Helvetica, sans-serif);
   font-size: min(var(--board-font-size, 22px), 8vw, 9vh);
   font-weight: 700;
+  overflow: hidden;
+  transform-origin: center;
 }
 
 .number-cell.drawn {
@@ -1063,6 +1066,28 @@ select {
 .number-cell.latest {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
+}
+
+body.board-mark-effect-zoom .number-cell.latest {
+  animation: numberMarkZoom 820ms cubic-bezier(0.2, 1, 0.28, 1);
+}
+
+body.board-mark-effect-spin .number-cell.latest {
+  animation: numberMarkSpin 900ms cubic-bezier(0.18, 0.9, 0.28, 1);
+}
+
+body.board-mark-effect-pulse .number-cell.latest {
+  animation: numberMarkPulse 1100ms ease-out;
+}
+
+body.board-mark-effect-sweep .number-cell.latest::after {
+  content: "";
+  position: absolute;
+  inset: -35%;
+  background: linear-gradient(110deg, transparent 22%, rgba(255, 255, 255, 0.78) 48%, transparent 74%);
+  transform: translateX(-120%) rotate(12deg);
+  animation: numberMarkSweep 980ms ease-out;
+  pointer-events: none;
 }
 
 body.board-shadow-off .number-cell {
@@ -1094,6 +1119,59 @@ body.board-neon-on .number-cell.drawn {
   100% {
     opacity: 1;
     transform: translateY(0) scale(1) rotate(0);
+  }
+}
+
+@keyframes numberMarkZoom {
+  0% {
+    transform: scale(0.72);
+    filter: brightness(1.45);
+  }
+  58% {
+    transform: scale(1.22);
+    filter: brightness(1.28);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes numberMarkSpin {
+  0% {
+    transform: rotate(-180deg) scale(0.7);
+    filter: brightness(1.45);
+  }
+  62% {
+    transform: rotate(12deg) scale(1.16);
+  }
+  100% {
+    transform: rotate(0) scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes numberMarkPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--board-drawn-color, #ffcb45) 85%, transparent);
+  }
+  45% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 12px color-mix(in srgb, var(--board-drawn-color, #ffcb45) 28%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 22px transparent;
+  }
+}
+
+@keyframes numberMarkSweep {
+  0% {
+    transform: translateX(-120%) rotate(12deg);
+  }
+  100% {
+    transform: translateX(120%) rotate(12deg);
   }
 }
 
