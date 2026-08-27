@@ -11,8 +11,17 @@ Esta es la version online compartida de Cargas.
 ## Variables recomendadas
 
 - `PORT`: lo define el hosting automaticamente.
-- `DATA_DIR`: carpeta persistente para guardar la base, por ejemplo `/data`.
+- `DATA_DIR`: carpeta persistente para guardar la base, por ejemplo `/data`. Si no se define, en Railway la app usa automaticamente `RAILWAY_VOLUME_MOUNT_PATH`.
 
 ## Importante
 
-Para produccion conviene usar un hosting con disco persistente o volumen. Si el hosting no tiene disco persistente, los datos pueden perderse al reiniciar.
+Para produccion hay que conectar un volumen persistente al servicio de Railway. Si no hay volumen, los eventos, cargas, balances y estadisticas pueden perderse al reiniciar o desplegar.
+
+En Railway:
+
+1. Abrir el servicio de Cargas Online.
+2. Agregar un Volume.
+3. Montarlo en una ruta persistente, por ejemplo `/data`.
+4. Desplegar nuevamente.
+
+La app guarda la base en `db.json` dentro de ese volumen y antes de cada escritura deja una copia `db.json.bak`.

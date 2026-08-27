@@ -6,7 +6,8 @@ const crypto = require('crypto');
 const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
-const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
+const RAILWAY_VOLUME_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH;
+const DATA_DIR = process.env.DATA_DIR || (RAILWAY_VOLUME_DIR ? path.join(RAILWAY_VOLUME_DIR, 'cargas-online') : path.join(ROOT, 'data'));
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const BUNDLED_DB_FILE = path.join(ROOT, 'data', 'db.json');
 const BUNDLE_DATA_VERSION = '2026-06-23-03';
@@ -94,7 +95,7 @@ function mergeBundledDb(db) {
 
     next._bundleDataVersion = BUNDLE_DATA_VERSION;
     changed = true;
-    if (changed) fs.writeFileSync(DB_FILE, JSON.stringify(next, null, 2));
+    if (changed) writeDb(next);
     return next;
   } catch {
     return db;
@@ -107,13 +108,41 @@ function readDb() {
     const raw = fs.readFileSync(DB_FILE, 'utf8').replace(/^\uFEFF/, '');
     return mergeBundledDb({ ...defaultDb, ...JSON.parse(raw) });
   } catch {
+    const backupFile = `${DB_FILE}.bak`;
+    if (fs.existsSync(backupFile)) {
+      try {
+        const raw = fs.readFileSync(backupFile, 'utf8').replace(/^\uFEFF/, '');
+        const restored = { ...defaultDb, ...JSON.parse(raw) };
+        writeDb(restored);
+        return mergeBundledDb(restored);
+      } catch {
+        return structuredClone(defaultDb);
+      }
+    }
     return structuredClone(defaultDb);
   }
 }
 
 function writeDb(db) {
   ensureDb();
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+  const body = JSON.stringify({ ...db, savedAt: new Date().toISOString() }, null, 2);
+  const tempFile = `${DB_FILE}.${process.pid}.tmp`;
+  if (fs.existsSync(DB_FILE)) fs.copyFileSync(DB_FILE, `${DB_FILE}.bak`);
+  fs.writeFileSync(tempFile, body);
+  fs.renameSync(tempFile, DB_FILE);
+}
+
+function storageInfo(db) {
+  const isRailway = Boolean(process.env.RAILWAY_ENVIRONMENT_NAME || process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_SERVICE_ID);
+  const events = Array.isArray(db.events) ? db.events : [];
+  return {
+    isRailway,
+    usingRailwayVolume: Boolean(RAILWAY_VOLUME_DIR),
+    usingCustomDataDir: Boolean(process.env.DATA_DIR),
+    eventCount: events.length,
+    salesCount: events.reduce((total, event) => total + (Array.isArray(event.sales) ? event.sales.length : 0), 0),
+    dbUpdatedAt: db.savedAt || null
+  };
 }
 
 function sendJson(res, status, data) {
@@ -306,7 +335,8 @@ async function handleApi(req, res) {
     return sendJson(res, 200, {
       events: visibleEventsFor(session, db.events || []),
       users: hasFunctionPermission(session, db.settings, 'settings') ? (db.users || []) : [],
-      settings: db.settings || defaultDb.settings
+      settings: db.settings || defaultDb.settings,
+      storage: storageInfo(db)
     });
   }
 

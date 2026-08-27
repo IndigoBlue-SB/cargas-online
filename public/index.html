@@ -111,6 +111,9 @@
     @keyframes splashIn { from { opacity: 0; transform: translateY(18px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
     @keyframes logoFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
     .user-strip { display: grid; gap: 6px; padding: 8px; border-radius: var(--radius); background: rgba(255,255,255,.08); color: rgba(255,255,255,.84); }
+    .storage-warning { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid #f59e0b; border-radius: var(--radius); background: #fff7ed; color: #7c2d12; box-shadow: var(--shadow); }
+    .storage-warning strong { font-size: 14px; }
+    .storage-warning span { font-size: 12px; line-height: 1.25; }
 
     .hidden { display: none !important; }
     .event-layout { display: grid; grid-template-columns: 285px minmax(0, 1fr); gap: 10px; align-items: start; }
@@ -337,6 +340,11 @@
     </aside>
 
     <main class="main">
+      <div id="storageWarning" class="storage-warning hidden">
+        <strong>Atencion: guardado temporal en Railway</strong>
+        <span>Conecta un volumen persistente al servicio para que las cargas, balances y estadisticas no se pierdan al reiniciar o desplegar.</span>
+      </div>
+
       <section id="page-home" data-screen>
         <div class="topbar">
           <div>
@@ -869,6 +877,7 @@
     let settings = { ...defaultSettings };
     if (!settings.adminPassword) settings.adminPassword = defaultSettings.adminPassword;
     let appUsers = [];
+    let storageInfo = null;
     let currentUser = null;
     let activePage = 'home';
     let activeEventId = null;
@@ -944,6 +953,7 @@
       events = data.events || [];
       appUsers = data.users || appUsers;
       settings = { ...defaultSettings, ...(data.settings || {}) };
+      storageInfo = data.storage || null;
       settings.functionPermissions = normalizeFunctionPermissions(settings.functionPermissions);
       applySettings();
       renderAll();
@@ -3224,6 +3234,7 @@
     }
 
     function renderAll() {
+      renderStorageWarning();
       renderUsers();
       renderEventCards();
       renderDeleteList();
@@ -3234,6 +3245,12 @@
       renderStats();
       if (activeEventId) renderActiveEvent();
       if (activeBalanceEventId && activePage === 'balance-detail') renderBalanceDetail();
+    }
+
+    function renderStorageWarning() {
+      const warning = $('storageWarning');
+      if (!warning) return;
+      warning.classList.toggle('hidden', !(isAdmin() && storageInfo?.isRailway && !storageInfo?.usingRailwayVolume));
     }
 
     navButtons.forEach(button => button.addEventListener('click', () => go(button.dataset.page)));
