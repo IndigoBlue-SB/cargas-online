@@ -187,23 +187,29 @@
     .bingo-card-cell { min-height: 24px; display: grid; place-items: center; border-radius: 4px; background: #eef2ed; font-size: 12px; font-weight: 700; }
     .bingo-card-cell.empty-cell { background: #f8faf8; }
     .bingo-card-cell.hit { background: #0f766e; color: #fff; }
+    .stats-dashboard { display: grid; gap: 10px; }
     .stats-layout { display: grid; grid-template-columns: minmax(260px, 330px) minmax(0, 1fr); gap: 10px; align-items: start; }
     .stats-event-list, .stats-event-detail { padding: 0; overflow: hidden; }
     .stats-events { display: grid; gap: 6px; padding: 8px; max-height: calc(100vh - 250px); overflow-y: auto; }
     .stats-event-button { width: 100%; display: grid; gap: 4px; min-height: 64px; border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; color: var(--ink); background: #fbfcfa; text-align: left; }
     .stats-event-button.active { border-color: var(--brand); background: var(--soft); }
     .stats-event-button strong, .stats-event-button span { display: block; line-height: 1.2; }
-    .stats-period-cards { display: grid; grid-template-columns: repeat(6, minmax(105px, 1fr)); gap: 8px; padding: 10px; }
-    .stats-period-cards .stat { box-shadow: none; }
-    .stats-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 10px 10px; }
+    .stats-period-line { display: flex; gap: 10px; flex-wrap: wrap; padding: 9px 10px; color: var(--muted); font-size: 13px; border-bottom: 1px solid var(--line); }
+    .stats-period-line strong { color: var(--ink); }
+    .stats-delta { font-weight: 800; }
+    .stats-delta.up { color: #047857; }
+    .stats-delta.down { color: #b42318; }
+    .stats-delta.flat { color: var(--muted); }
+    .stats-charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 10px; }
     .stats-charts section { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; background: #fbfcfa; }
     .stats-charts h3 { margin: 0 0 10px; font-size: 15px; }
-    .stats-bars { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(52px, 1fr); align-items: end; gap: 8px; min-height: 230px; overflow-x: auto; padding: 8px 4px 0; }
-    .stats-bar-item { display: grid; grid-template-rows: 1fr auto auto; gap: 5px; height: 100%; min-width: 52px; text-align: center; }
-    .stats-bar-track { display: flex; align-items: end; min-height: 150px; border-radius: 6px; background: #eef2ed; overflow: hidden; }
+    .stats-bars { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(56px, 1fr); align-items: end; gap: 8px; min-height: 230px; overflow-x: auto; padding: 8px 4px 0; }
+    .stats-bar-item { display: grid; grid-template-rows: 1fr auto auto auto; gap: 5px; height: 100%; min-width: 56px; text-align: center; }
+    .stats-bar-track { display: flex; align-items: end; min-height: 145px; border-radius: 6px; background: #eef2ed; overflow: hidden; border: 1px solid #d9ded6; }
     .stats-bar-fill { width: 100%; min-height: 4px; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, #0f766e, #2b7bbb); }
     .stats-bar-value { color: var(--ink); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
-    .stats-bar-label { color: var(--muted); font-size: 11px; line-height: 1.15; }
+    .stats-bar-label { color: var(--muted); font-size: 11px; line-height: 1.15; min-height: 24px; }
+    .stats-bar-change { font-size: 11px; min-height: 14px; }
     .balance-grid { display: grid; grid-template-columns: minmax(190px, 225px) minmax(420px, 460px) minmax(245px, 1fr) minmax(245px, 1fr); gap: 12px; align-items: start; width: 100%; }
     .balance-accounts, .balance-admins, .balance-main, .balance-side { min-width: 0; }
     .balance-side, .balance-admins { border-left: 1px solid var(--line); padding-left: 8px; display: grid; gap: 5px; }
@@ -427,40 +433,53 @@
       </section>
 
       <section id="page-stats" data-screen class="hidden">
-        <div class="topbar"><h2>Estadisticas</h2></div>
-        <div class="cards">
-          <div class="stat"><span>Eventos</span><strong id="statsEvents">0</strong></div>
-          <div class="stat"><span>Eventos con ventas</span><strong id="statsActiveEvents">0</strong></div>
-          <div class="stat"><span>Bingos vendidos</span><strong id="statsUnits">0</strong></div>
-          <div class="stat"><span>Cargas realizadas</span><strong id="statsLoads">0</strong></div>
+        <div class="topbar">
+          <div><h2>Estadisticas</h2><p class="muted">Graficos de ventas por cantidad, con comparacion semanal, mensual y anual.</p></div>
         </div>
-        <section class="stats-layout">
-          <aside class="panel stats-event-list">
-            <div class="table-head"><h3>Eventos</h3><span id="statsCount" class="muted">0 eventos</span></div>
-            <div id="statsEventsList" class="stats-events"></div>
-          </aside>
-          <div class="panel stats-event-detail">
-            <div class="table-head"><h3 id="statsSelectedTitle">Elegir evento</h3><span id="statsSelectedInfo" class="muted"></span></div>
-            <div class="stats-period-cards">
-              <div class="stat"><span>Esta semana</span><strong id="statsWeekUnits">0</strong></div>
-              <div class="stat"><span>Semana anterior</span><strong id="statsPrevWeekUnits">0</strong></div>
-              <div class="stat"><span>Proyeccion semanal</span><strong id="statsWeekProjection">0</strong></div>
-              <div class="stat"><span>Este mes</span><strong id="statsMonthUnits">0</strong></div>
-              <div class="stat"><span>Mes anterior</span><strong id="statsPrevMonthUnits">0</strong></div>
-              <div class="stat"><span>Proyeccion mensual</span><strong id="statsMonthProjection">0</strong></div>
-            </div>
+        <div class="stats-dashboard">
+          <section class="panel stats-event-detail">
+            <div class="table-head"><h3>Total de todos los eventos</h3><span id="statsGlobalInfo" class="muted"></span></div>
+            <div id="statsGlobalLine" class="stats-period-line"></div>
             <div class="stats-charts">
               <section>
-                <h3>Ventas semana a semana</h3>
-                <div id="statsWeeklyChart" class="stats-bars"></div>
+                <h3>Todos - semana a semana</h3>
+                <div id="statsGlobalWeeklyChart" class="stats-bars"></div>
               </section>
               <section>
-                <h3>Ventas mes a mes</h3>
-                <div id="statsMonthlyChart" class="stats-bars"></div>
+                <h3>Todos - mes a mes</h3>
+                <div id="statsGlobalMonthlyChart" class="stats-bars"></div>
+              </section>
+              <section>
+                <h3>Todos - ano a ano</h3>
+                <div id="statsGlobalYearlyChart" class="stats-bars"></div>
               </section>
             </div>
-          </div>
-        </section>
+          </section>
+          <section class="stats-layout">
+            <aside class="panel stats-event-list">
+              <div class="table-head"><h3>Eventos</h3><span id="statsCount" class="muted">0 eventos</span></div>
+              <div id="statsEventsList" class="stats-events"></div>
+            </aside>
+            <div class="panel stats-event-detail">
+              <div class="table-head"><h3 id="statsSelectedTitle">Elegir evento</h3><span id="statsSelectedInfo" class="muted"></span></div>
+              <div id="statsSelectedLine" class="stats-period-line"></div>
+              <div class="stats-charts">
+                <section>
+                  <h3>Evento - semana a semana</h3>
+                  <div id="statsWeeklyChart" class="stats-bars"></div>
+                </section>
+                <section>
+                  <h3>Evento - mes a mes</h3>
+                  <div id="statsMonthlyChart" class="stats-bars"></div>
+                </section>
+                <section>
+                  <h3>Evento - ano a ano</h3>
+                  <div id="statsYearlyChart" class="stats-bars"></div>
+                </section>
+              </div>
+            </div>
+          </section>
+        </div>
       </section>
 
       <section id="page-delete" data-screen class="hidden">
@@ -2539,24 +2558,25 @@
     function renderStats() {
       if (!canUsePage('stats')) return;
       const availableEvents = visibleEvents();
-      const allSales = availableEvents.flatMap(event => officialSales(event).map(sale => ({ sale, event })));
-      const units = allSales.reduce((sum, item) => sum + rangeCount(item.sale), 0);
+      const allSales = salesRowsForEvents(availableEvents);
+      const units = allSales.reduce((sum, item) => sum + item.units, 0);
       const activeEvents = availableEvents.filter(event => officialSales(event).length > 0);
       const selected = availableEvents.find(event => event.id === activeStatsEventId) || activeEvents[0] || availableEvents[0] || null;
       activeStatsEventId = selected?.id || null;
-      $('statsEvents').textContent = num(availableEvents.length);
-      $('statsActiveEvents').textContent = num(activeEvents.length);
-      $('statsUnits').textContent = num(units);
-      $('statsLoads').textContent = num(allSales.length);
       $('statsCount').textContent = `${availableEvents.length} eventos`;
+      $('statsGlobalInfo').textContent = `${num(availableEvents.length)} eventos - ${num(activeEvents.length)} con ventas - ${num(units)} bingos vendidos`;
+      renderStatsSummaryLine($('statsGlobalLine'), availableEvents);
+      $('statsGlobalWeeklyChart').innerHTML = renderStatsBars(salesSeriesByPeriodForEvents(availableEvents, 'week', 14));
+      $('statsGlobalMonthlyChart').innerHTML = renderStatsBars(salesSeriesByPeriodForEvents(availableEvents, 'month', 12));
+      $('statsGlobalYearlyChart').innerHTML = renderStatsBars(salesSeriesByPeriodForEvents(availableEvents, 'year', 8));
       $('statsEventsList').innerHTML = availableEvents.length ? availableEvents.map(event => {
         const sales = officialSales(event);
         const eventUnits = sales.reduce((sum, sale) => sum + rangeCount(sale), 0);
         return `
           <button type="button" class="stats-event-button ${event.id === activeStatsEventId ? 'active' : ''}" data-open-stats="${event.id}">
             <strong>${event.name}</strong>
-            <span class="muted">${shortDate(event.date)} - ${event.town || 'Sin localidad'}</span>
-            <span>${num(eventUnits)} bingos - ${num(sales.length)} cargas</span>
+            <span class="muted">Sorteo ${shortDate(event.date)} - ${event.town || 'Sin localidad'}</span>
+            <span>${num(eventUnits)} bingos registrados</span>
           </button>
         `;
       }).join('') : '<div class="empty">No hay eventos disponibles.</div>';
@@ -2567,63 +2587,98 @@
       if (!eventData) {
         $('statsSelectedTitle').textContent = 'Elegir evento';
         $('statsSelectedInfo').textContent = '';
-        ['statsWeekUnits', 'statsPrevWeekUnits', 'statsWeekProjection', 'statsMonthUnits', 'statsPrevMonthUnits', 'statsMonthProjection'].forEach(id => $(id).textContent = '0');
+        $('statsSelectedLine').innerHTML = '<span>Selecciona un evento para ver sus ventas.</span>';
         $('statsWeeklyChart').innerHTML = '<div class="empty">Sin ventas.</div>';
         $('statsMonthlyChart').innerHTML = '<div class="empty">Sin ventas.</div>';
+        $('statsYearlyChart').innerHTML = '<div class="empty">Sin ventas.</div>';
         return;
       }
-      const weekly = salesSeriesByPeriod(eventData, 'week');
-      const monthly = salesSeriesByPeriod(eventData, 'month');
-      const weekNow = periodUnits(eventData, currentWeekKey());
-      const prevWeek = periodUnits(eventData, previousWeekKey());
-      const monthNow = periodUnits(eventData, currentMonthKey());
-      const prevMonth = periodUnits(eventData, previousMonthKey());
+      const weekly = salesSeriesByPeriodForEvents([eventData], 'week', 14);
+      const monthly = salesSeriesByPeriodForEvents([eventData], 'month', 12);
+      const yearly = salesSeriesByPeriodForEvents([eventData], 'year', 8);
       $('statsSelectedTitle').textContent = eventData.name;
-      $('statsSelectedInfo').textContent = `${shortDate(eventData.date)} - ${eventData.town || 'Sin localidad'}, ${eventData.province || 'Sin provincia'}`;
-      $('statsWeekUnits').textContent = num(weekNow);
-      $('statsPrevWeekUnits').textContent = num(prevWeek);
-      $('statsWeekProjection').textContent = num(projectCurrentPeriod(weekNow, 'week'));
-      $('statsMonthUnits').textContent = num(monthNow);
-      $('statsPrevMonthUnits').textContent = num(prevMonth);
-      $('statsMonthProjection').textContent = num(projectCurrentPeriod(monthNow, 'month'));
+      $('statsSelectedInfo').textContent = `Fecha del sorteo ${shortDate(eventData.date)} - ${eventData.town || 'Sin localidad'}, ${eventData.province || 'Sin provincia'}`;
+      renderStatsSummaryLine($('statsSelectedLine'), [eventData]);
       $('statsWeeklyChart').innerHTML = renderStatsBars(weekly);
       $('statsMonthlyChart').innerHTML = renderStatsBars(monthly);
+      $('statsYearlyChart').innerHTML = renderStatsBars(yearly);
     }
 
-    function salesSeriesByPeriod(eventData, period) {
+    function salesRowsForEvents(eventList) {
+      return eventList.flatMap(event => officialSales(event).map(sale => ({
+        event,
+        sale,
+        date: saleDate(sale) || event.date || '',
+        units: rangeCount(sale)
+      }))).filter(item => item.date && item.units > 0);
+    }
+
+    function salesSeriesByPeriodForEvents(eventList, period, limit = 12) {
       const groups = new Map();
-      officialSales(eventData).forEach(sale => {
-        const key = period === 'month' ? monthKey(saleDate(sale)) : weekKey(saleDate(sale));
+      salesRowsForEvents(eventList).forEach(item => {
+        const key = period === 'year' ? yearKey(item.date) : period === 'month' ? monthKey(item.date) : weekKey(item.date);
         if (!key) return;
-        if (!groups.has(key.id)) groups.set(key.id, { label: key.label, units: 0 });
-        groups.get(key.id).units += rangeCount(sale);
+        if (!groups.has(key.id)) groups.set(key.id, { label: key.label, units: 0, events: new Set() });
+        const group = groups.get(key.id);
+        group.units += item.units;
+        group.events.add(item.event.id);
       });
       return [...groups.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
-        .slice(-8)
-        .map(([, item]) => item);
+        .slice(-limit)
+        .map(([, item]) => ({ ...item, eventCount: item.events.size }));
     }
 
     function renderStatsBars(items) {
       if (!items.length) return '<div class="empty">Sin ventas en el periodo.</div>';
       const max = Math.max(...items.map(item => item.units), 1);
-      return items.map(item => {
+      return items.map((item, index) => {
         const height = Math.max(4, Math.round((item.units / max) * 100));
+        const delta = statsDelta(item.units, items[index - 1]?.units);
         return `
           <div class="stats-bar-item">
             <div class="stats-bar-track"><div class="stats-bar-fill" style="height:${height}%"></div></div>
             <div class="stats-bar-value">${num(item.units)}</div>
+            <div class="stats-bar-change stats-delta ${delta.className}">${delta.label}</div>
             <div class="stats-bar-label">${item.label}</div>
           </div>
         `;
       }).join('');
     }
 
-    function periodUnits(eventData, key) {
-      return officialSales(eventData).reduce((sum, sale) => {
-        const saleKey = key.length === 7 ? monthKey(saleDate(sale))?.id : weekKey(saleDate(sale))?.id;
-        return saleKey === key ? sum + rangeCount(sale) : sum;
+    function renderStatsSummaryLine(container, eventList) {
+      const weekNow = periodUnitsForEvents(eventList, 'week', currentWeekKey());
+      const prevWeek = periodUnitsForEvents(eventList, 'week', previousWeekKey());
+      const monthNow = periodUnitsForEvents(eventList, 'month', currentMonthKey());
+      const prevMonth = periodUnitsForEvents(eventList, 'month', previousMonthKey());
+      const yearNow = periodUnitsForEvents(eventList, 'year', currentYearKey());
+      const prevYear = periodUnitsForEvents(eventList, 'year', previousYearKey());
+      const weekDelta = statsDelta(weekNow, prevWeek);
+      const monthDelta = statsDelta(monthNow, prevMonth);
+      const yearDelta = statsDelta(yearNow, prevYear);
+      container.innerHTML = `
+        <span>Semana actual <strong>${num(weekNow)}</strong> <span class="stats-delta ${weekDelta.className}">${weekDelta.label}</span></span>
+        <span>Mes actual <strong>${num(monthNow)}</strong> <span class="stats-delta ${monthDelta.className}">${monthDelta.label}</span></span>
+        <span>Ano actual <strong>${num(yearNow)}</strong> <span class="stats-delta ${yearDelta.className}">${yearDelta.label}</span></span>
+      `;
+    }
+
+    function periodUnitsForEvents(eventList, period, id) {
+      return salesRowsForEvents(eventList).reduce((sum, item) => {
+        const key = period === 'year' ? yearKey(item.date)?.id : period === 'month' ? monthKey(item.date)?.id : weekKey(item.date)?.id;
+        return key === id ? sum + item.units : sum;
       }, 0);
+    }
+
+    function statsDelta(current, previous) {
+      const now = Number(current) || 0;
+      const before = Number(previous) || 0;
+      if (!before && !now) return { label: '0%', className: 'flat' };
+      if (!before) return { label: '+100%', className: 'up' };
+      const percent = Math.round(((now - before) / before) * 100);
+      if (percent > 0) return { label: `+${percent}%`, className: 'up' };
+      if (percent < 0) return { label: `${percent}%`, className: 'down' };
+      return { label: '0%', className: 'flat' };
     }
 
     function dateFromIso(iso) {
@@ -2643,6 +2698,13 @@
       if (!date) return null;
       const id = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       return { id, label: `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getFullYear()).slice(-2)}` };
+    }
+
+    function yearKey(iso) {
+      const date = dateFromIso(iso);
+      if (!date) return null;
+      const id = String(date.getFullYear());
+      return { id, label: id };
     }
 
     function currentWeekKey() {
@@ -2665,11 +2727,12 @@
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     }
 
-    function projectCurrentPeriod(units, period) {
-      const today = new Date();
-      const elapsed = period === 'week' ? ((today.getDay() + 6) % 7) + 1 : today.getDate();
-      const total = period === 'week' ? 7 : new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-      return Math.round((Number(units) || 0) / Math.max(elapsed, 1) * total);
+    function currentYearKey() {
+      return String(new Date().getFullYear());
+    }
+
+    function previousYearKey() {
+      return String(new Date().getFullYear() - 1);
     }
 
     function eventSales() {
