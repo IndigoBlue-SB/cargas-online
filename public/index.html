@@ -190,23 +190,25 @@
     .stats-dashboard { display: grid; gap: 10px; }
     .stats-layout { display: grid; grid-template-columns: minmax(260px, 330px) minmax(0, 1fr); gap: 10px; align-items: start; }
     .stats-event-list, .stats-event-detail { padding: 0; overflow: hidden; }
-    .stats-events { display: grid; gap: 6px; padding: 8px; max-height: calc(100vh - 250px); overflow-y: auto; }
-    .stats-event-button { width: 100%; display: grid; gap: 4px; min-height: 64px; border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; color: var(--ink); background: #fbfcfa; text-align: left; }
-    .stats-event-button.active { border-color: var(--brand); background: var(--soft); }
+    .stats-event-detail { background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); }
+    .stats-events { display: grid; gap: 7px; padding: 8px; max-height: calc(100vh - 250px); overflow-y: auto; }
+    .stats-event-button { width: 100%; display: grid; gap: 4px; min-height: 64px; border: 1px solid #dbe3ea; border-left: 5px solid #2b7bbb; border-radius: var(--radius); padding: 8px; color: var(--ink); background: linear-gradient(90deg, #ffffff, #f6fbff); text-align: left; }
+    .stats-event-button.active { border-color: var(--brand); border-left-color: #0f766e; background: linear-gradient(90deg, #e8f3ef, #ffffff); box-shadow: inset 0 0 0 1px rgba(15, 118, 110, .16); }
     .stats-event-button strong, .stats-event-button span { display: block; line-height: 1.2; }
-    .stats-period-line { display: flex; gap: 10px; flex-wrap: wrap; padding: 9px 10px; color: var(--muted); font-size: 13px; border-bottom: 1px solid var(--line); }
+    .stats-period-line { display: flex; gap: 8px; flex-wrap: wrap; padding: 9px 10px; color: var(--muted); font-size: 13px; border-bottom: 1px solid var(--line); background: #f8fafc; }
+    .stats-period-line > span { display: inline-flex; gap: 5px; align-items: center; min-height: 30px; padding: 5px 8px; border-radius: 6px; background: #ffffff; border: 1px solid #e1e7dd; }
     .stats-period-line strong { color: var(--ink); }
-    .stats-delta { font-weight: 800; }
-    .stats-delta.up { color: #047857; }
-    .stats-delta.down { color: #b42318; }
-    .stats-delta.flat { color: var(--muted); }
+    .stats-delta { display: inline-flex; justify-content: center; align-items: center; font-weight: 800; border-radius: 999px; padding: 2px 6px; }
+    .stats-delta.up { color: #047857; background: #d1fae5; }
+    .stats-delta.down { color: #b42318; background: #fee2e2; }
+    .stats-delta.flat { color: #475569; background: #e2e8f0; }
     .stats-charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 10px; }
-    .stats-charts section { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; background: #fbfcfa; }
-    .stats-charts h3 { margin: 0 0 10px; font-size: 15px; }
+    .stats-charts section { min-width: 0; border: 1px solid #dbe3ea; border-radius: var(--radius); padding: 10px; background: linear-gradient(180deg, #ffffff, #f7fafc); box-shadow: 0 8px 20px rgba(27, 36, 33, .07); }
+    .stats-charts h3 { margin: 0 0 10px; font-size: 15px; color: #0f3d55; }
     .stats-bars { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(56px, 1fr); align-items: end; gap: 8px; min-height: 230px; overflow-x: auto; padding: 8px 4px 0; }
     .stats-bar-item { display: grid; grid-template-rows: 1fr auto auto auto; gap: 5px; height: 100%; min-width: 56px; text-align: center; }
-    .stats-bar-track { display: flex; align-items: end; min-height: 145px; border-radius: 6px; background: #eef2ed; overflow: hidden; border: 1px solid #d9ded6; }
-    .stats-bar-fill { width: 100%; min-height: 4px; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, #0f766e, #2b7bbb); }
+    .stats-bar-track { display: flex; align-items: end; min-height: 145px; border-radius: 6px; background: repeating-linear-gradient(0deg, #eef2ed 0, #eef2ed 27px, #dbe3ea 28px); overflow: hidden; border: 1px solid #d9ded6; }
+    .stats-bar-fill { width: 100%; min-height: 4px; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, color-mix(in srgb, var(--bar-color, #0f766e) 78%, #ffffff), var(--bar-color, #0f766e)); box-shadow: inset 0 1px 0 rgba(255,255,255,.38); }
     .stats-bar-value { color: var(--ink); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
     .stats-bar-label { color: var(--muted); font-size: 11px; line-height: 1.15; min-height: 24px; }
     .stats-bar-change { font-size: 11px; min-height: 14px; }
@@ -450,7 +452,7 @@
                 <div id="statsGlobalMonthlyChart" class="stats-bars"></div>
               </section>
               <section>
-                <h3>Todos - ano a ano</h3>
+                <h3>Todos - año a año</h3>
                 <div id="statsGlobalYearlyChart" class="stats-bars"></div>
               </section>
             </div>
@@ -473,7 +475,7 @@
                   <div id="statsMonthlyChart" class="stats-bars"></div>
                 </section>
                 <section>
-                  <h3>Evento - ano a ano</h3>
+                  <h3>Evento - año a año</h3>
                   <div id="statsYearlyChart" class="stats-bars"></div>
                 </section>
               </div>
@@ -2632,12 +2634,14 @@
     function renderStatsBars(items) {
       if (!items.length) return '<div class="empty">Sin ventas en el periodo.</div>';
       const max = Math.max(...items.map(item => item.units), 1);
+      const colors = ['#0f766e', '#2b7bbb', '#f59e0b', '#db2777', '#7c3aed', '#16a34a', '#ea580c', '#0891b2', '#be123c', '#4f46e5', '#65a30d', '#d97706'];
       return items.map((item, index) => {
         const height = Math.max(4, Math.round((item.units / max) * 100));
         const delta = statsDelta(item.units, items[index - 1]?.units);
+        const color = colors[index % colors.length];
         return `
           <div class="stats-bar-item">
-            <div class="stats-bar-track"><div class="stats-bar-fill" style="height:${height}%"></div></div>
+            <div class="stats-bar-track"><div class="stats-bar-fill" style="height:${height}%; --bar-color:${color}"></div></div>
             <div class="stats-bar-value">${num(item.units)}</div>
             <div class="stats-bar-change stats-delta ${delta.className}">${delta.label}</div>
             <div class="stats-bar-label">${item.label}</div>
@@ -2659,7 +2663,7 @@
       container.innerHTML = `
         <span>Semana actual <strong>${num(weekNow)}</strong> <span class="stats-delta ${weekDelta.className}">${weekDelta.label}</span></span>
         <span>Mes actual <strong>${num(monthNow)}</strong> <span class="stats-delta ${monthDelta.className}">${monthDelta.label}</span></span>
-        <span>Ano actual <strong>${num(yearNow)}</strong> <span class="stats-delta ${yearDelta.className}">${yearDelta.label}</span></span>
+        <span>Año actual <strong>${num(yearNow)}</strong> <span class="stats-delta ${yearDelta.className}">${yearDelta.label}</span></span>
       `;
     }
 
