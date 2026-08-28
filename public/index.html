@@ -188,6 +188,9 @@
     .bingo-card-cell.empty-cell { background: #f8faf8; }
     .bingo-card-cell.hit { background: #0f766e; color: #fff; }
     .stats-dashboard { display: grid; gap: 10px; }
+    .stats-filter-bar { display: flex; gap: 7px; align-items: end; flex-wrap: wrap; }
+    .stats-filter-bar label { width: 150px; }
+    .stats-filter-bar button { min-height: 32px; padding: 6px 9px; }
     .stats-layout { display: grid; grid-template-columns: minmax(260px, 330px) minmax(0, 1fr); gap: 10px; align-items: start; }
     .stats-event-list, .stats-event-detail { padding: 0; overflow: hidden; }
     .stats-event-detail { background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); }
@@ -438,6 +441,16 @@
         <div class="topbar">
           <div><h2>Estadisticas</h2><p class="muted">Graficos de ventas por cantidad, con comparacion semanal, mensual y anual.</p></div>
         </div>
+        <div class="panel stats-filter-bar">
+          <label>Fecha base<input id="statsPeriodDate" inputmode="numeric" placeholder="01-09-26"></label>
+          <button type="button" class="light" id="statsPickedWeek">Ver semana</button>
+          <button type="button" class="light" id="statsPickedMonth">Ver mes</button>
+          <button type="button" class="light" id="statsPickedYear">Ver año</button>
+          <button type="button" class="light" id="statsCurrentWeek">Semana actual</button>
+          <button type="button" class="light" id="statsCurrentMonth">Mes actual</button>
+          <button type="button" class="light" id="statsCurrentYear">Año actual</button>
+          <button type="button" class="secondary" id="statsClearPeriod">Ver todo</button>
+        </div>
         <div class="stats-dashboard">
           <section class="panel stats-event-detail">
             <div class="table-head"><h3>Total de todos los eventos</h3><span id="statsGlobalInfo" class="muted"></span></div>
@@ -463,7 +476,13 @@
               <div id="statsEventsList" class="stats-events"></div>
             </aside>
             <div class="panel stats-event-detail">
-              <div class="table-head"><h3 id="statsSelectedTitle">Elegir evento</h3><span id="statsSelectedInfo" class="muted"></span></div>
+              <div class="table-head">
+                <div><h3 id="statsSelectedTitle">Elegir evento</h3><span id="statsSelectedInfo" class="muted"></span></div>
+                <div class="actions">
+                  <button type="button" class="light" id="statsResetEvent">Resetear evento desde fecha</button>
+                  <button type="button" class="danger" id="statsClearEventReset">Quitar reset</button>
+                </div>
+              </div>
               <div id="statsSelectedLine" class="stats-period-line"></div>
               <div class="stats-charts">
                 <section>
@@ -907,6 +926,8 @@
     let activeBingoEventId = null;
     let activeAccountingEventId = null;
     let activeStatsEventId = null;
+    let statsRangeStart = '';
+    let statsRangeEnd = '';
     let currentView = 'detalle';
     let draftRanges = [];
     let selectedDraftId = null;
@@ -1175,6 +1196,16 @@
     function monthRange(date = new Date()) {
       const start = new Date(date.getFullYear(), date.getMonth(), 1);
       const end = new Date(date);
+      return { start: localDateIso(start), end: localDateIso(end) };
+    }
+    function fullMonthRange(date = new Date()) {
+      const start = new Date(date.getFullYear(), date.getMonth(), 1);
+      const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+      return { start: localDateIso(start), end: localDateIso(end) };
+    }
+    function yearRange(date = new Date()) {
+      const start = new Date(date.getFullYear(), 0, 1);
+      const end = new Date(date.getFullYear(), 11, 31);
       return { start: localDateIso(start), end: localDateIso(end) };
     }
     function ensureAccountingWeek() {
@@ -2562,23 +2593,25 @@
       const availableEvents = visibleEvents();
       const allSales = salesRowsForEvents(availableEvents);
       const units = allSales.reduce((sum, item) => sum + item.units, 0);
-      const activeEvents = availableEvents.filter(event => officialSales(event).length > 0);
+      const activeEvents = availableEvents.filter(event => salesRowsForEvents([event]).length > 0);
       const selected = availableEvents.find(event => event.id === activeStatsEventId) || activeEvents[0] || availableEvents[0] || null;
       activeStatsEventId = selected?.id || null;
+      syncStatsPeriodInput();
       $('statsCount').textContent = `${availableEvents.length} eventos`;
-      $('statsGlobalInfo').textContent = `${num(availableEvents.length)} eventos - ${num(activeEvents.length)} con ventas - ${num(units)} bingos vendidos`;
+      $('statsGlobalInfo').textContent = `${statsRangeLabel()} - ${num(availableEvents.length)} eventos - ${num(activeEvents.length)} con ventas - ${num(units)} bingos vendidos`;
       renderStatsSummaryLine($('statsGlobalLine'), availableEvents);
       $('statsGlobalWeeklyChart').innerHTML = renderStatsBars(salesSeriesByPeriodForEvents(availableEvents, 'week', 14));
       $('statsGlobalMonthlyChart').innerHTML = renderStatsBars(salesSeriesByPeriodForEvents(availableEvents, 'month', 12));
       $('statsGlobalYearlyChart').innerHTML = renderStatsBars(salesSeriesByPeriodForEvents(availableEvents, 'year', 8));
       $('statsEventsList').innerHTML = availableEvents.length ? availableEvents.map(event => {
-        const sales = officialSales(event);
-        const eventUnits = sales.reduce((sum, sale) => sum + rangeCount(sale), 0);
+        const sales = salesRowsForEvents([event]);
+        const eventUnits = sales.reduce((sum, item) => sum + item.units, 0);
         return `
           <button type="button" class="stats-event-button ${event.id === activeStatsEventId ? 'active' : ''}" data-open-stats="${event.id}">
             <strong>${event.name}</strong>
             <span class="muted">Sorteo ${shortDate(event.date)} - ${event.town || 'Sin localidad'}</span>
             <span>${num(eventUnits)} bingos registrados</span>
+            ${event.statsStartDate ? `<span class="stats-delta flat">Desde ${shortDate(event.statsStartDate)}</span>` : ''}
           </button>
         `;
       }).join('') : '<div class="empty">No hay eventos disponibles.</div>';
@@ -2590,6 +2623,8 @@
         $('statsSelectedTitle').textContent = 'Elegir evento';
         $('statsSelectedInfo').textContent = '';
         $('statsSelectedLine').innerHTML = '<span>Selecciona un evento para ver sus ventas.</span>';
+        $('statsResetEvent').disabled = true;
+        $('statsClearEventReset').disabled = true;
         $('statsWeeklyChart').innerHTML = '<div class="empty">Sin ventas.</div>';
         $('statsMonthlyChart').innerHTML = '<div class="empty">Sin ventas.</div>';
         $('statsYearlyChart').innerHTML = '<div class="empty">Sin ventas.</div>';
@@ -2599,11 +2634,18 @@
       const monthly = salesSeriesByPeriodForEvents([eventData], 'month', 12);
       const yearly = salesSeriesByPeriodForEvents([eventData], 'year', 8);
       $('statsSelectedTitle').textContent = eventData.name;
-      $('statsSelectedInfo').textContent = `Fecha del sorteo ${shortDate(eventData.date)} - ${eventData.town || 'Sin localidad'}, ${eventData.province || 'Sin provincia'}`;
+      $('statsSelectedInfo').textContent = `Fecha del sorteo ${shortDate(eventData.date)} - ${eventData.town || 'Sin localidad'}, ${eventData.province || 'Sin provincia'}${eventData.statsStartDate ? ` - Estadisticas desde ${shortDate(eventData.statsStartDate)}` : ''}`;
+      $('statsResetEvent').disabled = !eventData;
+      $('statsClearEventReset').disabled = !eventData.statsStartDate;
       renderStatsSummaryLine($('statsSelectedLine'), [eventData]);
       $('statsWeeklyChart').innerHTML = renderStatsBars(weekly);
       $('statsMonthlyChart').innerHTML = renderStatsBars(monthly);
       $('statsYearlyChart').innerHTML = renderStatsBars(yearly);
+    }
+
+    function eventStatsStartDate(event) {
+      const value = String(event?.statsStartDate || '').slice(0, 10);
+      return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
     }
 
     function salesRowsForEvents(eventList) {
@@ -2612,7 +2654,13 @@
         sale,
         date: saleDate(sale) || event.date || '',
         units: rangeCount(sale)
-      }))).filter(item => item.date && item.units > 0);
+      }))).filter(item => {
+        const resetStart = eventStatsStartDate(item.event);
+        return item.date && item.units > 0
+          && (!resetStart || item.date >= resetStart)
+          && (!statsRangeStart || item.date >= statsRangeStart)
+          && (!statsRangeEnd || item.date <= statsRangeEnd);
+      });
     }
 
     function salesSeriesByPeriodForEvents(eventList, period, limit = 12) {
@@ -2737,6 +2785,54 @@
 
     function previousYearKey() {
       return String(new Date().getFullYear() - 1);
+    }
+
+    function syncStatsPeriodInput() {
+      const input = $('statsPeriodDate');
+      if (!input || document.activeElement === input) return;
+      input.value = statsRangeStart ? shortDate(statsRangeStart) : '';
+    }
+
+    function statsRangeLabel() {
+      if (!statsRangeStart || !statsRangeEnd) return 'Todo el historial';
+      if (statsRangeStart === statsRangeEnd) return shortDate(statsRangeStart);
+      return `${shortDate(statsRangeStart)} a ${shortDate(statsRangeEnd)}`;
+    }
+
+    function statsBaseDate() {
+      const raw = $('statsPeriodDate')?.value;
+      const parsed = parseShortDate(raw);
+      if (parsed) return dateFromIso(parsed);
+      alert('Escribi una fecha valida, por ejemplo 01-09-26.');
+      $('statsPeriodDate')?.focus();
+      return null;
+    }
+
+    function setStatsRange(range) {
+      statsRangeStart = range?.start || '';
+      statsRangeEnd = range?.end || '';
+      renderStats();
+    }
+
+    function resetSelectedEventStats() {
+      const eventData = events.find(event => event.id === activeStatsEventId);
+      if (!eventData) return alert('Primero elegi un evento.');
+      const baseDate = parseShortDate($('statsPeriodDate')?.value) || parseShortDate(prompt('Desde que fecha queres que empiecen las estadisticas de este evento? Ej: 01-09-26', shortDate(eventData.statsStartDate || '2026-09-01')) || '');
+      if (!baseDate) return alert('Fecha invalida. Usa el formato 01-09-26.');
+      if (!confirm(`Las estadisticas de ${eventData.name} empezaran desde ${shortDate(baseDate)}.\n\nNo se borran cargas, balance ni contable. Solo se ignoran ventas anteriores en Estadisticas.`)) return;
+      eventData.statsStartDate = baseDate;
+      saveEvents();
+      renderStats();
+    }
+
+    function clearSelectedEventStatsReset() {
+      const eventData = events.find(event => event.id === activeStatsEventId);
+      if (!eventData) return alert('Primero elegi un evento.');
+      if (!eventData.statsStartDate) return;
+      if (!confirm(`Quitar el reset de estadisticas de ${eventData.name}? Volveran a contar todas las fechas guardadas.`)) return;
+      delete eventData.statsStartDate;
+      saveEvents();
+      renderStats();
     }
 
     function eventSales() {
@@ -3760,6 +3856,33 @@
     $('clearDraftRanges').addEventListener('click', () => { if (draftRanges.length && confirm('Eliminar toda la lista previa?')) { draftRanges = []; selectedDraftId = null; renderDraft(); } });
     $('clearSaleForm').addEventListener('click', resetSaleForm);
     $('openAdvancedBingo').addEventListener('click', openAdvancedBingo);
+    $('statsPickedWeek').addEventListener('click', () => {
+      const date = statsBaseDate();
+      if (date) setStatsRange(weekRange(date));
+    });
+    $('statsPickedMonth').addEventListener('click', () => {
+      const date = statsBaseDate();
+      if (date) setStatsRange(fullMonthRange(date));
+    });
+    $('statsPickedYear').addEventListener('click', () => {
+      const date = statsBaseDate();
+      if (date) setStatsRange(yearRange(date));
+    });
+    $('statsCurrentWeek').addEventListener('click', () => {
+      $('statsPeriodDate').value = shortDate(localDateIso());
+      setStatsRange(weekRange());
+    });
+    $('statsCurrentMonth').addEventListener('click', () => {
+      $('statsPeriodDate').value = shortDate(localDateIso());
+      setStatsRange(fullMonthRange());
+    });
+    $('statsCurrentYear').addEventListener('click', () => {
+      $('statsPeriodDate').value = shortDate(localDateIso());
+      setStatsRange(yearRange());
+    });
+    $('statsClearPeriod').addEventListener('click', () => setStatsRange(null));
+    $('statsResetEvent').addEventListener('click', resetSelectedEventStats);
+    $('statsClearEventReset').addEventListener('click', clearSelectedEventStatsReset);
     $('drawBingoBall')?.addEventListener('click', drawBingoBall);
     $('resetBingoGame')?.addEventListener('click', resetBingoGame);
     $('clearEventForm').addEventListener('click', resetEventForm);
