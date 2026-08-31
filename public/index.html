@@ -450,6 +450,8 @@
           <button type="button" class="light" id="statsCurrentMonth">Mes actual</button>
           <button type="button" class="light" id="statsCurrentYear">Año actual</button>
           <button type="button" class="secondary" id="statsClearPeriod">Ver todo</button>
+          <button type="button" id="statsResetAll">Resetear todos desde fecha</button>
+          <button type="button" class="danger" id="statsClearAllReset">Quitar reset a todos</button>
         </div>
         <div class="stats-dashboard">
           <section class="panel stats-event-detail">
@@ -2835,6 +2837,33 @@
       renderStats();
     }
 
+    function resetAllEventStats() {
+      const availableEvents = visibleEvents();
+      if (!availableEvents.length) return alert('No hay eventos para resetear.');
+      const baseDate = parseShortDate($('statsPeriodDate')?.value) || parseShortDate(prompt('Desde que fecha queres que empiecen las estadisticas de todos los eventos? Ej: 01-09-26', '01-09-26') || '');
+      if (!baseDate) return alert('Fecha invalida. Usa el formato 01-09-26.');
+      const message = `Las estadisticas de ${num(availableEvents.length)} eventos empezaran desde ${shortDate(baseDate)}.\n\nNo se borran cargas, balance ni contable. Solo se ignoran ventas anteriores en Estadisticas.`;
+      if (!confirm(message)) return;
+      const ids = new Set(availableEvents.map(event => event.id));
+      events.forEach(event => {
+        if (ids.has(event.id)) event.statsStartDate = baseDate;
+      });
+      saveEvents();
+      renderStats();
+    }
+
+    function clearAllEventStatsReset() {
+      const availableEvents = visibleEvents().filter(event => event.statsStartDate);
+      if (!availableEvents.length) return alert('No hay resets de estadisticas para quitar.');
+      if (!confirm(`Quitar el reset de estadisticas de ${num(availableEvents.length)} eventos? Volveran a contar todas las fechas guardadas.`)) return;
+      const ids = new Set(availableEvents.map(event => event.id));
+      events.forEach(event => {
+        if (ids.has(event.id)) delete event.statsStartDate;
+      });
+      saveEvents();
+      renderStats();
+    }
+
     function eventSales() {
       const event = activeEvent();
       return event?.sales || [];
@@ -3883,6 +3912,8 @@
     $('statsClearPeriod').addEventListener('click', () => setStatsRange(null));
     $('statsResetEvent').addEventListener('click', resetSelectedEventStats);
     $('statsClearEventReset').addEventListener('click', clearSelectedEventStatsReset);
+    $('statsResetAll').addEventListener('click', resetAllEventStats);
+    $('statsClearAllReset').addEventListener('click', clearAllEventStatsReset);
     $('drawBingoBall')?.addEventListener('click', drawBingoBall);
     $('resetBingoGame')?.addEventListener('click', resetBingoGame);
     $('clearEventForm').addEventListener('click', resetEventForm);
