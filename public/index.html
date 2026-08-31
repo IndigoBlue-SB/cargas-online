@@ -843,6 +843,7 @@
           </div>
           <div class="actions">
             <button type="button" id="confirmBingoLoad">Confirmar carga para bingo</button>
+            <button type="button" class="secondary hidden" id="goToConfirmedBingo">Ir a configurar bingo</button>
             <button type="button" class="danger hidden" id="reopenBingoLoad">Reabrir carga</button>
             <button type="button" class="danger hidden" id="clearReopenedLoads">Eliminar todas las cargas</button>
           </div>
@@ -1920,8 +1921,9 @@
     function renderBingo() {
       if (!canUsePage('bingo')) return;
       const confirmedEvents = visibleEvents().filter(isBingoLoadConfirmed);
+      const currentLoadedEvent = confirmedEvents.find(event => event.id === activeEventId);
       if (!activeBingoEventId || !confirmedEvents.some(event => event.id === activeBingoEventId)) {
-        activeBingoEventId = null;
+        activeBingoEventId = currentLoadedEvent?.id || null;
       }
       $('bingoEventsList').innerHTML = confirmedEvents.length ? confirmedEvents.map(event => {
         const units = officialSoldUnits(event);
@@ -3087,6 +3089,7 @@
         : `${num(unitsFromSales(event.sales || []).length)} series/cartones cargados. Al confirmar, esta cantidad se usa para Balance, Contable y Bingo. Semilla oficial: ${event.bingoSeed}.`;
       $('confirmBingoLoad').classList.toggle('hidden', confirmed);
       $('confirmBingoLoad').disabled = confirmed || !unitsFromSales(event.sales || []).length;
+      $('goToConfirmedBingo').classList.toggle('hidden', !confirmed);
       $('reopenBingoLoad').classList.toggle('hidden', !confirmed || !isAdmin());
       $('clearReopenedLoads').classList.toggle('hidden', confirmed || !isAdmin() || !Array.isArray(closure.snapshotSales));
       $('clearReopenedLoads').disabled = confirmed || !isAdmin() || !(event.sales || []).length;
@@ -3243,6 +3246,7 @@
         soldCardsCount: soldUnits.length,
         snapshotSales: clonePlain(eventData.sales || [])
       };
+      activeBingoEventId = eventData.id;
       saveEvents();
       resetSaleForm();
       renderActiveEvent();
@@ -3686,6 +3690,14 @@
       if (reopenBingoButton) reopenBingoLoad();
       const clearReopenedLoadsButton = event.target.closest('#clearReopenedLoads');
       if (clearReopenedLoadsButton) clearReopenedLoads();
+      const goToConfirmedBingoButton = event.target.closest('#goToConfirmedBingo');
+      if (goToConfirmedBingoButton) {
+        const eventData = activeEvent();
+        if (!eventData || !isBingoLoadConfirmed(eventData)) return alert('Primero confirma la carga para bingo.');
+        activeBingoEventId = eventData.id;
+        go('bingo');
+        openAdvancedBingo();
+      }
       const deleteUserButton = event.target.closest('[data-delete-user]');
       if (deleteUserButton && canUsePage('settings') && confirm('Eliminar este usuario?')) {
         const user = appUsers.find(item => item.id === deleteUserButton.dataset.deleteUser);
