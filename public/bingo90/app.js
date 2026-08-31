@@ -1834,7 +1834,7 @@ function fillStripDesigner() {
     : "Sin imagen de fondo.";
 }
 
-function applyStripDesign() {
+function applyStripDesign(options = {}) {
   state.stripDesign.headerHeight = clamp(Number(els.stripHeaderHeightInput.value) || 0, 0, 180);
   state.stripDesign.paperSize = els.stripPaperSizeInput.value;
   state.stripDesign.orientation = els.stripOrientationInput.value;
@@ -1865,7 +1865,7 @@ function applyStripDesign() {
   state.stripDesign.accentColor = els.stripAccentInput.value;
   state.stripDesign.backgroundColor = els.stripBgInput.value;
   renderStripPreview();
-  persistEventDesign();
+  if (!options.skipPersist) persistEventDesign();
 }
 
 async function saveStripDesignManually() {
@@ -1875,11 +1875,18 @@ async function saveStripDesignManually() {
     button.disabled = true;
     button.textContent = "Guardando...";
   }
-  applyStripDesign();
-  const serverSaved = await ensureCargasPanelSaved();
-  if (button) {
-    button.disabled = false;
-    button.textContent = previousText;
+  let serverSaved = false;
+  try {
+    applyStripDesign({ skipPersist: true });
+    const savedEvent = persistEventDesign({ skipCargasSave: true });
+    serverSaved = savedEvent ? await saveCargasBingoPanelSettings(savedEvent, { throwOnError: true, timeoutMs: 20000 }) : true;
+  } catch {
+    serverSaved = false;
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = previousText;
+    }
   }
   if (!serverSaved) {
     window.alert("El diseno quedo en esta pantalla, pero no se pudo confirmar el guardado en Cargas. Volve a entrar desde Cargas, revisa la sesion y toca Guardar diseno otra vez.");
@@ -2051,10 +2058,10 @@ function getBallImagesStatusText() {
   return `${count} bolillas cargadas${state.visualSettings.ballImageSetName ? ` (${state.visualSettings.ballImageSetName})` : ""}.`;
 }
 
-function persistEventDesign() {
+function persistEventDesign(options = {}) {
   persistStripDesignDraft();
-  if (!state.eventCreated) return;
-  saveCurrentEvent({ silent: true });
+  if (!state.eventCreated) return null;
+  return saveCurrentEvent({ silent: true, skipCargasSave: options.skipCargasSave });
 }
 
 function persistStripDesignDraft() {
@@ -4226,12 +4233,28 @@ function saveCurrentEvent(options = {}) {
   if (!state.eventCreated) {
     renderSavedEvents();
     renderHomeSavedEvents();
-    return;
+    return null;
   }
   state.prizeSettings = normalizePrizeSettings(state.prizeSettings);
   const events = loadSavedEvents();
-  const stats = getStats();
-  const payload = {
+  const payload = buildCurrentEventPayload();
+  const nextEvents = [payload, ...events.filter((event) => event.id !== state.eventId)].slice(0, 30);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextEvents));
+  scheduleServerStateSave();
+  if (!options.skipCargasSave) saveCargasBingoPanelSettings(payload);
+  renderSavedEvents();
+  renderHomeSavedEvents();
+  if (options.manual && state.gameFinished && options.prepareNext !== false) {
+    prepareNextDrawAfterFinished();
+    saveCurrentEvent({ silent: true, prepareNext: false });
+    render();
+    window.alert("Partida guardada. El sorteo quedo preparado para la proxima jugada.");
+  }
+  return payload;
+}
+
+function buildCurrentEventPayload() {
+  return {
     id: state.eventId,
     name: state.eventName,
     eventCreated: state.eventCreated,
@@ -4266,30 +4289,17 @@ function saveCurrentEvent(options = {}) {
     visualSettings: state.visualSettings,
     stripDesign: state.stripDesign,
     projectionSettings: state.projectionSettings,
-    stats,
+    stats: getStats(),
   };
-  const nextEvents = [payload, ...events.filter((event) => event.id !== state.eventId)].slice(0, 30);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextEvents));
-  scheduleServerStateSave();
-  saveCargasBingoPanelSettings(payload);
-  renderSavedEvents();
-  renderHomeSavedEvents();
-  if (options.manual && state.gameFinished && options.prepareNext !== false) {
-    prepareNextDrawAfterFinished();
-    saveCurrentEvent({ silent: true, prepareNext: false });
-    render();
-    window.alert("Partida guardada. El sorteo quedo preparado para la proxima jugada.");
-  }
 }
 
 async function ensureCargasPanelSaved() {
   if (!isLaunchedFromCargas() || optionsSavingToCargasDisabled()) return true;
   if (!state.eventCreated) return false;
-  saveCurrentEvent({ silent: true, prepareNext: false });
-  const savedEvent = getSavedEventById(state.eventId);
+  const savedEvent = saveCurrentEvent({ silent: true, prepareNext: false, skipCargasSave: true });
   if (!savedEvent) return false;
   try {
-    await saveCargasBingoPanelSettings(savedEvent, { throwOnError: true });
+    await saveCargasBingoPanelSettings(savedEvent, { throwOnError: true, timeoutMs: 20000 });
     return true;
   } catch {
     return false;
@@ -4332,18 +4342,25 @@ function saveCargasBingoPanelSettings(eventPayload, options = {}) {
     stats: eventPayload.stats,
     savedAt: eventPayload.savedAt,
   };
-  return fetch("/api/bingo-panel", {
+  return fetchWithTimeout("/api/bingo-panel", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
     body: JSON.stringify({ eventId: eventPayload.id, panel }),
-  }).then((response) => {
+  }, options.timeoutMs || 12000).then((response) => {
     if (!response.ok) throw new Error("Cargas no confirmo el guardado del diseno.");
     return true;
   }).catch((error) => {
     if (options.throwOnError) throw error;
     return false;
   });
+}
+
+function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal })
+    .finally(() => window.clearTimeout(timer));
 }
 
 function optionsSavingToCargasDisabled() {
