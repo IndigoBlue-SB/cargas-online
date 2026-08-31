@@ -309,11 +309,14 @@ async function handleApi(req, res) {
         status: sheet.status || 'open',
         seller: sheet.seller || '',
         phone: sheet.phone || '',
+        sheetFrom: Number(sheet.sheetFrom) || 0,
+        sheetTo: Number(sheet.sheetTo) || 0,
+        seriesPerSheet: Number(sheet.seriesPerSheet) || 10,
         desde: Number(sheet.desde) || 0,
         hasta: Number(sheet.hasta) || 0,
         town: sheet.town || event.town || '',
         province: sheet.province || event.province || '',
-        entries: Array.isArray(sheet.entries) ? sheet.entries : [],
+        entries: Array.isArray(sheet.entries) ? [...sheet.entries].sort((a, b) => Number(a.series) - Number(b.series)) : [],
         importedAt: sheet.importedAt || null
       },
       event: {
@@ -347,7 +350,8 @@ async function handleApi(req, res) {
         notes: String(entry.notes || '').trim(),
         createdAt: Number(entry.createdAt) || Date.now()
       };
-    }).filter(entry => entry.series >= desde && entry.series <= hasta);
+    }).filter(entry => entry.series >= desde && entry.series <= hasta)
+      .sort((a, b) => Number(a.series) - Number(b.series));
     sheet.updatedAt = new Date().toISOString();
     writeDb(db);
     return sendJson(res, 200, { ok: true, entries: sheet.entries });
