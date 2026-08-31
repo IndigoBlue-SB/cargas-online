@@ -1868,9 +1868,24 @@ function applyStripDesign() {
   persistEventDesign();
 }
 
-function saveStripDesignManually() {
+async function saveStripDesignManually() {
+  const button = els.stripSaveDesignBtn;
+  const previousText = button?.textContent;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Guardando...";
+  }
   applyStripDesign();
-  window.alert("Diseno guardado. La proxima vez se abre con esta configuracion.");
+  const serverSaved = await ensureCargasPanelSaved();
+  if (button) {
+    button.disabled = false;
+    button.textContent = previousText;
+  }
+  if (!serverSaved) {
+    window.alert("El diseno quedo en esta pantalla, pero no se pudo confirmar el guardado en Cargas. Volve a entrar desde Cargas, revisa la sesion y toca Guardar diseno otra vez.");
+    return;
+  }
+  window.alert("Diseno guardado en Cargas. La proxima vez este evento se abre con esta configuracion.");
 }
 
 function handleStripBackgroundSelection() {
@@ -2434,6 +2449,7 @@ async function exportStripDirectPdfFromExactHtml() {
     return;
   }
   applyStripDesign();
+  if (!(await ensureCargasPanelSaved())) return;
   await syncStripPreviewScaleForExport();
   const units = getPrintableStripUnits();
   const selection = getPrintableExportSelection(units, { useDesignerRange: true });
@@ -2492,6 +2508,7 @@ async function exportStripPdfZipFromExactHtml() {
     return;
   }
   applyStripDesign();
+  if (!(await ensureCargasPanelSaved())) return;
   await syncStripPreviewScaleForExport();
   const units = getPrintableStripUnits();
   const selection = getPrintableExportSelection(units, { useDesignerRange: true, ignoreLimit: true });
@@ -2635,6 +2652,7 @@ async function exportEventCardsPdf(options = {}) {
   } else {
     persistEventDesign();
   }
+  if (!(await ensureCargasPanelSaved())) return;
   const units = getPrintableStripUnits();
   if (!units.length) {
     window.alert("Primero configura el evento para generar cartones.");
@@ -2716,6 +2734,7 @@ async function exportEventCardsZip(options = {}) {
   } else {
     persistEventDesign();
   }
+  if (!(await ensureCargasPanelSaved())) return;
   saveCurrentEvent({ silent: true });
   const serverSaved = await saveServerState();
   if (!serverSaved) {
@@ -4263,8 +4282,23 @@ function saveCurrentEvent(options = {}) {
   }
 }
 
-function saveCargasBingoPanelSettings(eventPayload) {
-  if (!isLaunchedFromCargas() || !eventPayload?.id || optionsSavingToCargasDisabled()) return;
+async function ensureCargasPanelSaved() {
+  if (!isLaunchedFromCargas() || optionsSavingToCargasDisabled()) return true;
+  if (!state.eventCreated) return false;
+  saveCurrentEvent({ silent: true, prepareNext: false });
+  const savedEvent = getSavedEventById(state.eventId);
+  if (!savedEvent) return false;
+  try {
+    await saveCargasBingoPanelSettings(savedEvent, { throwOnError: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function saveCargasBingoPanelSettings(eventPayload, options = {}) {
+  if (!isLaunchedFromCargas() || optionsSavingToCargasDisabled()) return Promise.resolve(true);
+  if (!eventPayload?.id) return Promise.resolve(false);
   const panel = {
     id: eventPayload.id,
     name: eventPayload.name,
@@ -4298,12 +4332,18 @@ function saveCargasBingoPanelSettings(eventPayload) {
     stats: eventPayload.stats,
     savedAt: eventPayload.savedAt,
   };
-  fetch("/api/bingo-panel", {
+  return fetch("/api/bingo-panel", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
     body: JSON.stringify({ eventId: eventPayload.id, panel }),
-  }).catch(() => {});
+  }).then((response) => {
+    if (!response.ok) throw new Error("Cargas no confirmo el guardado del diseno.");
+    return true;
+  }).catch((error) => {
+    if (options.throwOnError) throw error;
+    return false;
+  });
 }
 
 function optionsSavingToCargasDisabled() {
