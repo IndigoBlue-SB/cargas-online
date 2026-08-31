@@ -12,7 +12,7 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 const BUNDLED_DB_FILE = path.join(ROOT, 'data', 'db.json');
 const BUNDLE_DATA_VERSION = '2026-06-23-03';
 const sessions = new Map();
-const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], bingo: [], sheets: [], balance: [], accounting: [], settings: [] };
+const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], bingo: [], virtual: [], sheets: [], balance: [], accounting: [], settings: [] };
 
 const defaultDb = {
   events: [],
@@ -234,6 +234,16 @@ function isBingoLoadConfirmed(event) {
   return event?.bingoClosure?.status === 'confirmed';
 }
 
+function publicVirtualSheet(db, token) {
+  const cleanToken = String(token || '').trim();
+  if (!cleanToken) return null;
+  for (const event of db.events || []) {
+    const sheet = (event.virtualSheets || []).find(item => String(item.token) === cleanToken);
+    if (sheet) return { event, sheet };
+  }
+  return null;
+}
+
 function protectConfirmedEvent(existing, incoming, session) {
   if (session.role === 'admin' || !isBingoLoadConfirmed(existing)) return incoming;
   return {
@@ -286,6 +296,62 @@ function serveStatic(req, res) {
 async function handleApi(req, res) {
   const url = new URL(req.url, 'http://localhost');
   const db = readDb();
+
+  const virtualMatch = url.pathname.match(/^\/api\/virtual\/([^/]+)$/);
+  if (virtualMatch && req.method === 'GET') {
+    const found = publicVirtualSheet(db, virtualMatch[1]);
+    if (!found) return sendJson(res, 404, { error: 'Planilla virtual no encontrada' });
+    const { event, sheet } = found;
+    return sendJson(res, 200, {
+      sheet: {
+        id: sheet.id,
+        token: sheet.token,
+        status: sheet.status || 'open',
+        seller: sheet.seller || '',
+        phone: sheet.phone || '',
+        desde: Number(sheet.desde) || 0,
+        hasta: Number(sheet.hasta) || 0,
+        town: sheet.town || event.town || '',
+        province: sheet.province || event.province || '',
+        entries: Array.isArray(sheet.entries) ? sheet.entries : [],
+        importedAt: sheet.importedAt || null
+      },
+      event: {
+        id: event.id,
+        name: event.name,
+        date: event.date,
+        town: event.town,
+        province: event.province,
+        price: Number(event.price) || 0
+      }
+    });
+  }
+
+  if (virtualMatch && req.method === 'PUT') {
+    const found = publicVirtualSheet(db, virtualMatch[1]);
+    if (!found) return sendJson(res, 404, { error: 'Planilla virtual no encontrada' });
+    const body = await readBody(req);
+    const { sheet } = found;
+    if ((sheet.status || 'open') !== 'open') return sendJson(res, 409, { error: 'Esta planilla ya esta cerrada.' });
+    const desde = Number(sheet.desde) || 0;
+    const hasta = Number(sheet.hasta) || 0;
+    const entries = Array.isArray(body.entries) ? body.entries : [];
+    sheet.entries = entries.map(entry => {
+      const series = Number(entry.series) || 0;
+      return {
+        id: String(entry.id || crypto.randomUUID()),
+        series,
+        buyer: String(entry.buyer || '').trim(),
+        phone: String(entry.phone || '').trim(),
+        payment: ['Efectivo', 'Transferencia', 'Pendiente'].includes(entry.payment) ? entry.payment : 'Pendiente',
+        notes: String(entry.notes || '').trim(),
+        createdAt: Number(entry.createdAt) || Date.now()
+      };
+    }).filter(entry => entry.series >= desde && entry.series <= hasta);
+    sheet.updatedAt = new Date().toISOString();
+    writeDb(db);
+    return sendJson(res, 200, { ok: true, entries: sheet.entries });
+  }
 
   if (url.pathname === '/api/login' && req.method === 'POST') {
     const body = await readBody(req);
