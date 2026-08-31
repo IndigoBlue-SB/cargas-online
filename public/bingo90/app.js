@@ -6,6 +6,7 @@ const STRIP_DESIGN_STORAGE_KEY = "bingo90.stripDesignDraft.v1";
 const SERVER_STATE_ENDPOINT = "/api/bingo90/state";
 const MEDIA_DB_NAME = "bingo90.media.v1";
 const MEDIA_STORE_NAME = "files";
+const CARGAS_LAUNCH_STORAGE_KEY = "bingo90.launchedFromCargas";
 const SERIES_SIZE = 6;
 const NUMBERS_PER_CARD = 15;
 
@@ -395,8 +396,11 @@ function init() {
   renderBoard();
   renderAnnouncementMediaControls();
   bindEvents();
+  rememberCargasLaunch();
   if (isLaunchedFromCargas()) {
     els.backHomeBtn.textContent = "Volver a pagina principal";
+    els.landingBackBtn.textContent = "Volver a pagina principal";
+    els.userLogoutBtn.textContent = "Volver a pagina principal";
   }
   restoreServerState().finally(() => {
     const params = new URLSearchParams(window.location.search);
@@ -420,7 +424,10 @@ function bindEvents() {
   els.adminLoginCancelBtn.addEventListener("click", () => els.adminLoginDialog.close());
   els.userLoginForm.addEventListener("submit", handleUserLogin);
   els.userLoginCancelBtn.addEventListener("click", () => els.userLoginDialog.close());
-  els.userLogoutBtn.addEventListener("click", showLanding);
+  els.userLogoutBtn.addEventListener("click", () => {
+    if (isLaunchedFromCargas()) returnToCargasHome();
+    else showLanding();
+  });
   els.drawBallBtn.addEventListener("click", drawRandomBall);
   els.undoBallBtn.addEventListener("click", undoLastBall);
   els.resetGameBtn.addEventListener("click", resetGame);
@@ -442,7 +449,10 @@ function bindEvents() {
   els.exportBackupBtn.addEventListener("click", exportBackupFile);
   els.importBackupBtn.addEventListener("click", () => els.importBackupInput.click());
   els.importBackupInput.addEventListener("change", importBackupFile);
-  els.landingBackBtn.addEventListener("click", showLanding);
+  els.landingBackBtn.addEventListener("click", () => {
+    if (isLaunchedFromCargas()) returnToCargasHome();
+    else showLanding();
+  });
   els.loadBackAdminBtn.addEventListener("click", showHome);
   els.salesBackAdminBtn.addEventListener("click", showHome);
   els.salesManualForm.addEventListener("submit", (event) => {
@@ -477,7 +487,7 @@ function bindEvents() {
   els.loadDesignNewInput.addEventListener("change", updateLoadCreationChoices);
   els.backHomeBtn.addEventListener("click", () => {
     if (isLaunchedFromCargas()) {
-      window.location.href = "/?page=home";
+      returnToCargasHome();
       return;
     }
     if (state.currentUser) {
@@ -637,7 +647,17 @@ function bindEvents() {
 }
 
 function isLaunchedFromCargas() {
-  return new URLSearchParams(window.location.search).get("from") === "cargas";
+  return new URLSearchParams(window.location.search).get("from") === "cargas" || sessionStorage.getItem(CARGAS_LAUNCH_STORAGE_KEY) === "1";
+}
+
+function rememberCargasLaunch() {
+  if (new URLSearchParams(window.location.search).get("from") === "cargas") {
+    sessionStorage.setItem(CARGAS_LAUNCH_STORAGE_KEY, "1");
+  }
+}
+
+function returnToCargasHome() {
+  window.location.href = "/?page=home";
 }
 
 function renderBoard() {
