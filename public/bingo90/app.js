@@ -2139,7 +2139,7 @@ function applyBackupPayload(payload, options = {}) {
   const shouldUpdateEvents = !options.onlyIfNewer || JSON.stringify(mergedEvents) !== JSON.stringify(currentEvents);
 
   if (shouldUpdateEvents) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedEvents));
+    saveEventsToLocalStorage(mergedEvents);
   }
 
   if (payload.stripDesign) {
@@ -4241,7 +4241,7 @@ function saveCurrentEvent(options = {}) {
   const events = loadSavedEvents();
   const payload = buildCurrentEventPayload();
   const nextEvents = [payload, ...events.filter((event) => event.id !== state.eventId)].slice(0, 30);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextEvents));
+  saveEventsToLocalStorage(nextEvents);
   scheduleServerStateSave();
   if (!options.skipCargasSave) saveCargasBingoPanelSettings(payload);
   renderSavedEvents();
@@ -4577,6 +4577,51 @@ function loadSavedEvents() {
   } catch {
     return [];
   }
+}
+
+function saveEventsToLocalStorage(events) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    return true;
+  } catch {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(events.map(stripLargeEventAssets)));
+    } catch {
+      // Si tambien falla la copia liviana, seguimos con el estado en memoria y el guardado en servidor.
+    }
+    return false;
+  }
+}
+
+function stripLargeEventAssets(event) {
+  const next = clonePlain(event);
+  if (next.stripDesign) {
+    next.stripDesign = {
+      ...next.stripDesign,
+      backgroundImageData: "",
+      backgroundImageName: next.stripDesign.backgroundImageName
+        ? `${next.stripDesign.backgroundImageName} (guardada en Cargas)`
+        : "",
+    };
+  }
+  if (next.visualSettings) {
+    next.visualSettings = {
+      ...next.visualSettings,
+      bingoLogoData: "",
+      indigoLogoData: "",
+      ballImageKeys: {},
+      bingoLogoName: next.visualSettings.bingoLogoName
+        ? `${next.visualSettings.bingoLogoName} (guardado en Cargas)`
+        : "",
+      indigoLogoName: next.visualSettings.indigoLogoName
+        ? `${next.visualSettings.indigoLogoName} (guardado en Cargas)`
+        : "",
+      ballImageSetName: next.visualSettings.ballImageSetName
+        ? `${next.visualSettings.ballImageSetName} (guardadas en Cargas)`
+        : "",
+    };
+  }
+  return next;
 }
 
 function getSavedEventById(eventId) {
