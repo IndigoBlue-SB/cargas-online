@@ -2411,7 +2411,11 @@ function buildStripHtml(seriesNumber, cards) {
 }
 
 async function exportStripPdf() {
-  await exportStripDirectPdfFromExactHtml();
+  if (window.bingoDesktop?.savePdfFromHtml) {
+    await exportStripDirectPdfFromExactHtml();
+    return;
+  }
+  await exportEventCardsPdf({ useDesignerRange: true });
 }
 
 async function exportStripZip() {
