@@ -1876,11 +1876,13 @@ async function saveStripDesignManually() {
     button.textContent = "Guardando...";
   }
   let serverSaved = false;
+  let saveError = null;
   try {
     applyStripDesign({ skipPersist: true });
     const savedEvent = persistEventDesign({ skipCargasSave: true });
-    serverSaved = savedEvent ? await saveCargasBingoPanelSettings(savedEvent, { throwOnError: true, timeoutMs: 20000 }) : true;
-  } catch {
+    serverSaved = savedEvent ? await saveCargasBingoPanelSettings(savedEvent, { throwOnError: true, timeoutMs: 60000 }) : true;
+  } catch (error) {
+    saveError = error;
     serverSaved = false;
   } finally {
     if (button) {
@@ -1889,7 +1891,7 @@ async function saveStripDesignManually() {
     }
   }
   if (!serverSaved) {
-    window.alert("El diseno quedo en esta pantalla, pero no se pudo confirmar el guardado en Cargas. Volve a entrar desde Cargas, revisa la sesion y toca Guardar diseno otra vez.");
+    window.alert(`El diseno quedo en esta pantalla, pero no se pudo confirmar el guardado en Cargas.\n\n${describeCargasPanelSaveError(saveError)}\n\nVolve a entrar desde Cargas, revisa la sesion y toca Guardar diseno otra vez.`);
     return;
   }
   window.alert("Diseno guardado en Cargas. La proxima vez este evento se abre con esta configuracion.");
@@ -4299,7 +4301,7 @@ async function ensureCargasPanelSaved() {
   const savedEvent = saveCurrentEvent({ silent: true, prepareNext: false, skipCargasSave: true });
   if (!savedEvent) return false;
   try {
-    await saveCargasBingoPanelSettings(savedEvent, { throwOnError: true, timeoutMs: 20000 });
+    await saveCargasBingoPanelSettings(savedEvent, { throwOnError: true, timeoutMs: 60000 });
     return true;
   } catch {
     return false;
@@ -4347,13 +4349,43 @@ function saveCargasBingoPanelSettings(eventPayload, options = {}) {
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
     body: JSON.stringify({ eventId: eventPayload.id, panel }),
-  }, options.timeoutMs || 12000).then((response) => {
-    if (!response.ok) throw new Error("Cargas no confirmo el guardado del diseno.");
+  }, options.timeoutMs || 60000).then(async (response) => {
+    if (!response.ok) {
+      const detail = await readErrorResponse(response);
+      const error = new Error(detail || "Cargas no confirmo el guardado del diseno.");
+      error.status = response.status;
+      throw error;
+    }
     return true;
   }).catch((error) => {
     if (options.throwOnError) throw error;
     return false;
   });
+}
+
+async function readErrorResponse(response) {
+  const fallback = `Error ${response.status}`;
+  try {
+    const text = await response.text();
+    if (!text) return fallback;
+    try {
+      const parsed = JSON.parse(text);
+      return parsed.error || parsed.message || fallback;
+    } catch {
+      return text.slice(0, 240);
+    }
+  } catch {
+    return fallback;
+  }
+}
+
+function describeCargasPanelSaveError(error) {
+  if (!error) return "No llego una respuesta valida del servidor.";
+  if (error.name === "AbortError") return "El servidor tardo demasiado en responder. Puede pasar si el diseno tiene imagenes muy pesadas.";
+  if (error.status === 401) return "La sesion de Cargas esta vencida. Inicia sesion otra vez y reintenta.";
+  if (error.status === 403) return "Tu usuario no tiene permiso para guardar el panel de este evento.";
+  if (error.status === 404) return "Cargas no encontro este evento. Volve a abrirlo desde el listado de eventos confirmados.";
+  return error.message || "No llego una respuesta valida del servidor.";
 }
 
 function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
