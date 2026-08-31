@@ -2225,8 +2225,30 @@
       if (!soldUnits.length) return alert('Este evento confirmado no tiene series/cartones vendidos.');
       const advancedEvent = buildBingo90Event(eventData);
       const saved = loadBingo90Events().filter(item => item && item.id !== advancedEvent.id);
-      localStorage.setItem(bingo90StorageKey, JSON.stringify([advancedEvent, ...saved].slice(0, 30)));
+      saveBingo90BridgeEvents([advancedEvent, ...saved].slice(0, 30));
       window.location.href = `/bingo90/index.html?eventId=${encodeURIComponent(advancedEvent.id)}&mode=config&from=cargas`;
+    }
+
+    function saveBingo90BridgeEvents(nextEvents) {
+      try {
+        localStorage.setItem(bingo90StorageKey, JSON.stringify(nextEvents.map(lightBingo90Event)));
+      } catch {
+        localStorage.removeItem(bingo90StorageKey);
+        localStorage.setItem(bingo90StorageKey, JSON.stringify(nextEvents.slice(0, 1).map(lightBingo90Event)));
+      }
+    }
+
+    function lightBingo90Event(eventData) {
+      const copy = JSON.parse(JSON.stringify(eventData || {}));
+      if (copy.stripDesign) {
+        copy.stripDesign.backgroundImageData = '';
+      }
+      if (copy.visualSettings) {
+        copy.visualSettings.bingoLogoData = '';
+        copy.visualSettings.indigoLogoData = '';
+        copy.visualSettings.ballImageKeys = {};
+      }
+      return copy;
     }
 
     function defaultAccountingCategories() {

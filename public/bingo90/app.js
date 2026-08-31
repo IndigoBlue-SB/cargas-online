@@ -402,7 +402,7 @@ function init() {
     els.landingBackBtn.textContent = "Volver a pagina principal";
     els.userLogoutBtn.textContent = "Volver a pagina principal";
   }
-  restoreServerState().finally(() => {
+  restoreServerState().finally(async () => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("mode") === "virtual-strip") {
       openVirtualStripPrint(params);
@@ -410,7 +410,11 @@ function init() {
     }
     const eventId = params.get("eventId");
     const mode = params.get("mode");
-    if (eventId && loadSavedEvents().some((event) => event.id === eventId)) {
+    if (eventId && isLaunchedFromCargas() && await loadCargasEvent(eventId, { stayHome: mode === "config" })) {
+      if (mode === "config") {
+        window.setTimeout(openEventConfiguration, 250);
+      }
+    } else if (eventId && loadSavedEvents().some((event) => event.id === eventId)) {
       loadEvent(eventId, { stayHome: mode === "config" });
       if (mode === "config") {
         window.setTimeout(openEventConfiguration, 250);
@@ -2798,6 +2802,64 @@ async function exportEventCardsZip(options = {}) {
   }
 }
 
+async function loadCargasEvent(eventId, options = {}) {
+  try {
+    const response = await fetch("/api/state", { cache: "no-store", credentials: "same-origin" });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) return false;
+    const event = (payload.events || []).find((item) => String(item.id) === String(eventId));
+    if (!event) return false;
+    loadEventData(buildBingoEventFromCargas(event), options);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function buildBingoEventFromCargas(event) {
+  const panel = event.bingoPanelSettings || {};
+  const soldUnits = getCargasOfficialSoldUnits(event);
+  const maxSold = Math.max(0, ...soldUnits);
+  const rangeStart = Number(panel.rangeStart) || 1;
+  const rangeEnd = Math.max(15000, Number(panel.rangeEnd) || 0, Number(event.bingoRangeEnd) || 0, maxSold);
+  const drawn = Array.isArray(panel.drawn)
+    ? panel.drawn
+    : (Array.isArray(event.bingoGame?.drawn) ? event.bingoGame.drawn : []);
+  return {
+    ...panel,
+    id: event.id,
+    name: event.name || panel.name || "Evento confirmado",
+    eventCreated: true,
+    eventSeed: panel.eventSeed || event.bingoSeed || event.id,
+    eventDetail: [event.date, event.town, event.province].filter(Boolean).join(" - "),
+    combinationMode: panel.combinationMode || "new",
+    combinationSourceEventId: panel.combinationSourceEventId || "",
+    designMode: panel.designMode || "new",
+    designSourceEventId: panel.designSourceEventId || "",
+    cardMode: panel.cardMode || "series",
+    rangeStart,
+    rangeEnd,
+    configuredSeriesCount: Math.max(1, rangeEnd - rangeStart + 1),
+    salesLoaded: true,
+    soldUnits,
+    salesDraftUnits: soldUnits,
+    drawn,
+    savedAt: panel.savedAt || new Date().toISOString(),
+    cardDesign: panel.cardDesign || {},
+    visualSettings: panel.visualSettings || {},
+    stripDesign: panel.stripDesign || {},
+    projectionSettings: panel.projectionSettings || {},
+  };
+}
+
+function getCargasOfficialSoldUnits(event) {
+  const closure = event.bingoClosure || {};
+  if (Array.isArray(closure.soldUnits) && (closure.status === "confirmed" || closure.reopenedAt)) {
+    return normalizeSoldUnits(closure.soldUnits);
+  }
+  return normalizeSoldUnits((event.sales || []).flatMap((sale) => range(Number(sale.desde) || 0, Number(sale.hasta) || 0)));
+}
+
 function getPrintableExportSelection(units, options = {}) {
   const label = state.cardMode === "individual" ? "cartones" : "series";
   const fallbackSelection = {
@@ -4527,6 +4589,10 @@ function escapeHtml(value) {
 function loadEvent(eventId, options = {}) {
   const event = loadSavedEvents().find((item) => item.id === eventId);
   if (!event) return;
+  loadEventData(event, options);
+}
+
+function loadEventData(event, options = {}) {
   state.eventId = event.id;
   state.eventName = event.name;
   state.eventCreated = true;
@@ -4581,11 +4647,12 @@ function loadSavedEvents() {
 
 function saveEventsToLocalStorage(events) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(events.map(stripLargeEventAssets)));
     return true;
   } catch {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(events.map(stripLargeEventAssets)));
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(events.slice(0, 1).map(stripLargeEventAssets)));
     } catch {
       // Si tambien falla la copia liviana, seguimos con el estado en memoria y el guardado en servidor.
     }
