@@ -188,9 +188,22 @@
     .bingo-card-cell.empty-cell { background: #f8faf8; }
     .bingo-card-cell.hit { background: #0f766e; color: #fff; }
     .stats-dashboard { display: grid; gap: 10px; }
-    .stats-filter-bar { display: flex; gap: 7px; align-items: end; flex-wrap: wrap; }
-    .stats-filter-bar label { width: 150px; }
+    .stats-filter-bar { position: relative; display: flex; gap: 7px; align-items: end; flex-wrap: wrap; }
+    .stats-filter-bar label { width: 190px; }
     .stats-filter-bar button { min-height: 32px; padding: 6px 9px; }
+    .stats-calendar-panel { position: absolute; z-index: 20; top: calc(100% + 6px); left: 8px; width: min(360px, calc(100vw - 24px)); display: grid; gap: 8px; padding: 10px; border: 1px solid #cbd5e1; border-radius: var(--radius); background: #ffffff; box-shadow: 0 18px 40px rgba(15, 23, 42, .22); }
+    .stats-calendar-head { display: grid; grid-template-columns: 34px 1fr 34px; gap: 6px; align-items: center; }
+    .stats-calendar-head strong { text-align: center; color: #0f3d55; }
+    .stats-calendar-head button { min-height: 30px; padding: 4px 8px; text-align: center; }
+    .stats-calendar-weekdays, .stats-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .stats-calendar-weekdays span { text-align: center; font-size: 11px; color: var(--muted); font-weight: 800; }
+    .stats-calendar-day { min-height: 34px; padding: 0; background: #f8fafc; color: var(--ink); border: 1px solid #e2e8f0; text-align: center; }
+    .stats-calendar-day:hover { background: #e0f2fe; filter: none; }
+    .stats-calendar-day.outside { opacity: .38; }
+    .stats-calendar-day.in-range { background: #dbeafe; border-color: #93c5fd; }
+    .stats-calendar-day.selected { background: #0f766e; border-color: #0f766e; color: #ffffff; }
+    .stats-calendar-day.today { box-shadow: inset 0 0 0 2px #f59e0b; }
+    .stats-calendar-help { color: var(--muted); font-size: 12px; line-height: 1.25; }
     .stats-layout { display: grid; grid-template-columns: minmax(260px, 330px) minmax(0, 1fr); gap: 10px; align-items: start; }
     .stats-event-list, .stats-event-detail { padding: 0; overflow: hidden; }
     .stats-event-detail { background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); }
@@ -452,6 +465,16 @@
           <button type="button" class="secondary" id="statsClearPeriod">Ver todo</button>
           <button type="button" id="statsResetAll">Resetear todos desde fecha</button>
           <button type="button" class="danger" id="statsClearAllReset">Quitar reset a todos</button>
+          <div id="statsCalendar" class="stats-calendar-panel hidden">
+            <div class="stats-calendar-head">
+              <button type="button" class="light" id="statsCalendarPrev">&lt;</button>
+              <strong id="statsCalendarTitle">Septiembre 2026</strong>
+              <button type="button" class="light" id="statsCalendarNext">&gt;</button>
+            </div>
+            <div class="stats-calendar-weekdays"><span>Lun</span><span>Mar</span><span>Mie</span><span>Jue</span><span>Vie</span><span>Sab</span><span>Dom</span></div>
+            <div id="statsCalendarGrid" class="stats-calendar-grid"></div>
+            <div class="stats-calendar-help">Primer click: desde. Segundo click: hasta. Doble click: solo ese dia.</div>
+          </div>
         </div>
         <div class="stats-dashboard">
           <section class="panel stats-event-detail">
@@ -930,6 +953,8 @@
     let activeStatsEventId = null;
     let statsRangeStart = '';
     let statsRangeEnd = '';
+    let statsCalendarMonth = new Date();
+    let statsCalendarRangeStart = '';
     let currentView = 'detalle';
     let draftRanges = [];
     let selectedDraftId = null;
@@ -2789,10 +2814,79 @@
       return String(new Date().getFullYear() - 1);
     }
 
+    function showStatsCalendar() {
+      const parsed = parseStatsInputDate() || statsRangeStart || localDateIso();
+      const date = dateFromIso(parsed) || new Date();
+      statsCalendarMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+      $('statsCalendar').classList.remove('hidden');
+      renderStatsCalendar();
+    }
+
+    function hideStatsCalendar() {
+      $('statsCalendar')?.classList.add('hidden');
+      statsCalendarRangeStart = '';
+    }
+
+    function changeStatsCalendarMonth(offset) {
+      statsCalendarMonth = new Date(statsCalendarMonth.getFullYear(), statsCalendarMonth.getMonth() + offset, 1);
+      renderStatsCalendar();
+    }
+
+    function renderStatsCalendar() {
+      const calendar = $('statsCalendar');
+      if (!calendar || calendar.classList.contains('hidden')) return;
+      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      const year = statsCalendarMonth.getFullYear();
+      const month = statsCalendarMonth.getMonth();
+      $('statsCalendarTitle').textContent = `${monthNames[month]} ${year}`;
+      const first = new Date(year, month, 1);
+      const startOffset = (first.getDay() + 6) % 7;
+      const gridStart = new Date(year, month, 1 - startOffset);
+      const todayIso = localDateIso();
+      const start = statsCalendarRangeStart || statsRangeStart;
+      const end = statsCalendarRangeStart ? statsCalendarRangeStart : statsRangeEnd;
+      const rangeStart = start && end ? (start <= end ? start : end) : '';
+      const rangeEnd = start && end ? (start <= end ? end : start) : '';
+      const days = Array.from({ length: 42 }, (_, index) => {
+        const date = new Date(gridStart);
+        date.setDate(gridStart.getDate() + index);
+        const iso = localDateIso(date);
+        const inRange = rangeStart && rangeEnd && iso >= rangeStart && iso <= rangeEnd;
+        const selected = iso === start || iso === end;
+        return `<button type="button" class="stats-calendar-day ${date.getMonth() !== month ? 'outside' : ''} ${inRange ? 'in-range' : ''} ${selected ? 'selected' : ''} ${iso === todayIso ? 'today' : ''}" data-stats-calendar-day="${iso}">${date.getDate()}</button>`;
+      });
+      $('statsCalendarGrid').innerHTML = days.join('');
+    }
+
+    function parseStatsInputDate() {
+      const raw = String($('statsPeriodDate')?.value || '').split(/\s+a\s+/i)[0];
+      return parseShortDate(raw);
+    }
+
+    function applyStatsCalendarDay(dayIso) {
+      if (!statsCalendarRangeStart) {
+        statsCalendarRangeStart = dayIso;
+        $('statsPeriodDate').value = shortDate(dayIso);
+        renderStatsCalendar();
+        return;
+      }
+      const start = Math.min(statsCalendarRangeStart, dayIso);
+      const end = Math.max(statsCalendarRangeStart, dayIso);
+      statsCalendarRangeStart = '';
+      setStatsRange({ start, end });
+      hideStatsCalendar();
+    }
+
+    function applyStatsCalendarSingleDay(dayIso) {
+      statsCalendarRangeStart = '';
+      setStatsRange({ start: dayIso, end: dayIso });
+      hideStatsCalendar();
+    }
+
     function syncStatsPeriodInput() {
       const input = $('statsPeriodDate');
       if (!input || document.activeElement === input) return;
-      input.value = statsRangeStart ? shortDate(statsRangeStart) : '';
+      input.value = statsRangeStart ? (statsRangeStart === statsRangeEnd ? shortDate(statsRangeStart) : `${shortDate(statsRangeStart)} a ${shortDate(statsRangeEnd)}`) : '';
     }
 
     function statsRangeLabel() {
@@ -2802,8 +2896,7 @@
     }
 
     function statsBaseDate() {
-      const raw = $('statsPeriodDate')?.value;
-      const parsed = parseShortDate(raw);
+      const parsed = parseStatsInputDate();
       if (parsed) return dateFromIso(parsed);
       alert('Escribi una fecha valida, por ejemplo 01-09-26.');
       $('statsPeriodDate')?.focus();
@@ -2813,13 +2906,15 @@
     function setStatsRange(range) {
       statsRangeStart = range?.start || '';
       statsRangeEnd = range?.end || '';
+      statsCalendarRangeStart = '';
       renderStats();
+      renderStatsCalendar();
     }
 
     function resetSelectedEventStats() {
       const eventData = events.find(event => event.id === activeStatsEventId);
       if (!eventData) return alert('Primero elegi un evento.');
-      const baseDate = parseShortDate($('statsPeriodDate')?.value) || parseShortDate(prompt('Desde que fecha queres que empiecen las estadisticas de este evento? Ej: 01-09-26', shortDate(eventData.statsStartDate || '2026-09-01')) || '');
+      const baseDate = parseStatsInputDate() || statsRangeStart || parseShortDate(prompt('Desde que fecha queres que empiecen las estadisticas de este evento? Ej: 01-09-26', shortDate(eventData.statsStartDate || '2026-09-01')) || '');
       if (!baseDate) return alert('Fecha invalida. Usa el formato 01-09-26.');
       if (!confirm(`Las estadisticas de ${eventData.name} empezaran desde ${shortDate(baseDate)}.\n\nNo se borran cargas, balance ni contable. Solo se ignoran ventas anteriores en Estadisticas.`)) return;
       eventData.statsStartDate = baseDate;
@@ -2840,7 +2935,7 @@
     function resetAllEventStats() {
       const availableEvents = visibleEvents();
       if (!availableEvents.length) return alert('No hay eventos para resetear.');
-      const baseDate = parseShortDate($('statsPeriodDate')?.value) || parseShortDate(prompt('Desde que fecha queres que empiecen las estadisticas de todos los eventos? Ej: 01-09-26', '01-09-26') || '');
+      const baseDate = parseStatsInputDate() || statsRangeStart || parseShortDate(prompt('Desde que fecha queres que empiecen las estadisticas de todos los eventos? Ej: 01-09-26', '01-09-26') || '');
       if (!baseDate) return alert('Fecha invalida. Usa el formato 01-09-26.');
       const message = `Las estadisticas de ${num(availableEvents.length)} eventos empezaran desde ${shortDate(baseDate)}.\n\nNo se borran cargas, balance ni contable. Solo se ignoran ventas anteriores en Estadisticas.`;
       if (!confirm(message)) return;
@@ -3544,6 +3639,8 @@
       if (openBingo) { activeBingoEventId = openBingo.dataset.openBingo; renderBingo(); }
       const openStats = event.target.closest('[data-open-stats]');
       if (openStats) { activeStatsEventId = openStats.dataset.openStats; renderStats(); }
+      const statsCalendarDay = event.target.closest('[data-stats-calendar-day]');
+      if (statsCalendarDay) applyStatsCalendarDay(statsCalendarDay.dataset.statsCalendarDay);
       const editSheetButton = event.target.closest('[data-edit-sheet]');
       if (editSheetButton) editSheet(editSheetButton.dataset.editSheet);
       const deleteSheetButton = event.target.closest('[data-delete-sheet]');
@@ -3867,6 +3964,11 @@
     [$('search'), $('filterLocalidad'), $('filterProvincia'), $('filterVendedor')].forEach(input => input.addEventListener('input', renderActiveEvent));
     viewButtons.forEach(button => button.addEventListener('click', () => { currentView = button.dataset.view; viewButtons.forEach(item => item.classList.toggle('active', item === button)); renderActiveEvent(); }));
     document.addEventListener('dblclick', event => {
+      const statsCalendarDay = event.target.closest('[data-stats-calendar-day]');
+      if (statsCalendarDay) {
+        applyStatsCalendarSingleDay(statsCalendarDay.dataset.statsCalendarDay);
+        return;
+      }
       const stat = event.target.closest('.stat');
       if (!stat || !isAdmin()) return;
       const current = Number(settings.totalSize || defaultSettings.totalSize);
@@ -3881,10 +3983,20 @@
       saveSettingsData();
       applySettings();
     });
+    document.addEventListener('pointerdown', event => {
+      if ($('statsCalendar')?.classList.contains('hidden')) return;
+      if (event.target.closest('#statsCalendar') || event.target.closest('#statsPeriodDate')) return;
+      hideStatsCalendar();
+    });
     $('deleteSelectedRange').addEventListener('click', () => { draftRanges = draftRanges.filter(r => r.id !== selectedDraftId); selectedDraftId = draftRanges.at(-1)?.id || null; renderDraft(); });
     $('clearDraftRanges').addEventListener('click', () => { if (draftRanges.length && confirm('Eliminar toda la lista previa?')) { draftRanges = []; selectedDraftId = null; renderDraft(); } });
     $('clearSaleForm').addEventListener('click', resetSaleForm);
     $('openAdvancedBingo').addEventListener('click', openAdvancedBingo);
+    $('statsPeriodDate').addEventListener('focus', showStatsCalendar);
+    $('statsPeriodDate').addEventListener('click', showStatsCalendar);
+    $('statsPeriodDate').addEventListener('input', () => { statsCalendarRangeStart = ''; renderStatsCalendar(); });
+    $('statsCalendarPrev').addEventListener('click', () => changeStatsCalendarMonth(-1));
+    $('statsCalendarNext').addEventListener('click', () => changeStatsCalendarMonth(1));
     $('statsPickedWeek').addEventListener('click', () => {
       const date = statsBaseDate();
       if (date) setStatsRange(weekRange(date));
