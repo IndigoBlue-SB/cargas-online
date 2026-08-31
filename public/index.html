@@ -3087,6 +3087,10 @@
       return `${window.location.origin}${window.location.pathname}?virtual=${encodeURIComponent(sheet.token)}`;
     }
 
+    function virtualStripUrl(series) {
+      return `${window.location.origin}/bingo90/index.html?mode=virtual-strip&virtual=${encodeURIComponent(virtualPublicToken)}&series=${encodeURIComponent(series)}&from=cargas`;
+    }
+
     function virtualSheetSoldCount(sheet) {
       return (sheet.entries || []).length;
     }
@@ -3308,7 +3312,7 @@
         <td>${escapeAttr(entry.phone)}</td>
         <td>${escapeAttr(entry.payment)}</td>
         <td>${escapeAttr(entry.notes)}</td>
-        <td><button type="button" class="danger" data-delete-virtual-public="${entry.id}" ${closed ? 'disabled' : ''}>Quitar</button></td>
+        <td><div class="table-actions"><button type="button" class="secondary" data-open-virtual-strip="${entry.series}">Tira PDF</button><button type="button" class="danger" data-delete-virtual-public="${entry.id}" ${closed ? 'disabled' : ''}>Quitar</button></div></td>
       </tr>`).join('');
     }
 
@@ -4070,6 +4074,10 @@
       if (deleteVirtualPublic && virtualPublicData) {
         const entries = (virtualPublicData.sheet.entries || []).filter(entry => entry.id !== deleteVirtualPublic.dataset.deleteVirtualPublic);
         saveVirtualPublicEntries(entries).catch(error => alert(error.message));
+      }
+      const openVirtualStrip = event.target.closest('[data-open-virtual-strip]');
+      if (openVirtualStrip && virtualPublicToken) {
+        window.open(virtualStripUrl(openVirtualStrip.dataset.openVirtualStrip), '_blank');
       }
       const confirmBingoButton = event.target.closest('#confirmBingoLoad');
       if (confirmBingoButton) confirmBingoLoad();

@@ -325,7 +325,9 @@ async function handleApi(req, res) {
         date: event.date,
         town: event.town,
         province: event.province,
-        price: Number(event.price) || 0
+        price: Number(event.price) || 0,
+        bingoSeed: event.bingoSeed || event.id,
+        bingoPanelSettings: event.bingoPanelSettings || null
       }
     });
   }

@@ -404,6 +404,10 @@ function init() {
   }
   restoreServerState().finally(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get("mode") === "virtual-strip") {
+      openVirtualStripPrint(params);
+      return;
+    }
     const eventId = params.get("eventId");
     const mode = params.get("mode");
     if (eventId && loadSavedEvents().some((event) => event.id === eventId)) {
@@ -2176,6 +2180,77 @@ function renderStripPreview() {
   const seriesNumber = clamp(Number(els.stripSeriesInput.value) || 1, 1, 20000);
   els.stripPreview.innerHTML = buildStripSheetHtml(seriesNumber);
   window.requestAnimationFrame(updateStripPreviewScale);
+}
+
+async function openVirtualStripPrint(params) {
+  const token = params.get("virtual") || "";
+  const series = clamp(Number(params.get("series")) || 0, 1, 20000);
+  if (!token || !series) {
+    document.body.innerHTML = "<p style='font-family:Arial;padding:24px'>No se encontro la tira solicitada.</p>";
+    return;
+  }
+  try {
+    const response = await fetch(`/api/virtual/${encodeURIComponent(token)}`, { cache: "no-store" });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || "No se pudo abrir la planilla virtual.");
+    const sheet = payload.sheet || {};
+    const event = payload.event || {};
+    const isAssigned = series >= Number(sheet.desde) && series <= Number(sheet.hasta);
+    const isSold = (sheet.entries || []).some((entry) => Number(entry.series) === series);
+    if (!isAssigned || !isSold) throw new Error("Esta serie no pertenece a la planilla virtual o todavia no esta vendida.");
+    applyVirtualStripEvent(event, series);
+    const pageDimensions = getPrintPageDimensions();
+    const pageSize = getPrintPageSize();
+    const html = buildPrintableZipHtml({
+      units: [series],
+      pages: [[series]],
+      selection: {
+        units: [series],
+        label: "series",
+        requestedStart: series,
+        requestedEnd: series,
+        limited: false,
+        nextStart: null,
+      },
+      partNumber: 1,
+      totalParts: 1,
+      pageSize,
+      pageDimensions,
+    });
+    document.open();
+    document.write(html.replace("</body>", "<script>window.onload=()=>setTimeout(()=>window.print(),250);<\\/script></body>"));
+    document.close();
+  } catch (error) {
+    document.body.innerHTML = `<main style="font-family:Arial;padding:24px;display:grid;gap:12px"><h1>No se pudo generar la tira</h1><p>${escapeHtml(error.message || error)}</p><button onclick="history.back()">Volver</button></main>`;
+  }
+}
+
+function applyVirtualStripEvent(event, series) {
+  const panel = event.bingoPanelSettings || {};
+  state.eventId = event.id || createId();
+  state.eventName = event.name || "Tira virtual";
+  state.eventCreated = true;
+  state.eventSeed = panel.eventSeed || event.bingoSeed || event.id || state.eventId;
+  state.eventDetail = [event.date, event.town, event.province].filter(Boolean).join(" - ");
+  state.combinationMode = panel.combinationMode || "new";
+  state.combinationSourceEventId = panel.combinationSourceEventId || "";
+  state.designMode = panel.designMode || "new";
+  state.designSourceEventId = panel.designSourceEventId || "";
+  state.cardMode = panel.cardMode || "series";
+  state.rangeStart = 1;
+  state.rangeEnd = Math.max(Number(panel.rangeEnd) || 0, series, 15000);
+  state.configuredSeriesCount = state.rangeEnd;
+  state.salesLoaded = true;
+  state.soldUnits = [series];
+  state.salesDraftUnits = [series];
+  state.cards = [];
+  state.cardDesign = { ...state.cardDesign, ...(panel.cardDesign || {}) };
+  state.visualSettings = normalizeVisualSettings(panel.visualSettings || {});
+  state.stripDesign = { ...createDefaultStripDesign(), ...(panel.stripDesign || {}) };
+  state.projectionSettings = normalizeProjectionSettings(panel.projectionSettings || {});
+  state.prizeSettings = normalizePrizeSettings({ ...state.prizeSettings, ...(panel.prizeSettings || {}) });
+  state.prizeEnabled = { ...state.prizeEnabled, ...(panel.prizeEnabled || {}) };
+  state.prizeAmounts = { ...state.prizeAmounts, ...(panel.prizeAmounts || {}) };
 }
 
 function applyStripPreviewStyles(target) {
