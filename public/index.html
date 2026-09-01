@@ -110,6 +110,12 @@
     .splash-enter:hover { background: rgba(255,255,255,.24); }
     @keyframes splashIn { from { opacity: 0; transform: translateY(18px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
     @keyframes logoFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    .boot-loading { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 24px; background: linear-gradient(135deg, #0f766e, #123f8c); color: #fff; }
+    .boot-loading-card { width: min(420px, 92vw); display: grid; gap: 12px; justify-items: center; text-align: center; padding: 24px; border: 1px solid rgba(255,255,255,.28); border-radius: 10px; background: rgba(255,255,255,.12); box-shadow: 0 20px 50px rgba(0,0,0,.22); }
+    .boot-loading-card strong { font-size: 22px; }
+    .boot-loading-card span { color: rgba(255,255,255,.82); }
+    .boot-spinner { width: 38px; height: 38px; border: 4px solid rgba(255,255,255,.28); border-top-color: #fff; border-radius: 50%; animation: bootSpin .9s linear infinite; }
+    @keyframes bootSpin { to { transform: rotate(360deg); } }
     .user-strip { display: grid; gap: 6px; padding: 8px; border-radius: var(--radius); background: rgba(255,255,255,.08); color: rgba(255,255,255,.84); }
     .storage-warning { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid #f59e0b; border-radius: var(--radius); background: #fff7ed; color: #7c2d12; box-shadow: var(--shadow); }
     .storage-warning strong { font-size: 14px; }
@@ -366,6 +372,14 @@
         <div class="table-head"><h3>Ventas anotadas</h3><span id="virtualPublicCount" class="muted">0 ventas</span></div>
         <div class="scroll"><table><thead><tr><th>Planilla</th><th>Serie</th><th>Cliente</th><th>Telefono</th><th>Pago</th><th>Observacion</th><th></th></tr></thead><tbody id="virtualPublicRows"></tbody></table><div id="virtualPublicEmpty" class="empty">Todavia no hay ventas anotadas.</div></div>
       </section>
+    </div>
+  </section>
+
+  <section id="bootLoading" class="boot-loading">
+    <div class="boot-loading-card">
+      <div class="boot-spinner" aria-hidden="true"></div>
+      <strong>Cargando Cargas Online</strong>
+      <span id="bootLoadingText">Buscando datos guardados...</span>
     </div>
   </section>
 
@@ -1144,6 +1158,12 @@
       settings.functionPermissions = normalizeFunctionPermissions(settings.functionPermissions);
       applySettings();
       renderAll();
+    }
+    function setBootLoading(show, text = 'Buscando datos guardados...') {
+      const panel = $('bootLoading');
+      if (!panel) return;
+      $('bootLoadingText').textContent = text;
+      panel.classList.toggle('hidden', !show);
     }
     function money(value) { return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Math.round(Number(value) || 0)); }
     function num(value) { return new Intl.NumberFormat('es-AR').format(Number(value) || 0); }
@@ -3986,6 +4006,7 @@
           body: JSON.stringify({ role, name, password })
         });
         currentUser = data.session;
+        setBootLoading(true, 'Cargando eventos, balances y estadisticas...');
         await loadState();
         activePage = role === 'admin' ? 'home' : 'events';
         applySession();
@@ -3993,6 +4014,7 @@
         alert(error.message);
         $('loginPassword').focus();
       } finally {
+        setBootLoading(false);
         if (submitButton) {
           submitButton.disabled = false;
           submitButton.textContent = 'Ingresar';
@@ -4676,30 +4698,42 @@
     });
 
     async function bootstrap() {
+      setBootLoading(true, 'Preparando Cargas Online...');
       const params = new URLSearchParams(window.location.search);
       const virtualToken = params.get('virtual');
       if (virtualToken) {
-        await loadVirtualPublic(virtualToken).catch(error => {
-          $('virtualPublicScreen').classList.remove('hidden');
-          $('splashScreen').classList.add('hidden');
-          $('loginScreen').classList.add('hidden');
-          $('appShell').classList.add('hidden');
-          $('virtualPublicTitle').textContent = 'Planilla no disponible';
-          $('virtualPublicInfo').textContent = error.message;
-          $('virtualPublicForm').querySelectorAll('input, select, button').forEach(control => { control.disabled = true; });
-        });
+        try {
+          await loadVirtualPublic(virtualToken).catch(error => {
+            $('virtualPublicScreen').classList.remove('hidden');
+            $('splashScreen').classList.add('hidden');
+            $('loginScreen').classList.add('hidden');
+            $('appShell').classList.add('hidden');
+            $('virtualPublicTitle').textContent = 'Planilla no disponible';
+            $('virtualPublicInfo').textContent = error.message;
+            $('virtualPublicForm').querySelectorAll('input, select, button').forEach(control => { control.disabled = true; });
+          });
+        } finally {
+          setBootLoading(false);
+        }
         return;
       }
-      const requestedPage = params.get('page');
-      $('eventDate').valueAsDate = new Date();
-      await loadAccounts().catch(() => {});
-      const sessionData = await api('/api/session').catch(() => ({ session: null }));
-      currentUser = sessionData.session;
-      if (currentUser) await loadState().catch(error => alert(error.message));
-      applySettings();
-      updatePreview();
-      applySession();
-      if (currentUser && requestedPage && canUsePage(requestedPage)) go(requestedPage);
+      try {
+        const requestedPage = params.get('page');
+        $('eventDate').valueAsDate = new Date();
+        await loadAccounts().catch(() => {});
+        const sessionData = await api('/api/session').catch(() => ({ session: null }));
+        currentUser = sessionData.session;
+        if (currentUser) {
+          setBootLoading(true, 'Cargando eventos, balances y estadisticas...');
+          await loadState().catch(error => alert(error.message));
+        }
+        applySettings();
+        updatePreview();
+        applySession();
+        if (currentUser && requestedPage && canUsePage(requestedPage)) go(requestedPage);
+      } finally {
+        setBootLoading(false);
+      }
     }
     bootstrap();
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {

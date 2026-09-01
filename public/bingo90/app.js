@@ -2656,85 +2656,94 @@ async function syncStripPreviewScaleForExport() {
 }
 
 async function exportEventCardsPdf(options = {}) {
-  if (!state.eventCreated) {
-    window.alert("Primero selecciona el evento que queres exportar.");
-    return;
+  const button = els.stripDesignerDialog?.open ? els.stripExportPdfBtn : els.exportCardsPdfBtn;
+  const previousText = button?.textContent;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Preparando PDF...";
   }
-  if (els.stripDesignerDialog?.open) {
-    applyStripDesign();
-  } else {
-    persistEventDesign();
+  try {
+    if (!state.eventCreated) {
+      window.alert("Primero selecciona el evento que queres exportar.");
+      return;
+    }
+    if (els.stripDesignerDialog?.open) {
+      applyStripDesign();
+    } else {
+      persistEventDesign();
+    }
+    if (!(await ensureCargasPanelSaved())) return;
+    const units = getPrintableStripUnits();
+    if (!units.length) {
+      window.alert("Primero configura el evento para generar cartones.");
+      return;
+    }
+    const exportSelection = getPrintableExportSelection(units, options);
+    const exportUnits = exportSelection.units;
+    if (!exportUnits.length) {
+      const label = state.cardMode === "individual" ? "cartones" : "series";
+      window.alert(`El rango elegido no tiene ${label} para exportar.`);
+      return;
+    }
+    const pageCount = getPrintableStripPages(exportUnits).length;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      window.alert("El navegador bloqueo la ventana de impresion. Habilita ventanas emergentes para exportar PDF.");
+      return;
+    }
+    if (exportSelection.limited && els.stripDesignerDialog?.open) {
+      els.stripExportFromInput.value = exportSelection.nextStart;
+    }
+    writePrintLoadingPage(printWindow, exportSelection, pageCount);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const styles = [...document.querySelectorAll("style,link[rel='stylesheet']")]
+      .map((node) => node.outerHTML)
+      .join("");
+    const pageSize = getPrintPageSize();
+    const pageDimensions = getPrintPageDimensions();
+    const pagesHtml = buildPrintableStripPagesHtml(exportUnits);
+    const fileName = slugify(state.eventName || "cartones-bingo-90");
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html>
+      <html lang="es">
+        <head>
+          <meta charset="utf-8">
+          <title>${escapeHtml(state.eventName || "Cartones Bingo 90")} - PDF</title>
+          ${styles}
+          <style>
+            *{box-sizing:border-box}
+            html,body{background:#ffffff;margin:0;padding:0;width:100%;min-height:100%}
+            body{display:block;overflow-x:hidden}
+            .print-toolbar{position:sticky;top:0;right:0;left:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#111827;color:#fff;font-family:Arial,Helvetica,sans-serif}
+            .print-toolbar button{border:0;border-radius:6px;padding:9px 13px;background:#e11d48;color:#fff;font-weight:800;cursor:pointer}
+            .print-note{font-size:13px;color:#cbd5e1}
+            .print-pages{padding-top:0}
+            .strip-preview.print-page{width:${pageDimensions.width};height:${pageDimensions.height};max-width:${pageDimensions.width};max-height:${pageDimensions.height};box-shadow:none;border:0;border-radius:0;min-height:auto;overflow:hidden;page-break-after:always;break-after:page;margin:0 auto;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+            .strip-preview.print-page:last-child{page-break-after:auto;break-after:auto}
+            .strip-page-layout{height:100%;align-content:start}
+            .strip-card{break-inside:avoid}
+            @page{size:${pageSize};margin:0}
+            @media print{html,body{width:100%;height:auto;overflow:visible}.print-toolbar{display:none}.print-pages{padding-top:0}.strip-preview.print-page{width:${pageDimensions.width};height:${pageDimensions.height};max-width:${pageDimensions.width};max-height:${pageDimensions.height};overflow:hidden;margin:0 auto}.strip-card{break-inside:avoid}}
+          </style>
+        </head>
+        <body>
+          <div class="print-toolbar">
+            <strong>${escapeHtml(state.eventName || "Cartones Bingo 90")}</strong>
+            <span class="print-note">${buildPrintToolbarNote(exportSelection, pageCount, fileName)}. Cuando cargue la vista, toca Guardar como PDF.</span>
+            <button onclick="window.print()">Guardar como PDF</button>
+          </div>
+          <main class="print-pages">${pagesHtml}</main>
+        </body>
+      </html>`);
+    printWindow.document.close();
+  } catch (error) {
+    window.alert(`No se pudo preparar el PDF: ${error.message || error}`);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = previousText;
+    }
   }
-  if (!(await ensureCargasPanelSaved())) return;
-  const units = getPrintableStripUnits();
-  if (!units.length) {
-    window.alert("Primero configura el evento para generar cartones.");
-    return;
-  }
-  const exportSelection = getPrintableExportSelection(units, options);
-  const exportUnits = exportSelection.units;
-  if (!exportUnits.length) {
-    const label = state.cardMode === "individual" ? "cartones" : "series";
-    window.alert(`El rango elegido no tiene ${label} para exportar.`);
-    return;
-  }
-  const pageCount = getPrintableStripPages(exportUnits).length;
-  if (false) {
-    const shouldContinue = window.confirm(`Se van a preparar ${pageCount} paginas para PDF. Puede tardar bastante. ¿Continuar?`);
-    if (!shouldContinue) return;
-  }
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    window.alert("El navegador bloqueo la ventana de impresion. Habilita ventanas emergentes para exportar PDF.");
-    return;
-  }
-  if (exportSelection.limited && els.stripDesignerDialog?.open) {
-    els.stripExportFromInput.value = exportSelection.nextStart;
-  }
-  writePrintLoadingPage(printWindow, exportSelection, pageCount);
-  await new Promise((resolve) => setTimeout(resolve, 80));
-  const styles = [...document.querySelectorAll("style,link[rel='stylesheet']")]
-    .map((node) => node.outerHTML)
-    .join("");
-  const pageSize = getPrintPageSize();
-  const pageDimensions = getPrintPageDimensions();
-  const pagesHtml = buildPrintableStripPagesHtml(exportUnits);
-  const fileName = slugify(state.eventName || "cartones-bingo-90");
-  printWindow.document.open();
-  printWindow.document.write(`<!doctype html>
-    <html lang="es">
-      <head>
-        <meta charset="utf-8">
-        <title>${escapeHtml(state.eventName || "Cartones Bingo 90")} - PDF</title>
-        ${styles}
-        <style>
-          *{box-sizing:border-box}
-          html,body{background:#ffffff;margin:0;padding:0;width:100%;min-height:100%}
-          body{display:block;overflow-x:hidden}
-          .print-toolbar{position:fixed;top:0;right:0;left:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#111827;color:#fff;font-family:Arial,Helvetica,sans-serif}
-          .print-toolbar button{border:0;border-radius:6px;padding:9px 13px;background:#e11d48;color:#fff;font-weight:800;cursor:pointer}
-          .print-note{font-size:13px;color:#cbd5e1}
-          .print-pages{padding-top:0}
-          .strip-preview.print-page{width:${pageDimensions.width};height:${pageDimensions.height};max-width:${pageDimensions.width};max-height:${pageDimensions.height};box-shadow:none;border:0;border-radius:0;min-height:auto;overflow:hidden;page-break-after:always;break-after:page;margin:0 auto;print-color-adjust:exact;-webkit-print-color-adjust:exact}
-          .strip-preview.print-page:last-child{page-break-after:auto;break-after:auto}
-          .strip-page-layout{height:100%;align-content:start}
-          .strip-card{break-inside:avoid}
-          @page{size:${pageSize};margin:0}
-          @media screen{.print-toolbar{opacity:.92;transform:translateY(calc(-100% + 8px));transition:.15s}.print-toolbar:hover{transform:translateY(0)}}
-          @media print{html,body{width:100%;height:auto;overflow:visible}.print-toolbar{display:none}.print-pages{padding-top:0}.strip-preview.print-page{width:${pageDimensions.width};height:${pageDimensions.height};max-width:${pageDimensions.width};max-height:${pageDimensions.height};overflow:hidden;margin:0 auto}.strip-card{break-inside:avoid}}
-        </style>
-      </head>
-      <body>
-        <div class="print-toolbar">
-          <strong>${escapeHtml(state.eventName || "Cartones Bingo 90")}</strong>
-          <span class="print-note">${buildPrintToolbarNote(exportSelection, pageCount, fileName)}</span>
-          <button onclick="window.print()">Guardar como PDF</button>
-        </div>
-        <main class="print-pages">${pagesHtml}</main>
-        <script>window.onload=()=>setTimeout(()=>window.print(),250);</script>
-      </body>
-    </html>`);
-  printWindow.document.close();
 }
 
 async function exportEventCardsZip(options = {}) {
