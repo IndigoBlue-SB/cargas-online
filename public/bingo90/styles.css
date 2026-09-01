@@ -1240,7 +1240,20 @@ body.board-neon-on .number-cell.drawn {
   font-family: var(--prize-font-family);
 }
 
-.prize-settings-panel .form-grid > label:not(.check-field) {
+.prize-template-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.prize-template-column {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.prize-settings-panel label:not(.check-field) {
   color: var(--prize-name-color);
   font-size: var(--prize-name-size);
   font-weight: 800;
@@ -1253,11 +1266,37 @@ body.board-neon-on .number-cell.drawn {
   font-weight: 800;
 }
 
+.prize-template-column label:not(.check-field) {
+  gap: 5px;
+}
+
+.prize-template-column input {
+  min-height: 34px;
+  border-color: rgba(148, 163, 184, 0.28);
+  background: rgba(3, 10, 18, 0.32);
+}
+
+.prize-template-column .check-field {
+  min-height: 46px;
+}
+
+.prize-template-column .check-field input {
+  width: auto;
+  accent-color: var(--prize-name-color);
+}
+
 .prize-settings-panel input[type="text"],
 .prize-settings-panel input[inputmode="numeric"] {
   color: var(--prize-amount-color);
   font-family: var(--prize-font-family);
   font-size: var(--prize-amount-size);
+  font-weight: 900;
+}
+
+.prize-settings-panel input[type="number"] {
+  color: var(--prize-amount-color);
+  font-family: var(--prize-font-family);
+  font-size: max(16px, calc(var(--prize-amount-size) * 0.85));
   font-weight: 900;
 }
 
@@ -2239,6 +2278,10 @@ dialog::backdrop {
   }
 
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .prize-template-grid {
     grid-template-columns: 1fr;
   }
 

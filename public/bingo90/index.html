@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Sistema de Bingo 90</title>
-    <link rel="stylesheet" href="styles.css?v=user-selector-20260803">
+    <link rel="stylesheet" href="styles.css?v=prize-template-20260901">
   </head>
   <body>
     <main class="app-shell">
@@ -505,87 +505,91 @@
           <p class="small-note">Los margenes de pantalla forman el marco negro exterior. Al cambiarlos, el panel completo se comprime o se expande dentro del espacio disponible.</p>
         </div>
         <div class="tab-panel prize-settings-panel" data-panel="premios">
-          <div class="form-grid">
-            <label>
-              Bolilla tope del pozo
-              <input id="eventPozoLimitInput" type="number" min="30" max="90" value="37">
-            </label>
-            <label>
-              Bolilla inicio pozo
-              <input id="eventPozoBaseLimitInput" type="number" min="30" max="90" value="37">
-            </label>
-            <label>
-              Incremento de bolilla
-              <input id="eventPozoLimitIncrementInput" type="number" min="1" max="20" value="1">
-            </label>
-            <label>
-              Premio cuaterno
-              <input id="eventCuaternoPrizeInput" type="text" inputmode="numeric" value="0">
-            </label>
-            <label class="check-field">
-              <input id="eventCuaternoEnabledInput" type="checkbox" checked>
-              Jugar cuaterno
-            </label>
-            <label>
-              Premio linea
-              <input id="eventLineaPrizeInput" type="text" inputmode="numeric" value="0">
-            </label>
-            <label class="check-field">
-              <input id="eventLineaEnabledInput" type="checkbox" checked>
-              Jugar linea
-            </label>
-            <label>
-              Premio segunda linea
-              <input id="eventSegundaLineaPrizeInput" type="text" inputmode="numeric" value="0">
-            </label>
-            <label class="check-field">
-              <input id="eventSegundaLineaEnabledInput" type="checkbox" checked>
-              Jugar segunda linea
-            </label>
-            <label>
-              Premio pozo
-              <input id="eventPozoPrizeInput" type="text" inputmode="numeric" value="0">
-            </label>
-            <label>
-              Premio base pozo
-              <input id="eventPozoBasePrizeInput" type="text" inputmode="numeric" value="0">
-            </label>
-            <label class="check-field">
-              <input id="eventPozoEnabledInput" type="checkbox" checked>
-              Jugar pozo acumulado
-            </label>
-            <label>
-              Incremento premio pozo
-              <input id="eventPozoPrizeIncrementInput" type="text" inputmode="numeric" value="0">
-            </label>
-            <label>
-              Premio bingo
-              <input id="eventBingoPrizeInput" type="text" inputmode="numeric" value="0">
-            </label>
-            <label class="check-field">
-              <input id="eventBingoEnabledInput" type="checkbox" checked>
-              Jugar bingo
-            </label>
-            <label>
-              Premio carton extra
-              <input id="eventExtraPrizeInput" type="text" inputmode="numeric" value="0">
-            </label>
-            <label>
-              Premio base extra
-              <input id="eventExtraBasePrizeInput" type="text" inputmode="numeric" value="0">
-            </label>
-            <label class="check-field">
-              <input id="eventExtraEnabledInput" type="checkbox" checked>
-              Jugar carton extra
-            </label>
-            <label>
-              Incremento premio extra
-              <input id="eventExtraPrizeIncrementInput" type="text" inputmode="numeric" value="0">
-            </label>
-            <label>
-              Bolillas adicionales para Extra
-              <input id="eventExtraBallsInput" type="number" min="1" max="90" value="5">
-            </label>
+          <div class="prize-template-grid">
+            <section class="prize-template-column">
+              <label>
+                Bolilla tope del pozo
+                <input id="eventPozoLimitInput" type="number" min="30" max="90" value="37">
+              </label>
+              <label>
+                Incremento de bolilla
+                <input id="eventPozoLimitIncrementInput" type="number" min="1" max="20" value="1">
+              </label>
+              <label class="check-field">
+                <input id="eventCuaternoEnabledInput" type="checkbox" checked>
+                Jugar cuaterno
+              </label>
+              <label class="check-field">
+                <input id="eventLineaEnabledInput" type="checkbox" checked>
+                Jugar linea
+              </label>
+              <label class="check-field">
+                <input id="eventSegundaLineaEnabledInput" type="checkbox" checked>
+                Jugar segunda linea
+              </label>
+              <label class="check-field">
+                <input id="eventPozoEnabledInput" type="checkbox" checked>
+                Jugar pozo acumulado
+              </label>
+              <label class="check-field">
+                <input id="eventBingoEnabledInput" type="checkbox" checked>
+                Jugar bingo
+              </label>
+              <label class="check-field">
+                <input id="eventExtraEnabledInput" type="checkbox" checked>
+                Jugar carton extra
+              </label>
+              <label>
+                Incremento premio extra
+                <input id="eventExtraPrizeIncrementInput" type="text" inputmode="numeric" value="0">
+              </label>
+            </section>
+            <section class="prize-template-column">
+              <label>
+                Bolilla inicio pozo
+                <input id="eventPozoBaseLimitInput" type="number" min="30" max="90" value="37">
+              </label>
+              <label>
+                Premio cuaterno
+                <input id="eventCuaternoPrizeInput" type="text" inputmode="numeric" value="0">
+              </label>
+              <label>
+                Premio linea
+                <input id="eventLineaPrizeInput" type="text" inputmode="numeric" value="0">
+              </label>
+              <label>
+                Premio segunda linea
+                <input id="eventSegundaLineaPrizeInput" type="text" inputmode="numeric" value="0">
+              </label>
+              <label>
+                Premio pozo
+                <input id="eventPozoPrizeInput" type="text" inputmode="numeric" value="0">
+              </label>
+              <label>
+                Premio base pozo
+                <input id="eventPozoBasePrizeInput" type="text" inputmode="numeric" value="0">
+              </label>
+              <label>
+                Premio bingo
+                <input id="eventBingoPrizeInput" type="text" inputmode="numeric" value="0">
+              </label>
+              <label>
+                Incremento premio pozo
+                <input id="eventPozoPrizeIncrementInput" type="text" inputmode="numeric" value="0">
+              </label>
+              <label>
+                Premio carton extra
+                <input id="eventExtraPrizeInput" type="text" inputmode="numeric" value="0">
+              </label>
+              <label>
+                Bolillas adicionales para Extra
+                <input id="eventExtraBallsInput" type="number" min="1" max="90" value="5">
+              </label>
+              <label>
+                Premio base extra
+                <input id="eventExtraBasePrizeInput" type="text" inputmode="numeric" value="0">
+              </label>
+            </section>
           </div>
         </div>
         <div class="tab-panel" data-panel="cartones">
@@ -1300,6 +1304,6 @@
       </section>
     </dialog>
 
-    <script src="app.js?v=loading-pdf-preview-20260901"></script>
+    <script src="app.js?v=prize-template-20260901"></script>
   </body>
 </html>
