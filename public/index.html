@@ -98,6 +98,8 @@
     .event-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; background: #fbfcfa; color: var(--ink); display: grid; gap: 8px; }
     .event-card h3 { margin: 0; color: var(--home-card-title-color); font-size: 16px; }
     .event-meta { display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
+    .home-logo-stage { min-height: calc(100vh - 275px); display: grid; place-items: center; padding: 22px; }
+    .home-indigo-logo { width: min(760px, 70vw); max-height: min(430px, 46vh); object-fit: contain; filter: drop-shadow(0 18px 34px rgba(0, 140, 255, .18)); opacity: .96; }
     .login-screen { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: var(--bg); }
     .login-card { width: min(460px, 100%); display: grid; gap: 16px; }
     .login-card h1 { margin: 0; font-size: 28px; letter-spacing: 0; }
@@ -457,6 +459,9 @@
           <button type="button" class="event-card" data-page-shortcut="sheets" data-admin-only><h3>PLANILLAS</h3><span class="muted">Anotar entregas, vendedor, telefono, venta y deuda.</span></button>
           <button type="button" class="event-card" data-page-shortcut="balance"><h3>BALANCE</h3><span class="muted">Revisar premios, comisiones, recaudacion y gastos.</span></button>
                   <button type="button" class="event-card" data-page-shortcut="accounting"><h3>CONTABLE</h3><span class="muted">Control semanal desde INDIGO BLUE por evento.</span></button>
+        </div>
+        <div class="home-logo-stage" aria-hidden="true">
+          <img class="home-indigo-logo" src="./assets/indigo-blue-logo-transparente-ajustado.png" alt="">
         </div>
       </section>
 
