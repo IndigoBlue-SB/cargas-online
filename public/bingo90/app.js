@@ -2715,7 +2715,10 @@ async function exportEventCardsPdf(options = {}) {
             html,body{background:#ffffff;margin:0;padding:0;width:100%;min-height:100%}
             body{display:block;overflow-x:hidden}
             .print-toolbar{position:sticky;top:0;right:0;left:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#111827;color:#fff;font-family:Arial,Helvetica,sans-serif}
+            .print-toolbar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
             .print-toolbar button{border:0;border-radius:6px;padding:9px 13px;background:#e11d48;color:#fff;font-weight:800;cursor:pointer}
+            .print-toolbar button.secondary{background:#0f766e}
+            .print-toolbar button.whatsapp{background:#16a34a}
             .print-note{font-size:13px;color:#cbd5e1}
             .print-pages{padding-top:0}
             .strip-preview.print-page{width:${pageDimensions.width};height:${pageDimensions.height};max-width:${pageDimensions.width};max-height:${pageDimensions.height};box-shadow:none;border:0;border-radius:0;min-height:auto;overflow:hidden;page-break-after:always;break-after:page;margin:0 auto;print-color-adjust:exact;-webkit-print-color-adjust:exact}
@@ -2730,9 +2733,17 @@ async function exportEventCardsPdf(options = {}) {
           <div class="print-toolbar">
             <strong>${escapeHtml(state.eventName || "Cartones Bingo 90")}</strong>
             <span class="print-note">${buildPrintToolbarNote(exportSelection, pageCount, fileName)}. Cuando cargue la vista, toca Guardar como PDF.</span>
-            <button onclick="window.print()">Guardar como PDF</button>
+            <div class="print-toolbar-actions">
+              <button class="secondary" type="button" data-download-jpg>Descargar JPG</button>
+              <button class="whatsapp" type="button" data-whatsapp-jpg>Enviar por WhatsApp</button>
+              <button type="button" onclick="window.print()">Guardar como PDF</button>
+            </div>
           </div>
           <main class="print-pages">${pagesHtml}</main>
+          ${buildPrintableJpgActionsScript({
+            fileName: `${fileName}-${exportSelection.requestedStart}-${exportSelection.requestedEnd}.jpg`,
+            whatsappText: `Tira de bingo ${state.eventName || "Cartones Bingo 90"} - ${exportSelection.label} ${exportSelection.requestedStart}-${exportSelection.requestedEnd}`,
+          })}
         </body>
       </html>`);
     printWindow.document.close();
@@ -2934,6 +2945,105 @@ function buildPrintToolbarNote(selection, pageCount, fileName) {
   return `${base}. Quedan pendientes: desde ${selection.nextStart} hasta ${selection.requestedEnd}.`;
 }
 
+function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
+  const safeFileName = JSON.stringify(fileName || "tira-bingo.jpg").replace(/<\/script/gi, "<\\/script");
+  const safeWhatsappText = JSON.stringify(whatsappText || "Tira de bingo").replace(/<\/script/gi, "<\\/script");
+  return `<script>
+    (() => {
+      const jpgFileName = ${safeFileName};
+      const whatsappText = ${safeWhatsappText};
+      const getStyleText = () => Array.from(document.styleSheets).map((sheet) => {
+        try {
+          return Array.from(sheet.cssRules || []).map((rule) => rule.cssText).join("\\n");
+        } catch {
+          return "";
+        }
+      }).filter(Boolean).join("\\n");
+      const loadImage = (src) => new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error("No se pudo generar el JPG de la tira."));
+        image.src = src;
+      });
+      async function createJpgBlob() {
+        const page = document.querySelector(".strip-preview.print-page");
+        if (!page) throw new Error("No se encontro la hoja para convertir a JPG.");
+        const rect = page.getBoundingClientRect();
+        const width = Math.max(1, Math.ceil(rect.width));
+        const height = Math.max(1, Math.ceil(rect.height));
+        const clone = page.cloneNode(true);
+        clone.style.margin = "0";
+        clone.style.transform = "none";
+        const styleText = getStyleText().replaceAll("<\\/style", "<\\\\/style");
+        const html = '<div xmlns="http://www.w3.org/1999/xhtml"><style>' + styleText + '</style>' + clone.outerHTML + '</div>';
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '"><foreignObject width="100%" height="100%">' + html + '</foreignObject></svg>';
+        const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+        try {
+          const image = await loadImage(url);
+          const scale = 2;
+          const canvas = document.createElement("canvas");
+          canvas.width = width * scale;
+          canvas.height = height * scale;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.setTransform(scale, 0, 0, scale, 0, 0);
+          ctx.drawImage(image, 0, 0);
+          return await new Promise((resolve, reject) => {
+            canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("No se pudo crear el archivo JPG.")), "image/jpeg", 0.92);
+          });
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }
+      async function downloadJpg() {
+        const blob = await createJpgBlob();
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = jpgFileName;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          URL.revokeObjectURL(link.href);
+          link.remove();
+        }, 800);
+        return blob;
+      }
+      async function sendWhatsapp() {
+        try {
+          const blob = await createJpgBlob();
+          const file = new File([blob], jpgFileName, { type: "image/jpeg" });
+          if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+            await navigator.share({ files: [file], text: whatsappText, title: jpgFileName });
+            return;
+          }
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = jpgFileName;
+          document.body.appendChild(link);
+          link.click();
+          setTimeout(() => {
+            URL.revokeObjectURL(link.href);
+            link.remove();
+          }, 800);
+          window.open("https://web.whatsapp.com/send?text=" + encodeURIComponent(whatsappText), "_blank", "noopener");
+          window.alert("Se descargo el JPG. WhatsApp Web se abre aparte; adjunta la imagen desde Descargas.");
+        } catch (error) {
+          window.alert(error.message || "No se pudo preparar el JPG para WhatsApp.");
+        }
+      }
+      document.querySelector("[data-download-jpg]")?.addEventListener("click", async () => {
+        try {
+          await downloadJpg();
+        } catch (error) {
+          window.alert(error.message || "No se pudo descargar el JPG.");
+        }
+      });
+      document.querySelector("[data-whatsapp-jpg]")?.addEventListener("click", sendWhatsapp);
+    })();
+  <\\/script>`;
+}
+
 function buildPrintableZipHtml({ units, pages, selection, partNumber, totalParts, pageSize, pageDimensions }) {
   const pageCount = pages?.length || Math.ceil(units.length / Math.max(1, state.stripDesign.itemsPerPage));
   const first = units[0];
@@ -2951,7 +3061,10 @@ function buildPrintableZipHtml({ units, pages, selection, partNumber, totalParts
           html,body{background:#ffffff;margin:0;padding:0;width:100%;min-height:100%}
           body{display:block;overflow-x:hidden}
           .print-toolbar{position:fixed;top:0;right:0;left:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#111827;color:#fff;font-family:Arial,Helvetica,sans-serif}
+          .print-toolbar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
           .print-toolbar button{border:0;border-radius:6px;padding:9px 13px;background:#e11d48;color:#fff;font-weight:800;cursor:pointer}
+          .print-toolbar button.secondary{background:#0f766e}
+          .print-toolbar button.whatsapp{background:#16a34a}
           .print-note{font-size:13px;color:#cbd5e1}
           .print-pages{padding-top:0}
           .strip-preview.print-page{width:${pageDimensions.width};height:${pageDimensions.height};max-width:${pageDimensions.width};max-height:${pageDimensions.height};box-shadow:none;border:0;border-radius:0;min-height:auto;overflow:hidden;page-break-after:always;break-after:page;margin:0 auto;print-color-adjust:exact;-webkit-print-color-adjust:exact}
@@ -2967,9 +3080,17 @@ function buildPrintableZipHtml({ units, pages, selection, partNumber, totalParts
         <div class="print-toolbar">
           <strong>${escapeHtml(state.eventName || "Cartones Bingo 90")}</strong>
           <span class="print-note">Parte ${partNumber} de ${totalParts}. ${selection.label}: ${first}-${last}. ${pageCount} paginas.</span>
-          <button onclick="window.print()">Imprimir / Guardar como PDF</button>
+          <div class="print-toolbar-actions">
+            <button class="secondary" type="button" data-download-jpg>Descargar JPG</button>
+            <button class="whatsapp" type="button" data-whatsapp-jpg>Enviar por WhatsApp</button>
+            <button type="button" onclick="window.print()">Imprimir / Guardar como PDF</button>
+          </div>
         </div>
         <main class="print-pages">${buildPrintableStripPagesHtml(pages || units)}</main>
+        ${buildPrintableJpgActionsScript({
+          fileName: `${slugify(state.eventName || "cartones-bingo-90")}-parte-${String(partNumber).padStart(3, "0")}-${first}-${last}.jpg`,
+          whatsappText: `Tira de bingo ${state.eventName || "Cartones Bingo 90"} - ${selection.label} ${first}-${last}`,
+        })}
       </body>
     </html>`;
 }

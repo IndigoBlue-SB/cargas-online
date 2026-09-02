@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cargas-app-v45';
+const CACHE_NAME = 'cargas-app-v46';
 const APP_FILES = [
   './',
   './manifest.webmanifest',
