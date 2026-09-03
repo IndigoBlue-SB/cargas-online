@@ -2952,7 +2952,7 @@ function buildStripShareFooterText() {
   const datePart = String(state.eventDetail || "").split(" - ")[0] || "";
   const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   const formatted = match ? `${match[3]}/${match[2]}/${match[1].slice(2)}` : datePart;
-  return formatted ? `Esta tira pertenece al sorteo del día ${formatted}` : "";
+  return formatted ? `Sorteo del día ${formatted}` : "";
 }
 
 function buildPrintableJpgActionsScript({ fileName, whatsappText, eventName, footerText }) {
@@ -3018,8 +3018,8 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText, eventName, foo
         const contentHeight = Math.ceil(bounds.bottom - bounds.top);
         const padding = 16;
         const borderWidth = 4;
-        const headerHeight = 54;
-        const footerHeight = jpgFooterText ? 34 : 14;
+        const headerHeight = jpgFooterText ? 66 : 48;
+        const footerHeight = 12;
         const width = Math.max(260, Math.ceil(contentWidth + padding * 2));
         const height = Math.max(1, Math.ceil(contentHeight + padding * 2 + headerHeight + footerHeight));
         const scale = 3;
@@ -3040,9 +3040,11 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText, eventName, foo
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(jpgEventName, width / 2, 28, width - padding * 2);
-        ctx.fillStyle = "#111827";
-        ctx.font = "700 12px Arial, Helvetica, sans-serif";
-        ctx.fillText(whatsappText, width / 2, 48, width - padding * 2);
+        if (jpgFooterText) {
+          ctx.fillStyle = "#111827";
+          ctx.font = "800 13px Arial, Helvetica, sans-serif";
+          ctx.fillText(jpgFooterText, width / 2, 50, width - padding * 2);
+        }
         const offsetX = padding - bounds.left + (width - padding * 2 - contentWidth) / 2;
         const offsetY = padding + headerHeight - bounds.top;
         const boxes = content.querySelectorAll(".strip-block, .strip-card, .strip-card-grid, .strip-card-row, .strip-number, .strip-empty");
@@ -3082,13 +3084,6 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText, eventName, foo
           ctx.textAlign = "center";
           ctx.fillText(text, x, y, Math.max(8, rect.width - 2));
         });
-        if (jpgFooterText) {
-          ctx.fillStyle = "#111827";
-          ctx.font = "800 13px Arial, Helvetica, sans-serif";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(jpgFooterText, width / 2, height - 20, width - padding * 2);
-        }
         return await new Promise((resolve, reject) => {
           canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("No se pudo crear el archivo JPG.")), "image/jpeg", 0.94);
         });
