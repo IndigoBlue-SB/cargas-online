@@ -2965,6 +2965,86 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
         image.onerror = () => reject(new Error("No se pudo generar el JPG de la tira."));
         image.src = src;
       });
+      function drawRoundRect(ctx, x, y, width, height, radius) {
+        const safeRadius = Math.max(0, Math.min(radius || 0, width / 2, height / 2));
+        ctx.beginPath();
+        ctx.moveTo(x + safeRadius, y);
+        ctx.lineTo(x + width - safeRadius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+        ctx.lineTo(x + width, y + height - safeRadius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+        ctx.lineTo(x + safeRadius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+        ctx.lineTo(x, y + safeRadius);
+        ctx.quadraticCurveTo(x, y, x + safeRadius, y);
+        ctx.closePath();
+      }
+      function isVisibleColor(value) {
+        return value && value !== "transparent" && value !== "rgba(0, 0, 0, 0)";
+      }
+      async function createManualJpgBlob() {
+        const content = document.querySelector(".strip-preview.print-page .strip-page-layout");
+        if (!content) throw new Error("No se encontro la tira para dibujar el JPG.");
+        const contentRect = content.getBoundingClientRect();
+        const padding = 18;
+        const borderWidth = 4;
+        const width = Math.max(1, Math.ceil(contentRect.width + padding * 2));
+        const height = Math.max(1, Math.ceil(contentRect.height + padding * 2));
+        const scale = 3;
+        const canvas = document.createElement("canvas");
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+        const ctx = canvas.getContext("2d");
+        ctx.setTransform(scale, 0, 0, scale, 0, 0);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+        ctx.strokeStyle = "#111827";
+        ctx.lineWidth = borderWidth;
+        drawRoundRect(ctx, borderWidth / 2, borderWidth / 2, width - borderWidth, height - borderWidth, 28);
+        ctx.stroke();
+        const offsetX = padding - contentRect.left;
+        const offsetY = padding - contentRect.top;
+        const boxes = content.querySelectorAll(".strip-block, .strip-card, .strip-card-grid, .strip-card-row, .strip-number, .strip-empty");
+        boxes.forEach((node) => {
+          const rect = node.getBoundingClientRect();
+          if (!rect.width || !rect.height) return;
+          const style = getComputedStyle(node);
+          const x = rect.left + offsetX;
+          const y = rect.top + offsetY;
+          const radius = parseFloat(style.borderRadius) || 0;
+          const bg = style.backgroundColor;
+          if (isVisibleColor(bg)) {
+            ctx.fillStyle = bg;
+            drawRoundRect(ctx, x, y, rect.width, rect.height, radius);
+            ctx.fill();
+          }
+          const borderColor = style.borderTopColor;
+          const lineWidth = parseFloat(style.borderTopWidth) || 0;
+          if (lineWidth > 0 && isVisibleColor(borderColor)) {
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = lineWidth;
+            drawRoundRect(ctx, x + lineWidth / 2, y + lineWidth / 2, rect.width - lineWidth, rect.height - lineWidth, radius);
+            ctx.stroke();
+          }
+        });
+        const textNodes = content.querySelectorAll(".strip-meta span, .strip-card header span, .strip-number");
+        textNodes.forEach((node) => {
+          const text = (node.textContent || "").trim();
+          if (!text) return;
+          const rect = node.getBoundingClientRect();
+          const style = getComputedStyle(node);
+          ctx.fillStyle = style.color || "#111827";
+          ctx.font = (style.fontWeight || "700") + " " + (style.fontSize || "14px") + " " + (style.fontFamily || "Arial");
+          ctx.textBaseline = "middle";
+          const x = rect.left + offsetX + rect.width / 2;
+          const y = rect.top + offsetY + rect.height / 2;
+          ctx.textAlign = "center";
+          ctx.fillText(text, x, y, Math.max(8, rect.width - 2));
+        });
+        return await new Promise((resolve, reject) => {
+          canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("No se pudo crear el archivo JPG.")), "image/jpeg", 0.94);
+        });
+      }
       async function createJpgBlob() {
         const page = document.querySelector(".strip-preview.print-page");
         const content = document.querySelector(".strip-preview.print-page .strip-page-layout") || page;
@@ -2984,10 +3064,16 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
         clonePage.style.padding = padding + "px";
         clonePage.style.border = "4px solid #111827";
         clonePage.style.borderRadius = "28px";
-        clonePage.style.backgroundColor = getComputedStyle(page).backgroundColor || "#ffffff";
-        clonePage.style.backgroundImage = getComputedStyle(page).backgroundImage || "none";
-        clonePage.style.backgroundSize = getComputedStyle(page).backgroundSize || "cover";
-        clonePage.style.backgroundPosition = getComputedStyle(page).backgroundPosition || "center";
+        clonePage.querySelectorAll("img, video, canvas, svg").forEach((node) => node.remove());
+        clonePage.querySelectorAll("*").forEach((node) => {
+          node.style.backgroundImage = "none";
+          node.style.filter = "none";
+          node.style.backdropFilter = "none";
+        });
+        clonePage.style.backgroundColor = "#ffffff";
+        clonePage.style.backgroundImage = "none";
+        clonePage.style.backgroundSize = "auto";
+        clonePage.style.backgroundPosition = "center";
         clonePage.style.overflow = "hidden";
         clonePage.style.display = "grid";
         clonePage.style.placeItems = "center";
@@ -2996,7 +3082,9 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
         cloneContent.style.margin = "0";
         cloneContent.style.width = "max-content";
         cloneContent.style.height = "max-content";
-        const styleText = getStyleText().replace(/<\\/style/gi, "<\\\\/style");
+        const styleText = getStyleText()
+          .replace(/url\\([^)]*\\)/gi, "none")
+          .replace(/<\\/style/gi, "<\\\\/style");
         const html = '<div xmlns="http://www.w3.org/1999/xhtml"><style>' + styleText + '.jpg-export-page{box-sizing:border-box;}</style>' + clonePage.outerHTML + '</div>';
         const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '"><foreignObject width="100%" height="100%">' + html + '</foreignObject></svg>';
         const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
@@ -3014,6 +3102,8 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
           return await new Promise((resolve, reject) => {
             canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("No se pudo crear el archivo JPG.")), "image/jpeg", 0.92);
           });
+        } catch {
+          return createManualJpgBlob();
         } finally {
           URL.revokeObjectURL(url);
         }
