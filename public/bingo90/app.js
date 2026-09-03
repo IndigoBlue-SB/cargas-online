@@ -2712,7 +2712,7 @@ async function exportEventCardsPdf(options = {}) {
           ${styles}
           <style>
             *{box-sizing:border-box}
-            html,body{background:#ffffff;margin:0;padding:0;width:100%;min-height:100%}
+            html,body{background:#cbd5e1;margin:0;padding:0;width:100%;min-height:100%}
             body{display:block;overflow-x:hidden}
             .print-toolbar{position:sticky;top:0;right:0;left:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#111827;color:#fff;font-family:Arial,Helvetica,sans-serif}
             .print-toolbar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
@@ -2720,7 +2720,7 @@ async function exportEventCardsPdf(options = {}) {
             .print-toolbar button.secondary{background:#0f766e}
             .print-toolbar button.whatsapp{background:#16a34a}
             .print-note{font-size:13px;color:#cbd5e1}
-            .print-pages{padding-top:0}
+            .print-pages{padding-top:0;display:grid;place-items:start center;min-height:100vh}
             .strip-preview.print-page{width:${pageDimensions.width};height:${pageDimensions.height};max-width:${pageDimensions.width};max-height:${pageDimensions.height};box-shadow:none;border:0;border-radius:0;min-height:auto;overflow:hidden;page-break-after:always;break-after:page;margin:0 auto;print-color-adjust:exact;-webkit-print-color-adjust:exact}
             .strip-preview.print-page:last-child{page-break-after:auto;break-after:auto}
             .strip-page-layout{height:100%;align-content:start}
@@ -2967,15 +2967,37 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
       });
       async function createJpgBlob() {
         const page = document.querySelector(".strip-preview.print-page");
-        if (!page) throw new Error("No se encontro la hoja para convertir a JPG.");
-        const rect = page.getBoundingClientRect();
-        const width = Math.max(1, Math.ceil(rect.width));
-        const height = Math.max(1, Math.ceil(rect.height));
-        const clone = page.cloneNode(true);
-        clone.style.margin = "0";
-        clone.style.transform = "none";
-        const styleText = getStyleText().replaceAll("<\\/style", "<\\\\/style");
-        const html = '<div xmlns="http://www.w3.org/1999/xhtml"><style>' + styleText + '</style>' + clone.outerHTML + '</div>';
+        const content = document.querySelector(".strip-preview.print-page .strip-page-layout") || page;
+        if (!page || !content) throw new Error("No se encontro la tira para convertir a JPG.");
+        const contentRect = content.getBoundingClientRect();
+        const padding = 18;
+        const width = Math.max(1, Math.ceil(contentRect.width + padding * 2));
+        const height = Math.max(1, Math.ceil(contentRect.height + padding * 2));
+        const clonePage = page.cloneNode(true);
+        const cloneContent = clonePage.querySelector(".strip-page-layout") || clonePage;
+        clonePage.classList.add("jpg-export-page");
+        clonePage.style.width = width + "px";
+        clonePage.style.height = height + "px";
+        clonePage.style.maxWidth = width + "px";
+        clonePage.style.maxHeight = height + "px";
+        clonePage.style.margin = "0";
+        clonePage.style.padding = padding + "px";
+        clonePage.style.border = "4px solid #111827";
+        clonePage.style.borderRadius = "28px";
+        clonePage.style.backgroundColor = getComputedStyle(page).backgroundColor || "#ffffff";
+        clonePage.style.backgroundImage = getComputedStyle(page).backgroundImage || "none";
+        clonePage.style.backgroundSize = getComputedStyle(page).backgroundSize || "cover";
+        clonePage.style.backgroundPosition = getComputedStyle(page).backgroundPosition || "center";
+        clonePage.style.overflow = "hidden";
+        clonePage.style.display = "grid";
+        clonePage.style.placeItems = "center";
+        clonePage.style.transform = "none";
+        cloneContent.style.transform = "none";
+        cloneContent.style.margin = "0";
+        cloneContent.style.width = "max-content";
+        cloneContent.style.height = "max-content";
+        const styleText = getStyleText().replace(/<\\/style/gi, "<\\\\/style");
+        const html = '<div xmlns="http://www.w3.org/1999/xhtml"><style>' + styleText + '.jpg-export-page{box-sizing:border-box;}</style>' + clonePage.outerHTML + '</div>';
         const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '"><foreignObject width="100%" height="100%">' + html + '</foreignObject></svg>';
         const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
         try {
@@ -3010,10 +3032,12 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
         return blob;
       }
       async function sendWhatsapp() {
+        const whatsappWindow = window.open("about:blank", "_blank");
         try {
           const blob = await createJpgBlob();
           const file = new File([blob], jpgFileName, { type: "image/jpeg" });
           if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+            if (whatsappWindow) whatsappWindow.close();
             await navigator.share({ files: [file], text: whatsappText, title: jpgFileName });
             return;
           }
@@ -3026,9 +3050,14 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
             URL.revokeObjectURL(link.href);
             link.remove();
           }, 800);
-          window.open("https://web.whatsapp.com/send?text=" + encodeURIComponent(whatsappText), "_blank", "noopener");
+          if (whatsappWindow) {
+            whatsappWindow.location.href = "https://web.whatsapp.com/send?text=" + encodeURIComponent(whatsappText);
+          } else {
+            window.open("https://web.whatsapp.com/send?text=" + encodeURIComponent(whatsappText), "_blank");
+          }
           window.alert("Se descargo el JPG. WhatsApp Web se abre aparte; adjunta la imagen desde Descargas.");
         } catch (error) {
+          if (whatsappWindow) whatsappWindow.close();
           window.alert(error.message || "No se pudo preparar el JPG para WhatsApp.");
         }
       }
@@ -3058,7 +3087,7 @@ function buildPrintableZipHtml({ units, pages, selection, partNumber, totalParts
         ${styles}
         <style>
           *{box-sizing:border-box}
-          html,body{background:#ffffff;margin:0;padding:0;width:100%;min-height:100%}
+          html,body{background:#cbd5e1;margin:0;padding:0;width:100%;min-height:100%}
           body{display:block;overflow-x:hidden}
           .print-toolbar{position:fixed;top:0;right:0;left:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#111827;color:#fff;font-family:Arial,Helvetica,sans-serif}
           .print-toolbar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
@@ -3066,7 +3095,7 @@ function buildPrintableZipHtml({ units, pages, selection, partNumber, totalParts
           .print-toolbar button.secondary{background:#0f766e}
           .print-toolbar button.whatsapp{background:#16a34a}
           .print-note{font-size:13px;color:#cbd5e1}
-          .print-pages{padding-top:0}
+          .print-pages{padding-top:0;display:grid;place-items:start center;min-height:100vh}
           .strip-preview.print-page{width:${pageDimensions.width};height:${pageDimensions.height};max-width:${pageDimensions.width};max-height:${pageDimensions.height};box-shadow:none;border:0;border-radius:0;min-height:auto;overflow:hidden;page-break-after:always;break-after:page;margin:0 auto;print-color-adjust:exact;-webkit-print-color-adjust:exact}
           .strip-preview.print-page:last-child{page-break-after:auto;break-after:auto}
           .strip-page-layout{height:100%;align-content:start}
