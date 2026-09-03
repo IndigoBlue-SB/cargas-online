@@ -312,6 +312,7 @@ async function handleApi(req, res) {
         sheetFrom: Number(sheet.sheetFrom) || 0,
         sheetTo: Number(sheet.sheetTo) || 0,
         seriesPerSheet: Number(sheet.seriesPerSheet) || 10,
+        validDate: sheet.validDate || event.date || '',
         desde: Number(sheet.desde) || 0,
         hasta: Number(sheet.hasta) || 0,
         town: sheet.town || event.town || '',

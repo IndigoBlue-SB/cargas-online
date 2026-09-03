@@ -718,6 +718,7 @@
               <label>Planilla hasta<input id="virtualSheetTo" type="number" min="1" step="1" required></label>
               <label>Series por planilla<input id="virtualSeriesPerSheet" type="number" min="1" step="1" value="10" required></label>
             </div>
+            <label>Fecha de validez de las tiras<input id="virtualValidDate" type="date" required></label>
             <div class="stat"><span>Series calculadas</span><strong id="virtualCalculatedRange">0 - 0</strong></div>
             <div class="grid-2">
               <label>Vendedora<input id="virtualSeller" required autocomplete="off" placeholder="Nombre"></label>
@@ -3179,6 +3180,7 @@
       $('virtualAdmin').value = eventData.admin || '';
       $('virtualAdminPercent').value = Number(eventData.adminPercent) || 0;
       $('virtualSeriesPerSheet').value = virtualSeriesPerSheet(eventData);
+      $('virtualValidDate').value = eventData.date || localDateIso();
       $('virtualTown').value = eventData.town || '';
       $('virtualProvince').value = eventData.province || '';
       updateVirtualCalculatedRange();
@@ -3207,6 +3209,7 @@
         return `<article class="virtual-card ${status}">
           <strong>${escapeAttr(sheet.seller || 'Sin vendedor/a')}</strong>
           <span>${escapeAttr(event.name)} - ${shortDate(event.date)}</span>
+          <span>Validez de tiras: ${shortDate(sheet.validDate || event.date)}</span>
           <span>Planillas ${num(sheet.sheetFrom || virtualPlanNumberForSeries(sheet, sheet.desde))} - ${num(sheet.sheetTo || virtualPlanNumberForSeries(sheet, sheet.hasta))} | Series ${num(sheet.desde)} - ${num(sheet.hasta)}</span>
           <span>${num(sold)} vendidos de ${num(assigned)}</span>
           <span>${status === 'imported' ? 'Importada' : status === 'closed' ? 'Cerrada' : 'Abierta'}</span>
@@ -3254,6 +3257,7 @@
         sheetFrom: range.sheetFrom,
         sheetTo: range.sheetTo,
         seriesPerSheet: range.seriesPerSheet,
+        validDate: $('virtualValidDate').value || eventData.date || localDateIso(),
         desde: range.desde,
         hasta: range.hasta,
         sellerPercent: parseAmount($('virtualSellerPercent').value),
@@ -3341,7 +3345,7 @@
       const sold = entries.length;
       const closed = (sheet.status || 'open') !== 'open';
       $('virtualPublicTitle').textContent = event.name;
-      $('virtualPublicInfo').textContent = `${shortDate(event.date)} - ${event.town}, ${event.province} - Tira ${money(event.price)}`;
+      $('virtualPublicInfo').textContent = `${shortDate(event.date)} - ${event.town}, ${event.province} - Tira ${money(event.price)} - Validez ${shortDate(sheet.validDate || event.date)}`;
       $('virtualPublicStatus').textContent = closed ? 'Cerrada' : 'Abierta';
       $('virtualPublicSeller').textContent = sheet.seller || '-';
       $('virtualPublicSheets').textContent = `${num(sheet.sheetFrom || virtualPlanNumberForSeries(sheet, sheet.desde))} - ${num(sheet.sheetTo || virtualPlanNumberForSeries(sheet, sheet.hasta))}`;

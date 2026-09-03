@@ -2226,7 +2226,7 @@ async function openVirtualStripPrint(params) {
     const isAssigned = series >= Number(sheet.desde) && series <= Number(sheet.hasta);
     const isSold = (sheet.entries || []).some((entry) => Number(entry.series) === series);
     if (!isAssigned || !isSold) throw new Error("Esta serie no pertenece a la planilla virtual o todavia no esta vendida.");
-    applyVirtualStripEvent(event, series);
+    applyVirtualStripEvent(event, series, sheet);
     const pageDimensions = getPrintPageDimensions();
     const pageSize = getPrintPageSize();
     const html = buildPrintableZipHtml({
@@ -2253,13 +2253,14 @@ async function openVirtualStripPrint(params) {
   }
 }
 
-function applyVirtualStripEvent(event, series) {
+function applyVirtualStripEvent(event, series, sheet = {}) {
   const panel = event.bingoPanelSettings || {};
+  const validDate = sheet.validDate || event.date || "";
   state.eventId = event.id || createId();
   state.eventName = event.name || "Tira virtual";
   state.eventCreated = true;
   state.eventSeed = panel.eventSeed || event.bingoSeed || event.id || state.eventId;
-  state.eventDetail = [event.date, event.town, event.province].filter(Boolean).join(" - ");
+  state.eventDetail = [validDate, event.town, event.province].filter(Boolean).join(" - ");
   state.combinationMode = panel.combinationMode || "new";
   state.combinationSourceEventId = panel.combinationSourceEventId || "";
   state.designMode = panel.designMode || "new";
@@ -2951,7 +2952,7 @@ function buildStripShareFooterText() {
   const datePart = String(state.eventDetail || "").split(" - ")[0] || "";
   const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   const formatted = match ? `${match[3]}/${match[2]}/${match[1].slice(2)}` : datePart;
-  return formatted ? `Esta tira pertenece al sorteo del dia ${formatted}` : "";
+  return formatted ? `Esta tira pertenece al sorteo del día ${formatted}` : "";
 }
 
 function buildPrintableJpgActionsScript({ fileName, whatsappText, eventName, footerText }) {
