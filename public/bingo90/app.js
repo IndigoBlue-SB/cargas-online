@@ -2743,6 +2743,8 @@ async function exportEventCardsPdf(options = {}) {
           ${buildPrintableJpgActionsScript({
             fileName: `${fileName}-${exportSelection.requestedStart}-${exportSelection.requestedEnd}.jpg`,
             whatsappText: `Tira de bingo ${state.eventName || "Cartones Bingo 90"} - ${exportSelection.label} ${exportSelection.requestedStart}-${exportSelection.requestedEnd}`,
+            eventName: state.eventName || "Cartones Bingo 90",
+            footerText: buildStripShareFooterText(),
           })}
         </body>
       </html>`);
@@ -2945,13 +2947,24 @@ function buildPrintToolbarNote(selection, pageCount, fileName) {
   return `${base}. Quedan pendientes: desde ${selection.nextStart} hasta ${selection.requestedEnd}.`;
 }
 
-function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
+function buildStripShareFooterText() {
+  const datePart = String(state.eventDetail || "").split(" - ")[0] || "";
+  const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const formatted = match ? `${match[3]}/${match[2]}/${match[1].slice(2)}` : datePart;
+  return formatted ? `Esta tira pertenece al sorteo del dia ${formatted}` : "";
+}
+
+function buildPrintableJpgActionsScript({ fileName, whatsappText, eventName, footerText }) {
   const safeFileName = JSON.stringify(fileName || "tira-bingo.jpg").replace(/<\/script/gi, "<\\/script");
   const safeWhatsappText = JSON.stringify(whatsappText || "Tira de bingo").replace(/<\/script/gi, "<\\/script");
+  const safeEventName = JSON.stringify(eventName || "Tira de bingo").replace(/<\/script/gi, "<\\/script");
+  const safeFooterText = JSON.stringify(footerText || "").replace(/<\/script/gi, "<\\/script");
   return `<script>
     (() => {
       const jpgFileName = ${safeFileName};
       const whatsappText = ${safeWhatsappText};
+      const jpgEventName = ${safeEventName};
+      const jpgFooterText = ${safeFooterText};
       const getStyleText = () => Array.from(document.styleSheets).map((sheet) => {
         try {
           return Array.from(sheet.cssRules || []).map((rule) => rule.cssText).join("\\n");
@@ -2983,13 +2996,31 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
         return value && value !== "transparent" && value !== "rgba(0, 0, 0, 0)";
       }
       async function createManualJpgBlob() {
+        const page = document.querySelector(".strip-preview.print-page");
         const content = document.querySelector(".strip-preview.print-page .strip-page-layout");
-        if (!content) throw new Error("No se encontro la tira para dibujar el JPG.");
-        const contentRect = content.getBoundingClientRect();
-        const padding = 18;
+        if (!page || !content) throw new Error("No se encontro la tira para dibujar el JPG.");
+        const nodes = Array.from(content.querySelectorAll(".strip-meta span, .strip-card")).filter((node) => {
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        });
+        if (!nodes.length) throw new Error("No se encontraron cartones para dibujar el JPG.");
+        const bounds = nodes.reduce((acc, node) => {
+          const rect = node.getBoundingClientRect();
+          return {
+            left: Math.min(acc.left, rect.left),
+            top: Math.min(acc.top, rect.top),
+            right: Math.max(acc.right, rect.right),
+            bottom: Math.max(acc.bottom, rect.bottom),
+          };
+        }, { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity });
+        const contentWidth = Math.ceil(bounds.right - bounds.left);
+        const contentHeight = Math.ceil(bounds.bottom - bounds.top);
+        const padding = 16;
         const borderWidth = 4;
-        const width = Math.max(1, Math.ceil(contentRect.width + padding * 2));
-        const height = Math.max(1, Math.ceil(contentRect.height + padding * 2));
+        const headerHeight = 54;
+        const footerHeight = jpgFooterText ? 34 : 14;
+        const width = Math.max(260, Math.ceil(contentWidth + padding * 2));
+        const height = Math.max(1, Math.ceil(contentHeight + padding * 2 + headerHeight + footerHeight));
         const scale = 3;
         const canvas = document.createElement("canvas");
         canvas.width = width * scale;
@@ -3002,8 +3033,17 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
         ctx.lineWidth = borderWidth;
         drawRoundRect(ctx, borderWidth / 2, borderWidth / 2, width - borderWidth, height - borderWidth, 28);
         ctx.stroke();
-        const offsetX = padding - contentRect.left;
-        const offsetY = padding - contentRect.top;
+        const accent = getComputedStyle(page).getPropertyValue("--strip-accent").trim() || "#d1223b";
+        ctx.fillStyle = accent;
+        ctx.font = "800 20px Arial, Helvetica, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(jpgEventName, width / 2, 28, width - padding * 2);
+        ctx.fillStyle = "#111827";
+        ctx.font = "700 12px Arial, Helvetica, sans-serif";
+        ctx.fillText(whatsappText, width / 2, 48, width - padding * 2);
+        const offsetX = padding - bounds.left + (width - padding * 2 - contentWidth) / 2;
+        const offsetY = padding + headerHeight - bounds.top;
         const boxes = content.querySelectorAll(".strip-block, .strip-card, .strip-card-grid, .strip-card-row, .strip-number, .strip-empty");
         boxes.forEach((node) => {
           const rect = node.getBoundingClientRect();
@@ -3041,6 +3081,13 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
           ctx.textAlign = "center";
           ctx.fillText(text, x, y, Math.max(8, rect.width - 2));
         });
+        if (jpgFooterText) {
+          ctx.fillStyle = "#111827";
+          ctx.font = "800 13px Arial, Helvetica, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(jpgFooterText, width / 2, height - 20, width - padding * 2);
+        }
         return await new Promise((resolve, reject) => {
           canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("No se pudo crear el archivo JPG.")), "image/jpeg", 0.94);
         });
@@ -3064,16 +3111,6 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
         clonePage.style.padding = padding + "px";
         clonePage.style.border = "4px solid #111827";
         clonePage.style.borderRadius = "28px";
-        clonePage.querySelectorAll("img, video, canvas, svg").forEach((node) => node.remove());
-        clonePage.querySelectorAll("*").forEach((node) => {
-          node.style.backgroundImage = "none";
-          node.style.filter = "none";
-          node.style.backdropFilter = "none";
-        });
-        clonePage.style.backgroundColor = "#ffffff";
-        clonePage.style.backgroundImage = "none";
-        clonePage.style.backgroundSize = "auto";
-        clonePage.style.backgroundPosition = "center";
         clonePage.style.overflow = "hidden";
         clonePage.style.display = "grid";
         clonePage.style.placeItems = "center";
@@ -3209,6 +3246,8 @@ function buildPrintableZipHtml({ units, pages, selection, partNumber, totalParts
         ${buildPrintableJpgActionsScript({
           fileName: `${slugify(state.eventName || "cartones-bingo-90")}-parte-${String(partNumber).padStart(3, "0")}-${first}-${last}.jpg`,
           whatsappText: `Tira de bingo ${state.eventName || "Cartones Bingo 90"} - ${selection.label} ${first}-${last}`,
+          eventName: state.eventName || "Cartones Bingo 90",
+          footerText: buildStripShareFooterText(),
         })}
       </body>
     </html>`;
