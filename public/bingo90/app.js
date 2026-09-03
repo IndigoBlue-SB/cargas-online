@@ -2246,7 +2246,7 @@ async function openVirtualStripPrint(params) {
       pageDimensions,
     });
     document.open();
-    document.write(html.replace("</body>", "<script>window.onload=()=>setTimeout(()=>window.print(),250);<\\/script></body>"));
+    document.write(html);
     document.close();
   } catch (error) {
     document.body.innerHTML = `<main style="font-family:Arial;padding:24px;display:grid;gap:12px"><h1>No se pudo generar la tira</h1><p>${escapeHtml(error.message || error)}</p><button onclick="history.back()">Volver</button></main>`;
@@ -3070,7 +3070,7 @@ function buildPrintableJpgActionsScript({ fileName, whatsappText }) {
       });
       document.querySelector("[data-whatsapp-jpg]")?.addEventListener("click", sendWhatsapp);
     })();
-  <\\/script>`;
+  </script>`;
 }
 
 function buildPrintableZipHtml({ units, pages, selection, partNumber, totalParts, pageSize, pageDimensions }) {
