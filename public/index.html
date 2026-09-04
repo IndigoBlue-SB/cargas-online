@@ -718,7 +718,7 @@
               <label>Planilla hasta<input id="virtualSheetTo" type="number" min="1" step="1" required></label>
               <label>Series por planilla<input id="virtualSeriesPerSheet" type="number" min="1" step="1" value="10" required></label>
             </div>
-            <label>Fecha de validez de las tiras<input id="virtualValidDate" type="date" required></label>
+            <label>Fecha que aparece en la tira<input id="virtualValidDate" type="date" required></label>
             <div class="stat"><span>Series calculadas</span><strong id="virtualCalculatedRange">0 - 0</strong></div>
             <div class="grid-2">
               <label>Vendedora<input id="virtualSeller" required autocomplete="off" placeholder="Nombre"></label>
@@ -3190,7 +3190,7 @@
       const listEvents = visibleEvents();
       const current = $('virtualEventSelect').value;
       $('virtualEventSelect').innerHTML = listEvents.length
-        ? listEvents.map(event => `<option value="${event.id}">${escapeAttr(event.name)} - ${shortDate(event.date)}</option>`).join('')
+        ? listEvents.map(event => `<option value="${event.id}">${escapeAttr(event.name)} - Sorteo ${shortDate(event.date)}</option>`).join('')
         : '<option value="">Sin eventos</option>';
       $('virtualEventSelect').value = listEvents.some(event => event.id === current) ? current : (listEvents[0]?.id || '');
       const eventData = selectedVirtualEvent();
@@ -3208,8 +3208,8 @@
         const status = sheet.importedAt ? 'imported' : (sheet.status || 'open') === 'closed' ? 'closed' : 'open';
         return `<article class="virtual-card ${status}">
           <strong>${escapeAttr(sheet.seller || 'Sin vendedor/a')}</strong>
-          <span>${escapeAttr(event.name)} - ${shortDate(event.date)}</span>
-          <span>Validez de tiras: ${shortDate(sheet.validDate || event.date)}</span>
+          <span>Evento: ${escapeAttr(event.name)} - Sorteo ${shortDate(event.date)}</span>
+          <span>Fecha en la tira: ${shortDate(sheet.validDate || event.date)}</span>
           <span>Planillas ${num(sheet.sheetFrom || virtualPlanNumberForSeries(sheet, sheet.desde))} - ${num(sheet.sheetTo || virtualPlanNumberForSeries(sheet, sheet.hasta))} | Series ${num(sheet.desde)} - ${num(sheet.hasta)}</span>
           <span>${num(sold)} vendidos de ${num(assigned)}</span>
           <span>${status === 'imported' ? 'Importada' : status === 'closed' ? 'Cerrada' : 'Abierta'}</span>
