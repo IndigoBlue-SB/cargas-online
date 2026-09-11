@@ -410,7 +410,7 @@ function init() {
     }
     const eventId = params.get("eventId");
     const mode = params.get("mode");
-    if (eventId && isLaunchedFromCargas() && await loadCargasEvent(eventId, { stayHome: mode === "config" })) {
+    if (eventId && await loadCargasEvent(eventId, { stayHome: mode === "config" })) {
       if (mode === "config") {
         window.setTimeout(openEventConfiguration, 250);
       }
@@ -1709,11 +1709,14 @@ function openSalesScreen() {
   render();
 }
 
-function openAdminGame() {
+async function openAdminGame() {
   if (!state.eventCreated) {
     window.alert("Primero carga o abre un evento.");
     openLoadScreen();
     return;
+  }
+  if (state.eventId && await refreshCargasOfficialLoad({ stayHome: false })) {
+    render();
   }
   if (!state.salesLoaded || !state.soldUnits.length) {
     window.alert("Antes de jugar carga las ventas. Solo las series o cartones vendidos participan.");
@@ -2832,11 +2835,25 @@ async function loadCargasEvent(eventId, options = {}) {
     if (!response.ok) return false;
     const event = (payload.events || []).find((item) => String(item.id) === String(eventId));
     if (!event) return false;
-    loadEventData(buildBingoEventFromCargas(event), options);
+    const officialEvent = buildBingoEventFromCargas(event);
+    if (!officialEvent.soldUnits.length) return false;
+    loadEventData(officialEvent, options);
+    saveOfficialCargasEventLocally();
     return true;
   } catch {
     return false;
   }
+}
+
+async function refreshCargasOfficialLoad(options = {}) {
+  if (!state.eventId) return false;
+  return loadCargasEvent(state.eventId, options);
+}
+
+function saveOfficialCargasEventLocally() {
+  const payload = buildCurrentEventPayload();
+  const events = loadSavedEvents();
+  saveEventsToLocalStorage([payload, ...events.filter((event) => event.id !== state.eventId)].slice(0, 30));
 }
 
 function buildBingoEventFromCargas(event) {
