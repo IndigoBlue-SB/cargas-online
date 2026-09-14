@@ -410,7 +410,7 @@ function init() {
     }
     const eventId = params.get("eventId");
     const mode = params.get("mode");
-    if (eventId && await loadCargasEvent(eventId, { stayHome: mode === "config" })) {
+    if (eventId && await loadCargasEvent(eventId, { stayHome: mode === "config", allowEmptySales: mode === "config" })) {
       if (mode === "config") {
         window.setTimeout(openEventConfiguration, 250);
       }
@@ -2836,7 +2836,7 @@ async function loadCargasEvent(eventId, options = {}) {
     const event = (payload.events || []).find((item) => String(item.id) === String(eventId));
     if (!event) return false;
     const officialEvent = buildBingoEventFromCargas(event);
-    if (!officialEvent.soldUnits.length) return false;
+    if (!officialEvent.soldUnits.length && !options.allowEmptySales) return false;
     loadEventData(officialEvent, options);
     saveOfficialCargasEventLocally();
     return true;
@@ -2880,7 +2880,7 @@ function buildBingoEventFromCargas(event) {
     rangeStart,
     rangeEnd,
     configuredSeriesCount: Math.max(1, rangeEnd - rangeStart + 1),
-    salesLoaded: true,
+    salesLoaded: soldUnits.length > 0,
     soldUnits,
     salesDraftUnits: soldUnits,
     drawn,

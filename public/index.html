@@ -672,20 +672,21 @@
 
       <section id="page-bingo" data-screen class="hidden">
         <div class="topbar">
-          <div><h2>INDIGO BINGO</h2><p class="muted">Elegi un evento confirmado para configurar su panel de bingo.</p></div>
+          <div><h2>INDIGO BINGO</h2><p class="muted">Prepara combinaciones, diseña tiras, carga ventas y juega solo con lo confirmado.</p></div>
           <div class="actions">
-            <button type="button" class="secondary" id="openAdvancedBingo">Configuracion de Panel de Bingo</button>
+            <button type="button" class="secondary" id="openAdvancedBingo">Preparar bingo</button>
+            <button type="button" id="openBingoSales">Cargar ventas</button>
           </div>
         </div>
         <div class="bingo-layout">
           <aside class="panel">
-            <h3>Eventos confirmados</h3>
+            <h3>Eventos</h3>
             <div id="bingoEventsList" class="bingo-event-list"></div>
           </aside>
           <section class="panel bingo-stage">
             <div class="table-head">
               <h3>Evento seleccionado</h3>
-              <span class="muted">Solo se habilita con una carga confirmada.</span>
+              <span class="muted">Orden: preparar bingo, imprimir tiras, cargar ventas, confirmar y jugar.</span>
             </div>
             <div class="cards">
               <div class="stat"><span>Evento</span><strong id="bingoEventName">Sin evento</strong></div>
@@ -976,7 +977,7 @@
           </div>
           <div class="actions">
             <button type="button" id="confirmBingoLoad">Confirmar carga para bingo</button>
-            <button type="button" class="secondary hidden" id="goToConfirmedBingo">Ir a configurar bingo</button>
+            <button type="button" class="secondary hidden" id="goToConfirmedBingo">Ir a bingo</button>
             <button type="button" class="danger hidden" id="reopenBingoLoad">Reabrir carga</button>
             <button type="button" class="danger hidden" id="clearReopenedLoads">Eliminar todas las cargas</button>
           </div>
@@ -2062,27 +2063,30 @@
 
     function renderBingo() {
       if (!canUsePage('bingo')) return;
-      const confirmedEvents = visibleEvents().filter(isBingoLoadConfirmed);
-      const currentLoadedEvent = confirmedEvents.find(event => event.id === activeEventId);
-      if (!activeBingoEventId || !confirmedEvents.some(event => event.id === activeBingoEventId)) {
+      const bingoEvents = visibleEvents();
+      const currentLoadedEvent = bingoEvents.find(event => event.id === activeEventId);
+      if (!activeBingoEventId || !bingoEvents.some(event => event.id === activeBingoEventId)) {
         activeBingoEventId = currentLoadedEvent?.id || null;
       }
-      $('bingoEventsList').innerHTML = confirmedEvents.length ? confirmedEvents.map(event => {
+      $('bingoEventsList').innerHTML = bingoEvents.length ? bingoEvents.map(event => {
         const units = officialSoldUnits(event);
         const soldTotal = officialSoldUnitsTotal(event);
         const uniqueNote = soldTotal !== units.length ? ` - ${num(units.length)} unicas para jugar` : '';
         const game = bingoGame(event);
+        const prepared = Boolean(event.bingoPanelSettings?.savedAt || event.bingoPanelSettings?.rangeEnd || event.bingoRangeEnd || event.bingoSeed);
+        const confirmed = isBingoLoadConfirmed(event);
         return `
           <button type="button" class="bingo-event-button ${event.id === activeBingoEventId ? 'active' : ''}" data-open-bingo="${event.id}">
             <strong>${escapeAttr(event.name)}</strong>
             <span>${shortDate(event.date)} - ${escapeAttr(event.town || '')}</span>
+            <span>${prepared ? 'Combinaciones/diseño preparados' : 'Falta preparar bingo'}</span>
             <span>${num(soldTotal)} series/cartones vendidas${uniqueNote}</span>
-            <span>${num(units.length * 6)} cartones en juego</span>
+            <span>${confirmed ? `${num(units.length * 6)} cartones en juego` : 'Carga sin confirmar'}</span>
             <span>${num(game.drawn.length)} bolillas cantadas</span>
             <span>${event.id === activeBingoEventId ? 'Seleccionado' : 'Tocar para seleccionar'}</span>
           </button>
         `;
-      }).join('') : '<div class="empty">No hay cargas confirmadas para jugar.</div>';
+      }).join('') : '<div class="empty">Todavia no hay eventos creados.</div>';
       renderBingoGame();
     }
 
@@ -2093,17 +2097,22 @@
       const drawnSet = new Set(game.drawn.map(Number));
       const soldUnits = hasEvent ? officialSoldUnits(eventData) : [];
       const soldTotal = hasEvent ? officialSoldUnitsTotal(eventData) : 0;
+      const confirmed = hasEvent && isBingoLoadConfirmed(eventData);
       $('bingoEventName').textContent = hasEvent ? eventData.name : 'Sin evento';
       $('bingoSoldUnits').textContent = hasEvent ? num(soldTotal) : '0';
-      $('bingoPlayableCards').textContent = num(soldUnits.length * 6);
+      $('bingoPlayableCards').textContent = confirmed ? num(soldUnits.length * 6) : '0';
       $('openAdvancedBingo').disabled = !hasEvent;
+      $('openBingoSales').disabled = !hasEvent;
       $('openAdvancedBingo').textContent = hasEvent
-        ? `Configuracion de Panel de Bingo: ${eventData.name}`
-        : 'Configuracion de Panel de Bingo';
+        ? `Preparar bingo: ${eventData.name}`
+        : 'Preparar bingo';
+      $('openBingoSales').textContent = hasEvent
+        ? `Cargar ventas: ${eventData.name}`
+        : 'Cargar ventas';
       if ($('bingoSelectedInfo')) {
         $('bingoSelectedInfo').textContent = hasEvent
-          ? `${num(soldTotal)} series/cartones vendidas${soldTotal !== soldUnits.length ? ` (${num(soldUnits.length)} unicas para jugar)` : ''}. Entra a Configuracion de Panel de Bingo para editar logos, colores, fuentes, premios, tiras y luego jugar ese evento.`
-          : 'Selecciona un evento confirmado de la columna izquierda.';
+          ? `Flujo correcto: 1) preparar combinaciones y diseño, 2) imprimir/exportar tiras, 3) cargar ventas, 4) confirmar carga, 5) jugar${confirmed ? ` con ${num(soldUnits.length)} series/cartones oficiales` : ' solo cuando la carga este confirmada'}.`
+          : 'Selecciona un evento de la columna izquierda.';
       }
     }
 
@@ -2219,7 +2228,7 @@
         rangeStart,
         rangeEnd,
         configuredSeriesCount: rangeEnd - rangeStart + 1,
-        salesLoaded: true,
+        salesLoaded: soldUnits.length > 0,
         soldUnits,
         salesDraftUnits: soldUnits,
         completedGames: Array.isArray(template.completedGames) ? template.completedGames : [],
@@ -2246,13 +2255,19 @@
 
     function openAdvancedBingo() {
       const eventData = activeBingoEvent();
-      if (!eventData) return alert('Primero elegi un evento confirmado.');
-      const soldUnits = officialSoldUnits(eventData);
-      if (!soldUnits.length) return alert('Este evento confirmado no tiene series/cartones vendidos.');
+      if (!eventData) return alert('Primero elegi un evento.');
       const advancedEvent = buildBingo90Event(eventData);
       const saved = loadBingo90Events().filter(item => item && item.id !== advancedEvent.id);
       saveBingo90BridgeEvents([advancedEvent, ...saved].slice(0, 30));
       window.location.href = `/bingo90/index.html?eventId=${encodeURIComponent(advancedEvent.id)}&mode=config&from=cargas`;
+    }
+
+    function openBingoSalesEvent() {
+      const eventData = activeBingoEvent();
+      if (!eventData) return alert('Primero elegi un evento.');
+      activeEventId = eventData.id;
+      currentView = 'detalle';
+      go('event');
     }
 
     function saveBingo90BridgeEvents(nextEvents) {
@@ -4144,7 +4159,6 @@
         if (!eventData || !isBingoLoadConfirmed(eventData)) return alert('Primero confirma la carga para bingo.');
         activeBingoEventId = eventData.id;
         go('bingo');
-        openAdvancedBingo();
       }
       const deleteUserButton = event.target.closest('[data-delete-user]');
       if (deleteUserButton && canUsePage('settings') && confirm('Eliminar este usuario?')) {
@@ -4498,6 +4512,7 @@
     $('clearDraftRanges').addEventListener('click', () => { if (draftRanges.length && confirm('Eliminar toda la lista previa?')) { draftRanges = []; selectedDraftId = null; renderDraft(); } });
     $('clearSaleForm').addEventListener('click', resetSaleForm);
     $('openAdvancedBingo').addEventListener('click', openAdvancedBingo);
+    $('openBingoSales').addEventListener('click', openBingoSalesEvent);
     $('statsPeriodDate').addEventListener('focus', showStatsCalendar);
     $('statsPeriodDate').addEventListener('click', showStatsCalendar);
     $('statsPeriodDate').addEventListener('input', () => { statsCalendarRangeStart = ''; renderStatsCalendar(); });
