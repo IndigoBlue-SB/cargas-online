@@ -1482,6 +1482,41 @@
         ? closure.snapshotSales
         : (eventData?.sales || []);
     }
+    function normalizeBingoClosureHistory(eventData) {
+      if (!eventData) return [];
+      eventData.bingoClosureHistory = Array.isArray(eventData.bingoClosureHistory)
+        ? eventData.bingoClosureHistory.filter(play => Array.isArray(play?.snapshotSales) && play.snapshotSales.length)
+        : [];
+      return eventData.bingoClosureHistory;
+    }
+    function salesForReports(eventData) {
+      const history = normalizeBingoClosureHistory(eventData);
+      if (!history.length) return officialSales(eventData);
+      return history.flatMap(play => (play.snapshotSales || []).map(sale => ({
+        ...sale,
+        playId: play.id || sale.playId || '',
+        playDate: play.date || sale.playDate || sale.date || ''
+      })));
+    }
+    function upsertBingoClosureHistory(eventData, closure) {
+      const history = normalizeBingoClosureHistory(eventData);
+      const play = {
+        id: closure.playId || crypto.randomUUID(),
+        date: localDateIso(new Date(closure.confirmedAt || Date.now())),
+        confirmedAt: closure.confirmedAt || new Date().toISOString(),
+        confirmedBy: closure.confirmedBy || '',
+        mode: closure.mode || 'series',
+        soldUnits: [...(closure.soldUnits || [])],
+        soldUnitsTotal: Number(closure.soldUnitsTotal) || 0,
+        soldCardsCount: Number(closure.soldCardsCount) || 0,
+        snapshotSales: clonePlain(closure.snapshotSales || [])
+      };
+      const index = history.findIndex(item => item.id === play.id);
+      if (index >= 0) history[index] = play;
+      else history.push(play);
+      eventData.bingoClosureHistory = history.sort((a, b) => String(a.confirmedAt || '').localeCompare(String(b.confirmedAt || '')));
+      return play.id;
+    }
     function officialSoldUnits(eventData) {
       const closure = ensureBingoControl(eventData);
       return useOfficialSnapshot(eventData) && Array.isArray(closure.soldUnits)
@@ -2322,7 +2357,7 @@
       };
     }
     function accountingCategoriesFromBalance(eventData) {
-      const balance = eventBalance(eventData);
+      const balance = eventBalance(accountingEventForWeek(eventData));
       const expenses = normalizeBalanceLines(balance.expenses, fallbackBalanceExpenses);
       const prizes = normalizeBalanceLines(balance.prizesList, fallbackBalancePrizes);
       const viaticos = expenses.filter(item => normalize(item.name).includes('viatic'));
@@ -2358,12 +2393,12 @@
       return syncAccountingWithBalance(eventData);
     }
     function accountingEventBase(eventData) {
-      const balance = eventBalance(eventData);
+      const balance = eventBalance(accountingEventForWeek(eventData));
       return balanceTotals(balance).indigoAmount;
     }
     function accountingSalesForWeek(eventData) {
       ensureAccountingWeek();
-      return officialSales(eventData).filter(sale => dateInAccountingWeek(saleDate(sale)));
+      return salesForReports(eventData).filter(sale => dateInAccountingWeek(saleDate(sale) || sale.playDate));
     }
     function accountingEventForWeek(eventData) {
       const sales = accountingSalesForWeek(eventData);
@@ -2452,7 +2487,7 @@
       const selected = activeAccountingEvent();
       if (!activeAccountingEventId && selected) activeAccountingEventId = selected.id;
       const totals = includedEvents.reduce((acc, eventData) => {
-        const balance = eventBalance(eventData);
+        const balance = eventBalance(accountingEventForWeek(eventData));
         const base = balanceTotals(balance).indigoAmount;
         const spent = accountingEventSpent(eventData);
         acc.base += base;
@@ -2465,7 +2500,7 @@
       $('accountingEventsList').innerHTML = availableEvents.length ? availableEvents.map(eventData => {
         const base = accountingEventBase(eventData);
         const spent = accountingEventSpent(eventData);
-        const balance = eventBalance(eventData);
+        const balance = eventBalance(accountingEventForWeek(eventData));
         const included = isAccountingEventIncluded(eventData);
         return `
           <label class="accounting-event accounting-event-toggle ${eventData.id === activeAccountingEventId ? 'active' : ''}">
@@ -2491,7 +2526,7 @@
         $('accountingCategoriesList').innerHTML = '';
         return;
       }
-      const balance = eventBalance(eventData);
+      const balance = eventBalance(accountingEventForWeek(eventData));
       const base = balanceTotals(balance).indigoAmount;
       const accounting = { categories: accountingCategoriesForRange(eventData) };
       const spent = accountingEventSpent(eventData);
@@ -2857,10 +2892,10 @@
     }
 
     function salesRowsForEvents(eventList) {
-      return eventList.flatMap(event => officialSales(event).map(sale => ({
+      return eventList.flatMap(event => salesForReports(event).map(sale => ({
         event,
         sale,
-        date: saleDate(sale) || event.date || '',
+        date: saleDate(sale) || sale.playDate || event.date || '',
         units: rangeCount(sale)
       }))).filter(item => {
         const resetStart = eventStatsStartDate(item.event);
@@ -3666,7 +3701,11 @@
       if (!soldUnits.length) return alert('No hay series/cartones cargados para confirmar.');
       const message = `Confirmar ${num(soldUnitsTotal)} series/cartones vendidas para Balance, Contable y Bingo? Luego la carga queda bloqueada.`;
       if (!confirm(message)) return;
+      const previousClosure = eventData.bingoClosure || {};
+      const startsNewPlay = Boolean(previousClosure.activeLoadClearedAt);
+      const playId = startsNewPlay ? crypto.randomUUID() : (previousClosure.playId || crypto.randomUUID());
       eventData.bingoClosure = {
+        playId,
         status: 'confirmed',
         confirmedAt: new Date().toISOString(),
         confirmedBy: currentUser?.name || (isAdmin() ? 'Administrador' : 'Usuario'),
@@ -3676,6 +3715,7 @@
         soldCardsCount: soldUnits.length,
         snapshotSales: clonePlain(eventData.sales || [])
       };
+      upsertBingoClosureHistory(eventData, eventData.bingoClosure);
       activeBingoEventId = eventData.id;
       saveEvents();
       resetSaleForm();
@@ -3712,11 +3752,16 @@
       const loads = groupLoads(eventData.sales || []);
       const units = totalsFor(eventData.sales || [], eventData).units;
       if (!loads.length) return alert('No hay cargas activas para eliminar.');
-      const message = `Eliminar ${num(loads.length)} filas de carga activa (${num(units)} bingos/series)?\n\nNo se borra Balance, Contable ni Estadisticas: quedan tomando la ultima carga confirmada hasta que confirmes una nueva.`;
+      const message = `Eliminar ${num(loads.length)} filas de carga activa (${num(units)} bingos/series)?\n\nNo se borra Balance, Contable ni Estadisticas: quedan tomando las cargas confirmadas hasta que confirmes una nueva.`;
       if (!confirm(message)) return;
+      if (Array.isArray(closure.snapshotSales) && closure.snapshotSales.length) {
+        const preservedClosure = { ...closure, playId: closure.playId || crypto.randomUUID() };
+        upsertBingoClosureHistory(eventData, preservedClosure);
+      }
       eventData.sales = [];
       eventData.bingoClosure = {
         ...closure,
+        playId: '',
         status: 'open',
         activeLoadClearedAt: new Date().toISOString(),
         activeLoadClearedBy: currentUser?.name || 'Administrador'
