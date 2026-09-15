@@ -4,7 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Sistema de Bingo 90</title>
-    <link rel="stylesheet" href="styles.css?v=prize-template-20260901">
+    <script>
+      try {
+        if (new URLSearchParams(window.location.search).get("from") === "cargas") {
+          document.documentElement.classList.add("from-cargas");
+        }
+      } catch {}
+    </script>
+    <link rel="stylesheet" href="styles.css?v=cargas-config-direct-20260914">
   </head>
   <body>
     <main class="app-shell">
@@ -1304,6 +1311,6 @@
       </section>
     </dialog>
 
-    <script src="app.js?v=bingo-preparation-flow-20260914"></script>
+    <script src="app.js?v=cargas-config-direct-20260914"></script>
   </body>
 </html>

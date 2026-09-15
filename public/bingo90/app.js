@@ -397,30 +397,33 @@ function init() {
   renderAnnouncementMediaControls();
   bindEvents();
   rememberCargasLaunch();
+  const params = new URLSearchParams(window.location.search);
+  const shouldOpenConfigDirectly = isLaunchedFromCargas() && params.get("mode") === "config";
   if (isLaunchedFromCargas()) {
     els.backHomeBtn.textContent = "Volver a pagina principal";
     els.landingBackBtn.textContent = "Volver a pagina principal";
     els.userLogoutBtn.textContent = "Volver a pagina principal";
+    if (shouldOpenConfigDirectly) {
+      state.view = "home";
+      render();
+    }
   }
   restoreServerState().finally(async () => {
-    const params = new URLSearchParams(window.location.search);
     if (params.get("mode") === "virtual-strip") {
       openVirtualStripPrint(params);
       return;
     }
     const eventId = params.get("eventId");
     const mode = params.get("mode");
+    let openConfig = false;
     if (eventId && await loadCargasEvent(eventId, { stayHome: mode === "config", allowEmptySales: mode === "config" })) {
-      if (mode === "config") {
-        window.setTimeout(openEventConfiguration, 250);
-      }
+      openConfig = mode === "config";
     } else if (eventId && loadSavedEvents().some((event) => event.id === eventId)) {
       loadEvent(eventId, { stayHome: mode === "config" });
-      if (mode === "config") {
-        window.setTimeout(openEventConfiguration, 250);
-      }
+      openConfig = mode === "config";
     }
     render();
+    if (openConfig) openEventConfiguration();
   });
 }
 
