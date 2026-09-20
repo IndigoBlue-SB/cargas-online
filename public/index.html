@@ -163,8 +163,10 @@
     .permission-card strong { font-size: 13px; }
     .permission-card label { display: flex; align-items: center; gap: 7px; color: var(--ink); }
     .permission-card input { width: auto; }
-    .user-list { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 1px; }
-    .user-row { display: inline-flex; justify-content: space-between; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: var(--radius); padding: 5px 6px; background: #fbfcfa; white-space: nowrap; }
+    .user-list { display: grid; gap: 5px; max-height: 130px; overflow: auto; padding-bottom: 1px; }
+    .user-row { display: grid; grid-template-columns: minmax(90px, .8fr) minmax(120px, 1fr) auto auto; align-items: end; gap: 6px; border: 1px solid var(--line); border-radius: var(--radius); padding: 5px 6px; background: #fbfcfa; }
+    .user-row strong { align-self: center; font-size: 13px; }
+    .user-row label { min-width: 0; }
     .event-user-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius); background: #fbfcfa; }
     .event-user-option { display: flex; align-items: center; gap: 7px; min-height: 32px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); font-size: 13px; }
     .event-user-option input { width: auto; }
@@ -1941,7 +1943,14 @@
         ? sortedUsers.map(user => `<label class="event-user-option"><input type="checkbox" data-private-user value="${user.name}"><span>${user.name}</span></label>`).join('')
         : '<div class="empty">Primero crea usuarios en Configuraciones.</div>';
       $('usersList').innerHTML = appUsers.length
-        ? appUsers.map(user => `<div class="user-row"><strong>${user.name}</strong><button type="button" class="danger" data-delete-user="${user.id}">Eliminar</button></div>`).join('')
+        ? appUsers.map(user => `
+            <div class="user-row">
+              <strong>${escapeAttr(user.name)}</strong>
+              <label>Clave<input data-user-password="${escapeAttr(user.id)}" value="${escapeAttr(user.password || '')}" autocomplete="off"></label>
+              <button type="button" data-save-user="${escapeAttr(user.id)}">Guardar</button>
+              <button type="button" class="danger" data-delete-user="${escapeAttr(user.id)}">Eliminar</button>
+            </div>
+          `).join('')
         : '<div class="empty">Todavia no hay usuarios creados.</div>';
       $('functionPermissions').innerHTML = sortedUsers.length
         ? Object.entries(functionLabels).map(([page, label]) => `
@@ -4204,6 +4213,17 @@
         if (!eventData || !isBingoLoadConfirmed(eventData)) return alert('Primero confirma la carga para bingo.');
         activeBingoEventId = eventData.id;
         go('bingo');
+      }
+      const saveUserButton = event.target.closest('[data-save-user]');
+      if (saveUserButton && canUsePage('settings')) {
+        const userId = saveUserButton.dataset.saveUser;
+        const input = document.querySelector(`[data-user-password="${CSS.escape(userId)}"]`);
+        const password = input?.value.trim() || '';
+        if (!password) return alert('La clave no puede quedar vacia.');
+        appUsers = appUsers.map(user => user.id === userId ? { ...user, password } : user);
+        saveUsers();
+        renderUsers();
+        alert('Clave actualizada.');
       }
       const deleteUserButton = event.target.closest('[data-delete-user]');
       if (deleteUserButton && canUsePage('settings') && confirm('Eliminar este usuario?')) {
