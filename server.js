@@ -42,6 +42,7 @@ const defaultDb = {
     eventLogoLeftSize: 86,
     eventLogoRightSize: 86,
     adminPassword: 'admin123',
+    recoveryPassword: '',
     functionPermissions: defaultFunctionPermissions,
     balanceTemplates: { prizesList: null, expenses: null }
   }
@@ -106,7 +107,7 @@ function readDb() {
   ensureDb();
   try {
     const raw = fs.readFileSync(DB_FILE, 'utf8').replace(/^\uFEFF/, '');
-    return mergeBundledDb({ ...defaultDb, ...JSON.parse(raw) });
+    return ensureRecoveryPassword(mergeBundledDb({ ...defaultDb, ...JSON.parse(raw) }));
   } catch {
     const backupFile = `${DB_FILE}.bak`;
     if (fs.existsSync(backupFile)) {
@@ -114,13 +115,22 @@ function readDb() {
         const raw = fs.readFileSync(backupFile, 'utf8').replace(/^\uFEFF/, '');
         const restored = { ...defaultDb, ...JSON.parse(raw) };
         writeDb(restored);
-        return mergeBundledDb(restored);
+        return ensureRecoveryPassword(mergeBundledDb(restored));
       } catch {
-        return structuredClone(defaultDb);
+        return ensureRecoveryPassword(structuredClone(defaultDb));
       }
     }
-    return structuredClone(defaultDb);
+    return ensureRecoveryPassword(structuredClone(defaultDb));
   }
+}
+
+function ensureRecoveryPassword(db) {
+  db.settings = { ...defaultDb.settings, ...(db.settings || {}) };
+  if (!String(db.settings.recoveryPassword || '').trim()) {
+    db.settings.recoveryPassword = `REC-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    writeDb(db);
+  }
+  return db;
 }
 
 function writeDb(db) {
@@ -382,6 +392,22 @@ async function handleApi(req, res) {
     sessions.set(token, session);
     res.setHeader('Set-Cookie', `cargas_session=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`);
     return sendJson(res, 200, { session });
+  }
+
+  if (url.pathname === '/api/recover-admin' && req.method === 'POST') {
+    const body = await readBody(req);
+    const recoveryPassword = String(body.recoveryPassword || '').trim();
+    const newAdminPassword = String(body.newAdminPassword || '').trim();
+    const savedRecoveryPassword = String(db.settings?.recoveryPassword || '').trim();
+    if (!savedRecoveryPassword || recoveryPassword !== savedRecoveryPassword) {
+      return sendJson(res, 401, { error: 'Clave de recuperacion incorrecta' });
+    }
+    if (!newAdminPassword) {
+      return sendJson(res, 400, { error: 'La nueva clave no puede quedar vacia' });
+    }
+    db.settings = { ...defaultDb.settings, ...(db.settings || {}), adminPassword: newAdminPassword };
+    writeDb(db);
+    return sendJson(res, 200, { ok: true });
   }
 
   if (url.pathname === '/api/logout' && req.method === 'POST') {
