@@ -173,8 +173,10 @@
     .logo-field { align-content: start; }
     .logo-preview { max-width: 100%; max-height: 36px; object-fit: contain; justify-self: start; border: 1px solid var(--line); border-radius: 6px; background: #fff; padding: 2px; }
     .event-title-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; }
-    #activeEventTitle { color: var(--membrete-color); }
-    #activeEventInfo { color: var(--event-info-color); font-family: var(--event-info-font-family); }
+    .event-title-copy { display: grid; gap: 3px; min-width: 0; }
+    #activeEventTitle { margin: 0; color: var(--membrete-color); line-height: 1.05; overflow-wrap: anywhere; }
+    #activeEventSubtitle { margin: 0; color: var(--membrete-color); line-height: 1.08; font-weight: 700; overflow-wrap: anywhere; }
+    #activeEventInfo { margin: 0; color: var(--event-info-color); font-family: var(--event-info-font-family); line-height: 1.25; }
     .event-logo { object-fit: contain; max-width: 220px; }
     .bingo-closure-panel { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; background: #fbfcfa; box-shadow: var(--shadow); }
     .bingo-closure-panel.confirmed { border-color: #0f766e; background: #ecfdf5; }
@@ -494,7 +496,7 @@
             <div id="eventPrivateUsers" class="event-user-list"></div>
             <small class="muted">Si no marcas un usuario, ese usuario no vera esos datos privados en Cuentas ni en PDF.</small>
           </label>
-          <div class="grid-2">
+          <div class="grid-4">
             <label>Fuente inicial
               <select id="eventFont">
                 <option value="Arial, Helvetica, sans-serif">Arial</option>
@@ -503,6 +505,8 @@
               </select>
             </label>
             <label>Color principal<input id="eventColor" type="color" value="#0f766e"></label>
+            <label>Tamano titulo<input id="eventTitleSize" type="number" min="12" max="72" step="1" value="22"></label>
+            <label>Tamano subtitulo<input id="eventSubtitleSize" type="number" min="10" max="60" step="1" value="17"></label>
           </div>
           <div class="grid-4">
             <label class="logo-field">Logo izquierdo del evento
@@ -970,7 +974,11 @@
         <div class="topbar">
           <div class="event-title-row">
             <img id="eventLogoLeft" class="event-logo hidden" alt="Logo izquierdo">
-            <div><h2 id="activeEventTitle">Evento</h2><p id="activeEventInfo" class="muted"></p></div>
+            <div class="event-title-copy">
+              <h2 id="activeEventTitle">Evento</h2>
+              <h3 id="activeEventSubtitle"></h3>
+              <p id="activeEventInfo" class="muted"></p>
+            </div>
             <img id="eventLogoRight" class="event-logo hidden" alt="Logo derecho">
           </div>
           <button type="button" class="secondary" data-page-shortcut="events">Volver a eventos</button>
@@ -1445,6 +1453,12 @@
     }
     function splitLegacyEventName(name) {
       return { line1: String(name || '').trim(), line2: '' };
+    }
+    function eventTitleLine1(eventData) {
+      return eventData?.nameLine1 || splitLegacyEventName(eventData?.name).line1 || 'Evento';
+    }
+    function eventTitleLine2(eventData) {
+      return eventData?.nameLine2 || '';
     }
     function canAccessEvent(event) {
       if (isAdmin()) return true;
@@ -2047,6 +2061,8 @@
       editingEventId = null;
       $('eventForm').reset();
       $('eventColor').value = '#0f766e';
+      $('eventTitleSize').value = 22;
+      $('eventSubtitleSize').value = 17;
       $('eventLogoLeftInput').value = '';
       $('eventLogoRightInput').value = '';
       $('eventLogoLeftSize').value = defaultSettings.eventLogoLeftSize;
@@ -2082,6 +2098,8 @@
       $('eventProvince').value = eventData.province || '';
       $('eventFont').value = eventData.font || 'Arial, Helvetica, sans-serif';
       $('eventColor').value = eventData.color || '#0f766e';
+      $('eventTitleSize').value = Number(eventData.titleSize) || 22;
+      $('eventSubtitleSize').value = Number(eventData.subtitleSize) || 17;
       $('eventLogoLeftInput').value = '';
       $('eventLogoRightInput').value = '';
       $('eventLogoLeftSize').value = eventData.eventLogoLeftSize || defaultSettings.eventLogoLeftSize;
@@ -2289,6 +2307,8 @@
         name: eventData.name || 'Evento confirmado',
         nameLine1: eventData.nameLine1 || '',
         nameLine2: eventData.nameLine2 || '',
+        titleSize: Number(eventData.titleSize) || 22,
+        subtitleSize: Number(eventData.subtitleSize) || 17,
         eventCreated: true,
         eventSeed: eventData.bingoSeed || eventData.id,
         eventDetail: [eventData.date, eventData.town, eventData.province].filter(Boolean).join(' - '),
@@ -3551,8 +3571,15 @@
         go('events');
         return;
       }
-      $('activeEventTitle').textContent = event.name;
+      const subtitle = eventTitleLine2(event);
+      $('activeEventTitle').textContent = eventTitleLine1(event);
+      $('activeEventSubtitle').textContent = subtitle;
+      $('activeEventSubtitle').classList.toggle('hidden', !subtitle);
       $('activeEventInfo').textContent = `${event.date} - ${event.town}, ${event.province} - Tira ${money(event.price)}`;
+      $('activeEventTitle').style.fontSize = `${Number(event.titleSize) || 22}px`;
+      $('activeEventSubtitle').style.fontSize = `${Number(event.subtitleSize) || 17}px`;
+      $('activeEventTitle').style.fontFamily = event.font || settings.font || defaultSettings.font;
+      $('activeEventSubtitle').style.fontFamily = event.font || settings.font || defaultSettings.font;
       setImage($('eventLogoLeft'), event.eventLogoLeft || '');
       setImage($('eventLogoRight'), event.eventLogoRight || '');
       $('eventLogoLeft').style.width = `${event.eventLogoLeftSize || defaultSettings.eventLogoLeftSize}px`;
@@ -4361,6 +4388,8 @@
         privateBalanceUsers: selectedPrivateUsers(),
         font: $('eventFont').value,
         color: $('eventColor').value,
+        titleSize: Number($('eventTitleSize').value) || 22,
+        subtitleSize: Number($('eventSubtitleSize').value) || 17,
         eventLogoLeft: pendingLogos.eventLogoLeft || currentEvent?.eventLogoLeft || '',
         eventLogoRight: pendingLogos.eventLogoRight || currentEvent?.eventLogoRight || '',
         eventLogoLeftSize: Number($('eventLogoLeftSize').value) || defaultSettings.eventLogoLeftSize,
