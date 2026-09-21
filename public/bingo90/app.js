@@ -3962,7 +3962,6 @@ function generateConfiguredCards(options = {}) {
   render();
   const generationUnits = getGenerationUnits();
   let unitIndex = 0;
-  const diversityTracker = createDiversityTracker();
   const unitTotal = generationUnits.length || 1;
   const batchSize = state.cardMode === "individual" ? 500 : 80;
 
@@ -3971,9 +3970,9 @@ function generateConfiguredCards(options = {}) {
     for (; unitIndex < batchEnd; unitIndex += 1) {
       const unit = generationUnits[unitIndex];
       if (state.cardMode === "individual") {
-        state.cards.push(createIndividualCard(unit, diversityTracker));
+        state.cards.push(createIndividualCard(unit));
       } else {
-        state.cards.push(...createSeries(String(unit), getFirstCardNumberForSeries(unit), diversityTracker));
+        state.cards.push(...createSeries(String(unit), getFirstCardNumberForSeries(unit)));
       }
     }
     state.generationProgress = Math.min(100, Math.round((unitIndex / unitTotal) * 100));
