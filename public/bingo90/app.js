@@ -509,6 +509,10 @@ function bindEvents() {
     showHome();
   });
   els.clearCardsBtn.addEventListener("click", () => {
+    if (state.eventCreated && isLaunchedFromCargas()) {
+      window.alert("Las combinaciones oficiales de este evento ya estan fijadas. No se pueden limpiar ni regenerar porque deben coincidir con las tiras impresas.");
+      return;
+    }
     state.cards = [];
     state.salesLoaded = false;
     state.soldUnits = [];
@@ -519,6 +523,10 @@ function bindEvents() {
   });
   els.seriesForm.addEventListener("submit", (event) => {
     event.preventDefault();
+    if (state.eventCreated && isLaunchedFromCargas()) {
+      window.alert("Las combinaciones oficiales de este evento ya estan fijadas. No se pueden generar combinaciones nuevas para este mismo evento.");
+      return;
+    }
     generateSeries(Number(els.seriesCountInput.value));
   });
   els.prizeSettingsForm.addEventListener("submit", (event) => {
@@ -713,15 +721,16 @@ function render() {
     : `<strong>Partida completa</strong>`;
   els.pozoLimitInput.value = state.prizeSettings.pozoLimitBall;
   els.seriesCountInput.value = state.configuredSeriesCount;
+  const combinationsLocked = state.eventCreated && isLaunchedFromCargas();
   els.undoBallBtn.disabled = state.drawn.length === 0 || playLocked;
   els.drawBallBtn.disabled = playLocked || state.pausedForWinner || state.drawn.length === 90;
   els.manualBallInput.disabled = playLocked || state.pausedForWinner;
   els.manualBallSubmitBtn.disabled = playLocked || state.pausedForWinner;
   els.pozoLimitInput.disabled = state.gameFinished || state.isProjecting;
   els.pozoLimitSubmitBtn.disabled = state.gameFinished || state.isProjecting;
-  els.seriesCountInput.disabled = state.gameFinished || state.isProjecting;
-  els.seriesSubmitBtn.disabled = state.gameFinished || state.isProjecting;
-  els.clearCardsBtn.disabled = state.gameFinished || state.isProjecting;
+  els.seriesCountInput.disabled = combinationsLocked || state.gameFinished || state.isProjecting;
+  els.seriesSubmitBtn.disabled = combinationsLocked || state.gameFinished || state.isProjecting;
+  els.clearCardsBtn.disabled = combinationsLocked || state.gameFinished || state.isProjecting;
   els.backHomeBtn.disabled = state.isProjecting;
   els.newEventBtn.disabled = state.gameFinished || state.isProjecting;
   els.saveEventStateBtn.disabled = userMode || !state.eventCreated;
@@ -3700,6 +3709,15 @@ function fillEventDialog(options = {}) {
   els.eventModeIndividualInput.checked = state.cardMode === "individual";
   els.eventRangeStartInput.value = state.rangeStart;
   els.eventRangeEndInput.value = state.rangeEnd;
+  const combinationsLocked = state.eventCreated && !options.blank;
+  [
+    els.eventModeSeriesInput,
+    els.eventModeIndividualInput,
+    els.eventRangeStartInput,
+    els.eventRangeEndInput,
+  ].forEach((control) => {
+    if (control) control.disabled = combinationsLocked;
+  });
   els.eventAccentColorInput.value = state.visualSettings.accentColor;
   els.eventPanelColorInput.value = state.visualSettings.panelColor;
   els.eventBallSizeInput.value = state.visualSettings.ballSize;
@@ -3814,6 +3832,16 @@ function applyEventSettings() {
     || nextRange.start !== state.rangeStart
     || nextRange.end !== state.rangeEnd
     || !state.eventCreated;
+
+  if (state.eventCreated && generationChanged) {
+    els.eventModeSeriesInput.checked = state.cardMode === "series";
+    els.eventModeIndividualInput.checked = state.cardMode === "individual";
+    els.eventRangeStartInput.value = state.rangeStart;
+    els.eventRangeEndInput.value = state.rangeEnd;
+    updateEstimatedCards();
+    window.alert("Las combinaciones de este evento ya quedaron fijadas. Para evitar errores entre tiras impresas y juego, no se pueden regenerar ni cambiar el rango en este mismo evento.");
+    return;
+  }
 
   state.eventName = els.eventNameInput.value.trim() || "Evento principal";
   state.eventDetail = els.eventDetailInput.value.trim();
