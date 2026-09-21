@@ -471,8 +471,9 @@
       <section id="page-create" data-screen class="hidden">
         <div class="topbar"><h2>Crear evento</h2></div>
         <form id="eventForm" class="panel form-grid">
-          <div class="grid-2">
-            <label>Nombre del evento<input id="eventName" required placeholder="Ej: Bingo aniversario"></label>
+          <div class="grid-3">
+            <label>Nombre del evento - linea 1<input id="eventNameLine1" required placeholder="Ej: Bingo aniversario"></label>
+            <label>Nombre del evento - linea 2<input id="eventNameLine2" placeholder="Ej: Especial noche"></label>
             <label>Fecha del evento<input id="eventDate" required type="date"></label>
           </div>
           <div class="grid-3">
@@ -1439,6 +1440,12 @@
     }
     function selectedUsers() { return [...document.querySelectorAll('[data-event-user]:checked')].map(option => option.value); }
     function selectedPrivateUsers() { return [...document.querySelectorAll('[data-private-user]:checked')].map(option => option.value); }
+    function eventNameFromLines(line1, line2) {
+      return [line1, line2].map(value => String(value || '').trim()).filter(Boolean).join(' ');
+    }
+    function splitLegacyEventName(name) {
+      return { line1: String(name || '').trim(), line2: '' };
+    }
     function canAccessEvent(event) {
       if (isAdmin()) return true;
       const allowed = event.allowedUsers || [];
@@ -1939,11 +1946,20 @@
       $('loginAccount').innerHTML = '<option value="admin:Administrador">Administrador</option>'
         + sortedUsers.map(user => `<option value="user:${user.name}">${user.name}</option>`).join('');
       $('loginAccount').value = [...$('loginAccount').options].some(option => option.value === loginCurrent) ? loginCurrent : 'admin:Administrador';
+      const editingEvent = editingEventId ? events.find(eventItem => eventItem.id === editingEventId) : null;
+      const allowed = (editingEvent?.allowedUsers || []).map(normalize);
+      const privateAllowed = (editingEvent?.privateBalanceUsers || []).map(normalize);
       $('eventUsers').innerHTML = sortedUsers.length
-        ? sortedUsers.map(user => `<label class="event-user-option"><input type="checkbox" data-event-user value="${user.name}"><span>${user.name}</span></label>`).join('')
+        ? sortedUsers.map(user => {
+          const checked = allowed.includes(normalize(user.name));
+          return `<label class="event-user-option"><input type="checkbox" data-event-user value="${escapeAttr(user.name)}" ${checked ? 'checked' : ''}><span>${escapeAttr(user.name)}</span></label>`;
+        }).join('')
         : '<div class="empty">Primero crea usuarios en Configuraciones.</div>';
       $('eventPrivateUsers').innerHTML = sortedUsers.length
-        ? sortedUsers.map(user => `<label class="event-user-option"><input type="checkbox" data-private-user value="${user.name}"><span>${user.name}</span></label>`).join('')
+        ? sortedUsers.map(user => {
+          const checked = privateAllowed.includes(normalize(user.name));
+          return `<label class="event-user-option"><input type="checkbox" data-private-user value="${escapeAttr(user.name)}" ${checked ? 'checked' : ''}><span>${escapeAttr(user.name)}</span></label>`;
+        }).join('')
         : '<div class="empty">Primero crea usuarios en Configuraciones.</div>';
       $('usersList').innerHTML = appUsers.length
         ? appUsers.map(user => `
@@ -2041,6 +2057,8 @@
       pendingLogos.eventLogoRight = null;
       $('saveEventButton').textContent = 'Crear evento';
       $('eventDate').valueAsDate = new Date();
+      $('eventNameLine1').value = '';
+      $('eventNameLine2').value = '';
       document.querySelectorAll('[data-event-user]').forEach(option => { option.checked = false; });
       document.querySelectorAll('[data-private-user]').forEach(option => { option.checked = false; });
     }
@@ -2049,7 +2067,12 @@
       const eventData = events.find(eventItem => eventItem.id === eventId);
       if (!eventData || !isAdmin()) return;
       editingEventId = eventId;
-      $('eventName').value = eventData.name || '';
+      const nameParts = {
+        line1: eventData.nameLine1 || splitLegacyEventName(eventData.name).line1,
+        line2: eventData.nameLine2 || splitLegacyEventName(eventData.name).line2
+      };
+      $('eventNameLine1').value = nameParts.line1;
+      $('eventNameLine2').value = nameParts.line2;
       $('eventDate').value = eventData.date || '';
       $('eventPrice').value = eventData.price || 0;
       $('eventSellerPercent').value = eventData.sellerPercent || 0;
@@ -2264,6 +2287,8 @@
         ...existingEvent,
         id: eventData.id,
         name: eventData.name || 'Evento confirmado',
+        nameLine1: eventData.nameLine1 || '',
+        nameLine2: eventData.nameLine2 || '',
         eventCreated: true,
         eventSeed: eventData.bingoSeed || eventData.id,
         eventDetail: [eventData.date, eventData.town, eventData.province].filter(Boolean).join(' - '),
@@ -4319,8 +4344,12 @@
       event.preventDefault();
       if (!canUsePage('create')) return;
       const currentEvent = editingEventId ? events.find(eventItem => eventItem.id === editingEventId) : null;
+      const nameLine1 = $('eventNameLine1').value.trim();
+      const nameLine2 = $('eventNameLine2').value.trim();
       const eventPayload = {
-        name: $('eventName').value.trim(),
+        name: eventNameFromLines(nameLine1, nameLine2),
+        nameLine1,
+        nameLine2,
         date: $('eventDate').value,
         price: Number($('eventPrice').value),
         sellerPercent: Number($('eventSellerPercent').value),
