@@ -136,6 +136,16 @@
     .toolbar { display: grid; grid-template-columns: 1.2fr .9fr .9fr .9fr auto; gap: 6px; align-items: end; }
     .views { display: flex; gap: 8px; flex-wrap: wrap; }
     .views button.active { background: var(--brand); }
+    .event-sheets-panel { gap: 8px; }
+    .event-sheets-head { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
+    .event-sheets-head h3 { margin: 0; font-size: 15px; }
+    .event-sheets-summary { color: var(--muted); font-size: 12px; text-align: right; }
+    .event-sheets-body { display: grid; gap: 8px; }
+    .event-sheets-controls { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 10px; align-items: end; }
+    .event-sheets-stats { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .event-sheets-stat { display: inline-flex; gap: 6px; align-items: center; min-height: 30px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fbfcfa; font-size: 12px; }
+    .event-sheets-stat strong { font-size: 14px; }
+    .event-sheets-table { min-width: 620px; }
     .table-wrap { overflow: hidden; }
     .table-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 10px; border-bottom: 1px solid var(--line); }
     .table-head h3 { margin: 0; font-size: 16px; }
@@ -1071,6 +1081,26 @@
               <button type="button" data-view="localidades">Ver por localidad</button>
               <button type="button" data-view="provincias">Ver por provincia</button>
             </div>
+            <section class="panel event-sheets-panel">
+              <div class="event-sheets-head">
+                <div>
+                  <h3>Planillas en juego</h3>
+                  <span id="eventSheetsSummary" class="event-sheets-summary">Sin ventas cargadas.</span>
+                </div>
+                <button type="button" class="secondary" id="toggleEventSheets">Ver planillas</button>
+                <button type="button" class="secondary" id="exportEventSheetsPdf">Exportar PDF</button>
+              </div>
+              <div id="eventSheetsBody" class="event-sheets-body hidden">
+                <div class="event-sheets-controls">
+                  <label>Series por planilla<input id="eventSeriesPerSheet" type="number" min="1" step="1" value="10"></label>
+                  <div class="event-sheets-stats">
+                    <span class="event-sheets-stat">Planillas <strong id="eventSheetsTotal">0</strong></span>
+                    <span class="event-sheets-stat">Series vendidas <strong id="eventSheetsUnits">0</strong></span>
+                  </div>
+                </div>
+                <div class="scroll"><table class="event-sheets-table"><thead><tr><th>Planilla</th><th>Rango de planilla</th><th>Series vendidas</th><th>Cantidad vendida</th></tr></thead><tbody id="eventSheetsRows"></tbody></table><div id="eventSheetsEmpty" class="empty">Todavia no hay ventas para agrupar por planilla.</div></div>
+              </div>
+            </section>
             <section class="table-wrap">
               <div class="table-head"><h3 id="tableTitle">Ventas cargadas</h3><span id="visibleCount" class="muted">0 cargas</span></div>
               <div class="scroll"><table><thead id="tableHead"></thead><tbody id="salesTable"></tbody></table><div id="emptyState" class="empty">Todavia no hay ventas cargadas.</div></div>
@@ -1104,6 +1134,7 @@
     let statsCalendarMonth = new Date();
     let statsCalendarRangeStart = '';
     let currentView = 'detalle';
+    let eventSheetsExpanded = false;
     let draftRanges = [];
     let selectedDraftId = null;
     let editingLoadId = null;
@@ -3563,6 +3594,111 @@
       return [...groups.values()].sort((a, b) => b.createdAt - a.createdAt);
     }
 
+    function eventSeriesPerSheet(eventData) {
+      return Math.max(Number(eventData?.seriesPerSheet || eventData?.virtualSeriesPerSheet) || 10, 1);
+    }
+
+    function planNumberForSeries(series, perSheet) {
+      return Math.floor((Number(series) - 1) / perSheet) + 1;
+    }
+
+    function planRangeLabel(planNumber, perSheet) {
+      const start = ((planNumber - 1) * perSheet) + 1;
+      return `${num(start)} - ${num(start + perSheet - 1)}`;
+    }
+
+    function compactNumberRanges(values = []) {
+      const numbers = [...new Set(values.map(Number).filter(Number.isFinite))].sort((a, b) => a - b);
+      const ranges = [];
+      let start = null;
+      let prev = null;
+      numbers.forEach(value => {
+        if (start === null) {
+          start = value;
+          prev = value;
+          return;
+        }
+        if (value === prev + 1) {
+          prev = value;
+          return;
+        }
+        ranges.push(start === prev ? num(start) : `${num(start)}-${num(prev)}`);
+        start = value;
+        prev = value;
+      });
+      if (start !== null) ranges.push(start === prev ? num(start) : `${num(start)}-${num(prev)}`);
+      return ranges.join(', ');
+    }
+
+    function eventSheetsData(eventData) {
+      const perSheet = eventSeriesPerSheet(eventData);
+      const units = unitsFromSales(eventData?.sales || []);
+      const groups = new Map();
+      units.forEach(unit => {
+        const planNumber = planNumberForSeries(unit, perSheet);
+        if (!groups.has(planNumber)) groups.set(planNumber, { planNumber, series: [] });
+        groups.get(planNumber).series.push(unit);
+      });
+      const rows = [...groups.values()].sort((a, b) => a.planNumber - b.planNumber).map(group => ({
+        planNumber: group.planNumber,
+        range: planRangeLabel(group.planNumber, perSheet),
+        seriesLabel: compactNumberRanges(group.series),
+        sold: group.series.length
+      }));
+      return { perSheet, units, rows };
+    }
+
+    function renderEventSheets(eventData) {
+      const data = eventSheetsData(eventData);
+      $('eventSeriesPerSheet').value = data.perSheet;
+      $('eventSheetsBody').classList.toggle('hidden', !eventSheetsExpanded);
+      $('toggleEventSheets').textContent = eventSheetsExpanded ? 'Ocultar planillas' : 'Ver planillas';
+      $('eventSheetsTotal').textContent = num(data.rows.length);
+      $('eventSheetsUnits').textContent = num(data.units.length);
+      $('eventSheetsSummary').textContent = data.rows.length
+        ? `${num(data.rows.length)} planillas en juego - ${num(data.units.length)} series vendidas - ${num(data.perSheet)} por planilla`
+        : 'Sin ventas cargadas.';
+      $('eventSheetsEmpty').classList.toggle('hidden', data.rows.length > 0);
+      $('eventSheetsRows').innerHTML = data.rows.map(row => `<tr><td><strong>Planilla ${num(row.planNumber)}</strong></td><td>${row.range}</td><td>${row.seriesLabel}</td><td>${num(row.sold)}</td></tr>`).join('');
+      $('exportEventSheetsPdf').disabled = !data.rows.length;
+    }
+
+    function exportEventSheetsPdf() {
+      const eventData = activeEvent();
+      if (!eventData) return;
+      const data = eventSheetsData(eventData);
+      if (!data.rows.length) {
+        alert('Todavia no hay ventas para exportar por planilla.');
+        return;
+      }
+      const title = `Planillas en juego - ${eventTitleLine1(eventData)}`;
+      const subtitleParts = [eventTitleLine2(eventData), `${eventData.date} - ${eventData.town}, ${eventData.province}`, `Series por planilla: ${num(data.perSheet)}`].filter(Boolean);
+      const summary = [
+        ['Total de planillas en juego', num(data.rows.length)],
+        ['Total de series vendidas', num(data.units.length)],
+        ['Series por planilla', num(data.perSheet)]
+      ];
+      const rows = data.rows.map(row => [`Planilla ${num(row.planNumber)}`, row.range, row.seriesLabel, num(row.sold)]);
+      $('printArea').classList.remove('hidden');
+      $('printArea').innerHTML = `
+        <style>
+          @page { size: A4 portrait; margin: 10mm; }
+          #printArea { font-family: Arial, sans-serif; color: #111; }
+          #printArea h1 { margin: 0 0 4px; font-size: 22px; }
+          #printArea p { margin: 0 0 10px; color: #555; }
+          #printArea table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 10px; }
+          #printArea th, #printArea td { border: 1px solid #ccc; padding: 6px; text-align: left; vertical-align: top; }
+          #printArea th { background: #eef2ed; }
+        </style>
+        <h1>${htmlCell(title).replace(/^<td>|<\/td>$/g, '')}</h1>
+        <p>${htmlCell(subtitleParts.join(' | ')).replace(/^<td>|<\/td>$/g, '')}</p>
+        ${exportTableHtml(['Resumen', 'Cantidad'], summary)}
+        ${exportTableHtml(['Planilla', 'Rango de planilla', 'Series vendidas', 'Cantidad vendida'], rows)}
+      `;
+      window.print();
+      $('printArea').classList.add('hidden');
+    }
+
     function renderActiveEvent() {
       const event = activeEvent();
       if (!event) return;
@@ -3604,6 +3740,7 @@
       $('eventUnits').textContent = num(totals.units);
       $('eventSellers').textContent = num(totals.sellers.size);
       $('eventPayments').textContent = `${money(totals.cash)} / ${money(totals.transfer)}`;
+      renderEventSheets(event);
       renderSalesTable(items);
     }
 
@@ -4793,6 +4930,19 @@
     });
     $('exportGroup').addEventListener('input', updateExportValues);
     $('openExport').addEventListener('click', exportRows);
+    $('toggleEventSheets').addEventListener('click', () => {
+      eventSheetsExpanded = !eventSheetsExpanded;
+      renderActiveEvent();
+    });
+    $('eventSeriesPerSheet').addEventListener('change', () => {
+      const eventData = activeEvent();
+      if (!eventData) return;
+      const value = Math.max(Number($('eventSeriesPerSheet').value) || 10, 1);
+      eventData.seriesPerSheet = value;
+      saveEvents();
+      renderEventSheets(eventData);
+    });
+    $('exportEventSheetsPdf').addEventListener('click', exportEventSheetsPdf);
     $('exportBalancePdf').addEventListener('click', exportBalancePdf);
     $('applySettingsButton').addEventListener('click', async () => {
       const preservedSheetSales = settings.sheetSales;
