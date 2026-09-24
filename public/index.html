@@ -866,6 +866,9 @@
               <h3>Administradores</h3>
               <div id="balanceAdminsList" class="form-grid"></div>
               <button type="button" class="light hidden" id="addBalanceAdmin">Agregar administrador</button>
+              <h3>Gastos de Indigo Blue</h3>
+              <div id="balanceIndigoExpenses" class="form-grid"></div>
+              <button type="button" class="light balance-add-button" id="addBalanceIndigoExpense">Agregar gasto de Indigo</button>
             </aside>
             <div class="balance-main">
               <h3>Gastos</h3>
@@ -1898,6 +1901,9 @@
     function defaultBalanceExpenses() {
       return normalizeBalanceLines(settings.balanceTemplates?.expenses, fallbackBalanceExpenses);
     }
+    function defaultIndigoExpenses() {
+      return [{ id: crypto.randomUUID(), name: '', amount: 0 }];
+    }
     function defaultBalancePrizes() {
       return normalizeBalanceLines(settings.balanceTemplates?.prizesList, fallbackBalancePrizes);
     }
@@ -1961,11 +1967,12 @@
           adminPercent: Number(eventData.adminPercent) || 0,
           noePercent: 0,
           indigoPercent: 50,
-          gisePercent: 0,
-          laureanoPercent: 0,
+          gisePercent: 30,
+          laureanoPercent: 70,
           admins: defaultBalanceAdmins(),
           prizesList: defaultBalancePrizes(),
-          expenses: defaultBalanceExpenses()
+          expenses: defaultBalanceExpenses(),
+          indigoExpenses: defaultIndigoExpenses()
         };
       }
       eventData.balance.units = soldUnits;
@@ -1981,8 +1988,18 @@
       } else {
         eventData.balance.expenses = normalizeBalanceLines(eventData.balance.expenses, fallbackBalanceExpenses);
       }
+      if (!Array.isArray(eventData.balance.indigoExpenses)) {
+        eventData.balance.indigoExpenses = defaultIndigoExpenses();
+      } else {
+        eventData.balance.indigoExpenses = normalizeBalanceLines(eventData.balance.indigoExpenses, () => []);
+      }
       if (!Array.isArray(eventData.balance.admins)) eventData.balance.admins = defaultBalanceAdmins();
       if (eventData.balance.indigoPercent === undefined || eventData.balance.indigoPercent === null) eventData.balance.indigoPercent = 50;
+      if ((eventData.balance.gisePercent === undefined || eventData.balance.gisePercent === null || Number(eventData.balance.gisePercent) === 0)
+        && (eventData.balance.laureanoPercent === undefined || eventData.balance.laureanoPercent === null || Number(eventData.balance.laureanoPercent) === 0)) {
+        eventData.balance.gisePercent = 30;
+        eventData.balance.laureanoPercent = 70;
+      }
       eventData.balance.admins = automaticBalanceAdmins(eventData);
       eventData.balance.style = { ...defaultBalanceStyle(), ...(eventData.balance.style || {}) };
       return eventData.balance;
@@ -2016,11 +2033,13 @@
       const noeAmount = pct(income, balance.noePercent);
       const afterNoe = income - noeAmount;
       const indigoAmount = pct(afterNoe, balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent);
+      const indigoExpenses = (balance.indigoExpenses || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      const indigoNetAmount = indigoAmount - indigoExpenses;
       const institutionAmount = afterNoe - indigoAmount;
-      const giseAmount = pct(indigoAmount, balance.gisePercent);
-      const laureanoAmount = pct(indigoAmount, balance.laureanoPercent);
+      const giseAmount = pct(indigoNetAmount, balance.gisePercent);
+      const laureanoAmount = pct(indigoNetAmount, balance.laureanoPercent);
       const extraPercents = giseAmount + laureanoAmount;
-      return { gross, sellerCommission, adminGeneralCommission, adminsCommission, commissions, prizes, expenses, income, subtotal, noeAmount, afterNoe, indigoAmount, institutionAmount, giseAmount, laureanoAmount, extraPercents, result: indigoAmount - extraPercents };
+      return { gross, sellerCommission, adminGeneralCommission, adminsCommission, commissions, prizes, expenses, income, subtotal, noeAmount, afterNoe, indigoAmount, indigoExpenses, indigoNetAmount, institutionAmount, giseAmount, laureanoAmount, extraPercents, result: indigoNetAmount };
     }
     function setImage(image, value) {
       image.classList.toggle('hidden', !value);
@@ -2594,11 +2613,13 @@
     function accountingCategoriesFromBalance(eventData) {
       const balance = eventBalance(accountingEventForWeek(eventData));
       const expenses = normalizeBalanceLines(balance.expenses, fallbackBalanceExpenses);
+      const indigoExpenses = normalizeBalanceLines(balance.indigoExpenses, () => []);
       const prizes = normalizeBalanceLines(balance.prizesList, fallbackBalancePrizes);
       const viaticos = expenses.filter(item => normalize(item.name).includes('viatic'));
       const gastos = expenses.filter(item => !normalize(item.name).includes('viatic'));
       return [
         { id: 'balance-gastos', name: 'Gastos', source: 'balance', details: gastos.map(item => balanceCategoryDetail(item, 'balance-expense')) },
+        { id: 'balance-gastos-indigo', name: 'Gastos Indigo Blue', source: 'balance', details: indigoExpenses.map(item => balanceCategoryDetail(item, 'balance-indigo-expense')) },
         { id: 'balance-premios', name: 'Premios', source: 'balance', details: prizes.map(item => balanceCategoryDetail(item, 'balance-prize')) },
         { id: 'balance-viaticos', name: 'Viaticos', source: 'balance', details: viaticos.map(item => balanceCategoryDetail(item, 'balance-viatico')) }
       ];
@@ -2629,7 +2650,7 @@
     }
     function accountingEventBase(eventData) {
       const balance = eventBalance(accountingEventForWeek(eventData));
-      return balanceTotals(balance).indigoAmount;
+      return balanceTotals(balance).indigoNetAmount;
     }
     function accountingSalesForWeek(eventData) {
       ensureAccountingWeek();
@@ -2834,6 +2855,11 @@
           name: row.querySelector('[data-expense-name]').value.trim() || 'Gasto',
           amount: parseAmount(row.querySelector('[data-expense-amount]').value)
         })),
+        indigoExpenses: [...document.querySelectorAll('[data-balance-indigo-expense]')].map(row => ({
+          id: row.dataset.balanceIndigoExpense,
+          name: row.querySelector('[data-indigo-expense-name]').value.trim() || 'Gasto Indigo',
+          amount: parseAmount(row.querySelector('[data-indigo-expense-amount]').value)
+        })),
         style: currentBalance?.style || defaultBalanceStyle()
       };
     }
@@ -2869,6 +2895,8 @@
           [`% Noe (${num(balance.noePercent)}%)`, money(totals.noeAmount)],
           ['Sub Total', money(totals.afterNoe)],
           [`INDIGO BLUE (${num(balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent)}%)`, money(totals.indigoAmount)],
+          ['Gastos Indigo Blue', money(totals.indigoExpenses)],
+          ['Neto Indigo Blue', money(totals.indigoNetAmount)],
           [`Institucion (${num(100 - (balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent))}%)`, money(totals.institutionAmount)],
           [`% Gise (${num(balance.gisePercent)}%)`, money(totals.giseAmount)],
           [`% Laureano (${num(balance.laureanoPercent)}%)`, money(totals.laureanoAmount)]
@@ -2926,9 +2954,11 @@
       const totals = balanceTotals(balance);
       const adminsTotal = document.querySelector('[data-balance-admins-total]');
       const expensesTotal = document.querySelector('[data-balance-expenses-total]');
+      const indigoExpensesTotal = document.querySelector('[data-balance-indigo-expenses-total]');
       const prizesColumnTotal = document.querySelector('[data-balance-prizes-total]');
       if (adminsTotal) adminsTotal.textContent = money(totals.adminsCommission);
       if (expensesTotal) expensesTotal.textContent = money(totals.expenses);
+      if (indigoExpensesTotal) indigoExpensesTotal.textContent = money(totals.indigoExpenses);
       if (prizesColumnTotal) prizesColumnTotal.textContent = money(totals.prizes);
     }
 
@@ -2951,6 +2981,27 @@
         scheduleBalanceAutosave();
       }));
       [...$('balanceExpenses').querySelectorAll('[data-expense-amount]')].forEach(bindAmountFormatting);
+    }
+
+    function renderBalanceIndigoExpenses(expenses) {
+      const total = (expenses || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      const rows = (expenses || []).map(item => `
+        <div class="balance-line" data-balance-indigo-expense="${item.id || crypto.randomUUID()}">
+          <label>Detalle<input data-indigo-expense-name autocomplete="off" value="${String(item.name || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}"></label>
+          <label>Importe<input data-indigo-expense-amount inputmode="decimal" autocomplete="off" value="${formatInputAmount(item.amount)}"></label>
+          <div class="actions"><button type="button" class="danger" data-delete-indigo-expense>Eliminar</button></div>
+        </div>
+      `).join('');
+      $('balanceIndigoExpenses').innerHTML = `${rows}
+        <div class="balance-total-line">
+          <strong>TOTAL GASTOS INDIGO</strong>
+          <span data-balance-indigo-expenses-total>${money(total)}</span>
+        </div>`;
+      [...$('balanceIndigoExpenses').querySelectorAll('input')].forEach(input => input.addEventListener('input', () => {
+        updateBalancePreview();
+        scheduleBalanceAutosave();
+      }));
+      [...$('balanceIndigoExpenses').querySelectorAll('[data-indigo-expense-amount]')].forEach(bindAmountFormatting);
     }
 
     function renderBalancePrizes(prizes) {
@@ -3051,15 +3102,17 @@
       });
       renderBalanceAdmins(balance.admins, balance);
       renderBalanceExpenses(balance.expenses);
+      renderBalanceIndigoExpenses(balance.indigoExpenses);
       renderBalancePrizes(balance.prizesList);
       $('balanceForm').querySelectorAll('input, button').forEach(control => {
         control.disabled = !canEditBalance;
       });
-      ['openBalanceConfig', 'addBalanceExpense', 'addBalancePrize'].forEach(id => $(id).classList.toggle('hidden', !canEditBalance));
+      ['openBalanceConfig', 'addBalanceExpense', 'addBalanceIndigoExpense', 'addBalancePrize'].forEach(id => $(id).classList.toggle('hidden', !canEditBalance));
       $('addBalanceAdmin').classList.add('hidden');
       $('balanceForm').querySelector('button[type="submit"]').classList.toggle('hidden', !canEditBalance);
       $('balanceAdminsList').querySelectorAll('[data-delete-admin]').forEach(button => button.classList.toggle('hidden', !canEditBalance));
       $('balanceExpenses').querySelectorAll('[data-delete-expense]').forEach(button => button.classList.toggle('hidden', !canEditBalance));
+      $('balanceIndigoExpenses').querySelectorAll('[data-delete-indigo-expense]').forEach(button => button.classList.toggle('hidden', !canEditBalance));
       $('balancePrizesList').querySelectorAll('[data-delete-prize]').forEach(button => button.classList.toggle('hidden', !canEditBalance));
       applyBalanceStyle(balance.style);
       fillBalanceConfig(balance.style);
@@ -4275,6 +4328,8 @@
           [`Noe ${num(balance.noePercent)}%`, money(totals.noeAmount)],
           ['Sub Total', money(totals.afterNoe)],
           [`INDIGO BLUE ${num(balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent)}%`, money(totals.indigoAmount)],
+          ['Gastos Indigo Blue', money(totals.indigoExpenses)],
+          ['Neto Indigo Blue', money(totals.indigoNetAmount)],
           [`Institucion ${num(100 - (balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent))}%`, money(totals.institutionAmount)],
           [`Gise ${num(balance.gisePercent)}%`, money(totals.giseAmount)],
           [`Laureano ${num(balance.laureanoPercent)}%`, money(totals.laureanoAmount)]
@@ -4297,6 +4352,7 @@
         ['Comisiones', money(totals.commissions)],
         ['Premios', money(totals.prizes)],
         ['Gastos', money(totals.expenses)],
+        ['Gastos Indigo Blue', money(totals.indigoExpenses)],
         ['Resultado', money(canSeePrivateBalance(eventData) ? totals.result : totals.subtotal)]
       ];
       const adminRows = (balance.admins || []).map(item => [
@@ -4307,9 +4363,11 @@
         money(balanceAdminAmount(balance, item))
       ]);
       const expenseRows = (balance.expenses || []).map(item => [item.name, money(item.amount)]);
+      const indigoExpenseRows = (balance.indigoExpenses || []).map(item => [item.name, money(item.amount)]);
       const prizeRows = (balance.prizesList || []).map(item => [item.name, money(item.amount)]);
       adminRows.push(['TOTAL ADMINISTRADORES', '', '', '', money(totals.adminsCommission)]);
       expenseRows.push(['TOTAL DE GASTOS', money(totals.expenses)]);
+      indigoExpenseRows.push(['TOTAL GASTOS INDIGO', money(totals.indigoExpenses)]);
       prizeRows.push(['TOTAL DE PREMIOS', money(totals.prizes)]);
       $('printArea').classList.remove('hidden');
       $('printArea').innerHTML = `
@@ -4331,6 +4389,7 @@
         <section class="section"><h2>Cuentas</h2>${exportTableHtml(['Concepto', 'Importe'], balanceReportRows(balance, totals))}</section>
         <section class="section"><h2>Administradores</h2>${exportTableHtml(['Administrador', 'Cantidad', '% carton', '$ fijo', 'Importe'], adminRows.length ? adminRows : [['Sin administradores', '', '', '', money(0)]])}</section>
         <section class="section"><h2>Gastos</h2>${exportTableHtml(['Detalle', 'Importe'], expenseRows.length ? expenseRows : [['Sin gastos', money(0)]])}</section>
+        <section class="section"><h2>Gastos de Indigo Blue</h2>${exportTableHtml(['Detalle', 'Importe'], indigoExpenseRows.length ? indigoExpenseRows : [['Sin gastos Indigo', money(0)]])}</section>
         <section class="section"><h2>Premios</h2>${exportTableHtml(['Premio', 'Importe'], prizeRows.length ? prizeRows : [['Sin premios', money(0)]])}</section>
       `;
       window.print();
@@ -4636,6 +4695,13 @@
       const deleteExpense = event.target.closest('[data-delete-expense]');
       if (deleteExpense) {
         const row = deleteExpense.closest('[data-balance-expense]');
+        if (row) row.remove();
+        updateBalancePreview();
+        persistBalanceFromForm({ renderList: true });
+      }
+      const deleteIndigoExpense = event.target.closest('[data-delete-indigo-expense]');
+      if (deleteIndigoExpense) {
+        const row = deleteIndigoExpense.closest('[data-balance-indigo-expense]');
         if (row) row.remove();
         updateBalancePreview();
         persistBalanceFromForm({ renderList: true });
@@ -5069,6 +5135,14 @@
       const current = balanceFromForm();
       current.expenses.push({ id: crypto.randomUUID(), name: 'Otro gasto', amount: 0 });
       renderBalanceExpenses(current.expenses);
+      setBalanceSummary(current);
+      persistBalanceFromForm({ renderList: true });
+    });
+    $('addBalanceIndigoExpense').addEventListener('click', () => {
+      if (!isAdmin()) return;
+      const current = balanceFromForm();
+      current.indigoExpenses.push({ id: crypto.randomUUID(), name: 'Gasto Indigo', amount: 0 });
+      renderBalanceIndigoExpenses(current.indigoExpenses);
       setBalanceSummary(current);
       persistBalanceFromForm({ renderList: true });
     });
