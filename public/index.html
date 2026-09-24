@@ -122,6 +122,8 @@
     .storage-warning { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid #f59e0b; border-radius: var(--radius); background: #fff7ed; color: #7c2d12; box-shadow: var(--shadow); }
     .storage-warning strong { font-size: 14px; }
     .storage-warning span { font-size: 12px; line-height: 1.25; }
+    .app-notice { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 9px 12px; border: 1px solid #f59e0b; border-radius: var(--radius); background: #fff7ed; color: #7c2d12; box-shadow: var(--shadow); font-size: 12px; }
+    .app-notice button { min-height: 28px; padding: 5px 8px; }
 
     .hidden { display: none !important; }
     .event-layout { display: grid; grid-template-columns: 285px minmax(0, 1fr); gap: 10px; align-items: start; }
@@ -462,6 +464,10 @@
       <div id="storageWarning" class="storage-warning hidden">
         <strong>Atencion: guardado temporal en Railway</strong>
         <span>Conecta un volumen persistente al servicio para que las cargas, balances y estadisticas no se pierdan al reiniciar o desplegar.</span>
+      </div>
+      <div id="appNotice" class="app-notice hidden">
+        <span id="appNoticeText"></span>
+        <button type="button" class="light" id="closeAppNotice">Cerrar</button>
       </div>
 
       <section id="page-home" data-screen>
@@ -1172,6 +1178,8 @@
     let accountingWeekStart = '';
     let accountingWeekEnd = '';
     let balanceAutosaveTimer = null;
+    let appNoticeTimer = null;
+    let lastSaveWarningAt = 0;
     const openAccountingCategories = new Set();
     const pendingLogos = { mainLogo: null, eventLogoLeft: null, eventLogoRight: null, balanceBgImage: null };
     const bingoCardsCache = new Map();
@@ -1186,33 +1194,51 @@
     let virtualPublicData = null;
     let lastVirtualLink = '';
 
+    function showAppNotice(message, timeout = 9000) {
+      const notice = $('appNotice');
+      if (!notice) return;
+      $('appNoticeText').textContent = message;
+      notice.classList.remove('hidden');
+      clearTimeout(appNoticeTimer);
+      if (timeout) appNoticeTimer = setTimeout(() => notice.classList.add('hidden'), timeout);
+    }
+    function handleBackgroundSaveError(error) {
+      console.warn(error);
+      const now = Date.now();
+      if (now - lastSaveWarningAt < 15000) return;
+      lastSaveWarningAt = now;
+      showAppNotice(`${error.message} Si estabas guardando datos, revisa la conexion y volve a tocar Guardar si no aparece reflejado.`);
+    }
+
     async function api(path, options = {}) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 12000);
+      const timeoutMs = Number(options.timeoutMs) || 30000;
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
+        const { timeoutMs: _timeoutMs, headers: optionHeaders, ...fetchOptions } = options;
         const response = await fetch(path, {
-          headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+          headers: { 'Content-Type': 'application/json', ...(optionHeaders || {}) },
           credentials: 'same-origin',
           signal: controller.signal,
-          ...options
+          ...fetchOptions
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || 'Error de servidor');
         return data;
       } catch (error) {
-        if (error.name === 'AbortError') throw new Error('La app tardo demasiado en responder. Cerra Cargas y abrila nuevamente.');
-        if (error instanceof TypeError) throw new Error('No se pudo conectar con la app. Cerra Cargas y abrila nuevamente.');
+        if (error.name === 'AbortError') throw new Error('La app tardo demasiado en confirmar la respuesta.');
+        if (error instanceof TypeError) throw new Error('No se pudo conectar con la app.');
         throw error;
       } finally {
         clearTimeout(timer);
       }
     }
     function saveEvents() {
-      api('/api/events', { method: 'PUT', body: JSON.stringify({ events }) }).catch(error => alert(error.message));
+      api('/api/events', { method: 'PUT', body: JSON.stringify({ events }) }).catch(handleBackgroundSaveError);
     }
     function saveSettingsData() {
       try {
-        api('/api/settings', { method: 'PUT', body: JSON.stringify({ settings }) }).catch(error => alert(error.message));
+        api('/api/settings', { method: 'PUT', body: JSON.stringify({ settings }) }).catch(handleBackgroundSaveError);
         return true;
       } catch (error) {
         alert('No se pudo guardar el logo. Probablemente la imagen es demasiado pesada. Proba con una imagen mas chica.');
@@ -1220,7 +1246,7 @@
       }
     }
     function saveUsers() {
-      api('/api/users', { method: 'PUT', body: JSON.stringify({ users: appUsers }) }).catch(error => alert(error.message));
+      api('/api/users', { method: 'PUT', body: JSON.stringify({ users: appUsers }) }).catch(handleBackgroundSaveError);
     }
     async function loadAccounts() {
       const data = await api('/api/accounts');
@@ -4431,6 +4457,7 @@
         alert(error.message);
       }
     });
+    $('closeAppNotice').addEventListener('click', () => $('appNotice').classList.add('hidden'));
     $('logoutButton').addEventListener('click', async () => {
       await api('/api/logout', { method: 'POST', body: '{}' }).catch(() => {});
       currentUser = null;
