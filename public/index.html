@@ -170,12 +170,13 @@
     #page-settings input[type="file"] { padding: 3px; font-size: 11px; }
     .settings-grid { display: grid; grid-template-columns: repeat(6, minmax(95px, 1fr)); gap: 5px; }
     .settings-users { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(120px, 1fr) auto minmax(220px, 2fr); gap: 6px; align-items: end; }
-    .reference-grid { display: grid; grid-template-columns: repeat(4, minmax(170px, 1fr)); gap: 8px; }
+    .reference-grid { display: grid; grid-template-columns: minmax(320px, 1.45fr) repeat(3, minmax(170px, 1fr)); gap: 8px; }
     .reference-box { border: 1px solid var(--line); border-radius: var(--radius); background: #fbfcfa; padding: 8px; display: grid; gap: 7px; align-content: start; }
     .reference-box h4 { margin: 0; font-size: 13px; }
     .reference-add { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: end; }
     .reference-list { display: grid; gap: 5px; max-height: 170px; overflow-y: auto; }
     .reference-item { display: grid; grid-template-columns: 1fr auto auto; gap: 5px; align-items: center; }
+    .reference-item.seller-reference-item { grid-template-columns: minmax(105px, 1.1fr) minmax(88px, 1fr) minmax(88px, 1fr) auto auto; }
     .reference-item input { min-width: 0; }
     .permissions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px; }
     .permission-card { border: 1px solid var(--line); border-radius: var(--radius); background: #fbfcfa; padding: 8px; display: grid; gap: 6px; }
@@ -1288,26 +1289,56 @@
         return true;
       }).sort((a, b) => a.localeCompare(b, 'es'));
     }
+    function sellerName(value) {
+      return typeof value === 'object' && value ? String(value.name || '').trim() : String(value || '').trim();
+    }
+    function normalizeSellerList(values = []) {
+      const seen = new Set();
+      return (values || []).map(value => ({
+        name: sellerName(value),
+        town: typeof value === 'object' && value ? String(value.town || '').trim() : '',
+        province: typeof value === 'object' && value ? String(value.province || '').trim() : ''
+      })).filter(value => {
+        const key = normalize(value.name);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+    }
     function normalizeReferenceLists(lists = {}) {
       return {
-        sellers: uniqueTextList(lists.sellers),
+        sellers: normalizeSellerList(lists.sellers),
         admins: uniqueTextList(lists.admins),
         provinces: uniqueTextList(lists.provinces),
         towns: uniqueTextList(lists.towns)
       };
     }
     function eventReferenceListsFromEvent(eventData, currentLists = {}) {
+      const currentSellers = normalizeSellerList(currentLists.sellers);
       return normalizeReferenceLists({
-        sellers: currentLists.sellers,
+        sellers: currentSellers,
         admins: [...(currentLists.admins || []), eventData?.admin || ''],
-        provinces: [...(currentLists.provinces || []), eventData?.province || ''],
-        towns: [...(currentLists.towns || []), eventData?.town || '']
+        provinces: [...(currentLists.provinces || []), ...currentSellers.map(seller => seller.province), eventData?.province || ''],
+        towns: [...(currentLists.towns || []), ...currentSellers.map(seller => seller.town), eventData?.town || '']
       });
     }
     function referenceLists(eventData = activeEvent()) {
       if (!eventData) return normalizeReferenceLists();
       eventData.referenceLists = eventReferenceListsFromEvent(eventData, eventData.referenceLists);
       return eventData.referenceLists;
+    }
+    function sellerReferenceByName(eventData, name) {
+      const clean = normalize(name);
+      if (!clean) return null;
+      return (referenceLists(eventData).sellers || []).find(seller => normalize(seller.name) === clean) || null;
+    }
+    function applySellerReference() {
+      const eventData = activeEvent();
+      if (!eventData) return;
+      const seller = sellerReferenceByName(eventData, fields.vendedor.value);
+      if (!seller) return;
+      if (seller.town) fields.localidad.value = seller.town;
+      if (seller.province) fields.provincia.value = seller.province;
     }
     function parseAmount(value) {
       const clean = String(value || '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
@@ -1339,7 +1370,8 @@
     function renderReferenceLists(eventData = activeEvent()) {
       const lists = referenceLists(eventData);
       Object.entries(referenceDatalists).forEach(([key, datalistId]) => {
-        $(datalistId).innerHTML = (lists[key] || []).map(value => `<option value="${escapeAttr(value)}"></option>`).join('');
+        const values = key === 'sellers' ? (lists.sellers || []).map(seller => seller.name) : (lists[key] || []);
+        $(datalistId).innerHTML = values.map(value => `<option value="${escapeAttr(value)}"></option>`).join('');
       });
       const container = $('referenceLists');
       if (!container) return;
@@ -1351,13 +1383,21 @@
             <button type="button" data-reference-add="${key}">Agregar</button>
           </div>
           <div class="reference-list">
-            ${(lists[key] || []).length ? lists[key].map((value, index) => `
+            ${key === 'sellers' ? ((lists.sellers || []).length ? lists.sellers.map((seller, index) => `
+              <div class="reference-item seller-reference-item" data-reference-seller-row="${index}">
+                <input data-reference-seller-name="${index}" value="${escapeAttr(seller.name)}" placeholder="Vendedor">
+                <input data-reference-seller-town="${index}" value="${escapeAttr(seller.town)}" list="townOptions" placeholder="Localidad">
+                <input data-reference-seller-province="${index}" value="${escapeAttr(seller.province)}" list="provinceOptions" placeholder="Provincia">
+                <button type="button" class="light" data-reference-save="${key}" data-reference-index="${index}">Guardar</button>
+                <button type="button" class="danger" data-reference-delete="${key}" data-reference-index="${index}">Eliminar</button>
+              </div>
+            `).join('') : '<div class="empty">Sin datos cargados.</div>') : ((lists[key] || []).length ? lists[key].map((value, index) => `
               <div class="reference-item">
                 <input data-reference-value="${key}" data-reference-index="${index}" value="${escapeAttr(value)}">
                 <button type="button" class="light" data-reference-save="${key}" data-reference-index="${index}">Guardar</button>
                 <button type="button" class="danger" data-reference-delete="${key}" data-reference-index="${index}">Eliminar</button>
               </div>
-            `).join('') : '<div class="empty">Sin datos cargados.</div>'}
+            `).join('') : '<div class="empty">Sin datos cargados.</div>')}
           </div>
         </section>
       `).join('');
@@ -1374,19 +1414,37 @@
       const clean = String(value || '').trim();
       if (!clean) return;
       const lists = referenceLists();
-      if (lists[key].some(item => normalize(item) === normalize(clean))) {
+      const exists = key === 'sellers'
+        ? lists.sellers.some(item => normalize(item.name) === normalize(clean))
+        : lists[key].some(item => normalize(item) === normalize(clean));
+      if (exists) {
         alert('Ese dato ya esta cargado.');
         return;
       }
-      lists[key].push(clean);
+      if (key === 'sellers') lists.sellers.push({ name: clean, town: '', province: '' });
+      else lists[key].push(clean);
       saveReferenceLists();
     }
     function updateReferenceValue(key, index, value) {
       if (!referenceListLabels[key]) return;
       const lists = referenceLists();
-      const clean = String(value || '').trim();
-      if (!clean) lists[key].splice(index, 1);
-      else lists[key][index] = clean;
+      if (key === 'sellers') {
+        const cleanSeller = {
+          name: sellerName(value),
+          town: String(value?.town || '').trim(),
+          province: String(value?.province || '').trim()
+        };
+        if (!cleanSeller.name) lists.sellers.splice(index, 1);
+        else {
+          lists.sellers[index] = cleanSeller;
+          if (cleanSeller.town) lists.towns.push(cleanSeller.town);
+          if (cleanSeller.province) lists.provinces.push(cleanSeller.province);
+        }
+      } else {
+        const clean = String(value || '').trim();
+        if (!clean) lists[key].splice(index, 1);
+        else lists[key][index] = clean;
+      }
       saveReferenceLists();
     }
     function deleteReferenceValue(key, index) {
@@ -4542,8 +4600,17 @@
       if (saveReference && isAdmin()) {
         const key = saveReference.dataset.referenceSave;
         const index = Number(saveReference.dataset.referenceIndex);
-        const input = document.querySelector(`[data-reference-value="${CSS.escape(key)}"][data-reference-index="${index}"]`);
-        updateReferenceValue(key, index, input?.value);
+        if (key === 'sellers') {
+          const row = saveReference.closest('[data-reference-seller-row]');
+          updateReferenceValue(key, index, {
+            name: row?.querySelector(`[data-reference-seller-name="${index}"]`)?.value,
+            town: row?.querySelector(`[data-reference-seller-town="${index}"]`)?.value,
+            province: row?.querySelector(`[data-reference-seller-province="${index}"]`)?.value
+          });
+        } else {
+          const input = document.querySelector(`[data-reference-value="${CSS.escape(key)}"][data-reference-index="${index}"]`);
+          updateReferenceValue(key, index, input?.value);
+        }
       }
       const deleteReference = event.target.closest('[data-reference-delete]');
       if (deleteReference && isAdmin() && confirm('Eliminar este dato de la lista?')) {
@@ -4883,6 +4950,7 @@
       const adminName = fields.saleAdmin.value.trim();
       const adminPercent = parseAmount(fields.saleAdminPercent.value);
       const adminFixed = parseAmount(fields.saleAdminFixed.value);
+      const sellerReference = sellerReferenceByName(eventData, fields.vendedor.value);
       if (editingLoadId) {
         eventData.sales = eventData.sales.filter(sale => (sale.batchId || sale.id) !== editingLoadId);
       }
@@ -4901,8 +4969,8 @@
         payment: cashTotal > 0 && transferTotal > 0 ? 'Mixto' : cashTotal > 0 ? 'Efectivo' : transferTotal > 0 ? 'Transferencia' : 'Sin pago',
         cashAmount: cashTotal * rangeCount(range) / totalDraftUnits,
         transferAmount: transferTotal * rangeCount(range) / totalDraftUnits,
-        town: fields.localidad.value.trim() || eventData.town,
-        province: fields.provincia.value.trim() || eventData.province
+        town: fields.localidad.value.trim() || sellerReference?.town || eventData.town,
+        province: fields.provincia.value.trim() || sellerReference?.province || eventData.province
       })));
       saveEvents();
       resetSaleForm();
@@ -4926,13 +4994,26 @@
       if (event.key !== 'Enter') return;
       const addInput = event.target.closest('[data-reference-new]');
       const valueInput = event.target.closest('[data-reference-value]');
-      if (!addInput && !valueInput) return;
+      const sellerInput = event.target.closest('[data-reference-seller-name], [data-reference-seller-town], [data-reference-seller-province]');
+      if (!addInput && !valueInput && !sellerInput) return;
       event.preventDefault();
       if (addInput) addReferenceValue(addInput.dataset.referenceNew, addInput.value);
       if (valueInput) updateReferenceValue(valueInput.dataset.referenceValue, Number(valueInput.dataset.referenceIndex), valueInput.value);
+      if (sellerInput) {
+        const row = sellerInput.closest('[data-reference-seller-row]');
+        const index = Number(row?.dataset.referenceSellerRow);
+        updateReferenceValue('sellers', index, {
+          name: row?.querySelector(`[data-reference-seller-name="${index}"]`)?.value,
+          town: row?.querySelector(`[data-reference-seller-town="${index}"]`)?.value,
+          province: row?.querySelector(`[data-reference-seller-province="${index}"]`)?.value
+        });
+      }
     });
 
     [fields.desde, fields.hasta].forEach(input => input.addEventListener('input', updatePreview));
+    fields.vendedor.addEventListener('input', applySellerReference);
+    fields.vendedor.addEventListener('change', applySellerReference);
+    fields.vendedor.addEventListener('blur', applySellerReference);
     fields.sinCargos.addEventListener('input', () => syncPaymentFrom(lastPaymentSource));
     fields.saleSellerPercent.addEventListener('input', () => syncPaymentFrom(lastPaymentSource));
     fields.saleAdminPercent.addEventListener('input', () => syncPaymentFrom(lastPaymentSource));
