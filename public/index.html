@@ -488,7 +488,7 @@
       </section>
 
       <section id="page-create" data-screen class="hidden">
-        <div class="topbar"><h2>Crear evento</h2><button type="button" class="secondary" data-open-reference-lists data-admin-only>Cargar vendedores</button></div>
+        <div class="topbar"><h2>Crear evento</h2></div>
         <form id="eventForm" class="panel form-grid">
           <div class="grid-3">
             <label>Nombre del evento - linea 1<input id="eventNameLine1" required placeholder="Ej: Bingo aniversario"></label>
@@ -501,9 +501,9 @@
             <label>Administrador %<input id="eventAdminPercent" required type="number" min="0" max="100" step="0.01" placeholder="0"></label>
           </div>
           <div class="grid-3">
-            <label>Administrador<input id="eventAdmin" required list="adminOptions" placeholder="Nombre"></label>
-            <label>Localidad principal<input id="eventTown" required list="townOptions" placeholder="Localidad"></label>
-            <label>Provincia<input id="eventProvince" required list="provinceOptions" placeholder="Provincia"></label>
+            <label>Administrador<input id="eventAdmin" required placeholder="Nombre"></label>
+            <label>Localidad principal<input id="eventTown" required placeholder="Localidad"></label>
+            <label>Provincia<input id="eventProvince" required placeholder="Provincia"></label>
           </div>
           <label>Usuarios habilitados
             <div id="eventUsers" class="event-user-list"></div>
@@ -982,9 +982,6 @@
             <div id="usersList" class="user-list"></div>
           </div>
           <hr>
-          <h3 id="referenceListsTitle">Base de datos para cargas</h3>
-          <div id="referenceLists" class="reference-grid"></div>
-          <hr>
           <h3>Permisos por funcion</h3>
           <div id="functionPermissions" class="permissions-grid"></div>
         </section>
@@ -1006,6 +1003,16 @@
             <button type="button" class="secondary" data-page-shortcut="events">Volver a eventos</button>
           </div>
         </div>
+        <section id="eventReferencePanel" class="panel form-grid hidden">
+          <div class="table-head">
+            <div>
+              <h3 id="referenceListsTitle">Datos propios de este evento</h3>
+              <span class="muted">Estas listas se usan solo en este sorteo para sugerir vendedor, administrador, localidad y provincia.</span>
+            </div>
+            <button type="button" class="light" id="closeEventReferencePanel">Cerrar</button>
+          </div>
+          <div id="referenceLists" class="reference-grid"></div>
+        </section>
         <div id="bingoClosurePanel" class="bingo-closure-panel">
           <div>
             <h3 id="bingoClosureTitle">Carga abierta para bingo</h3>
@@ -1136,7 +1143,7 @@
     const defaultReferenceLists = { sellers: [], admins: [], provinces: [], towns: [] };
     const referenceListLabels = { sellers: 'Vendedores', admins: 'Administradores', provinces: 'Provincias', towns: 'Localidades' };
     const referenceDatalists = { sellers: 'sellerOptions', admins: 'adminOptions', provinces: 'provinceOptions', towns: 'townOptions' };
-    const defaultSettings = { font: 'Arial, Helvetica, sans-serif', size: 15, buttonSize: 15, totalSize: 22, brand: '#0f766e', buttonBg: '#0f766e', navButtonBg: '#2b7bbb', navButtonActiveBg: '#0f766e', navButtonColor: '#ffffff', homeCardTitleColor: '#0f766e', membreteColor: '#202426', eventInfoColor: '#667078', eventInfoFont: 'Arial, Helvetica, sans-serif', bg: '#f4f6f2', panel: '#ffffff', splash: '#123f8c', side: '#18312d', radius: '8px', mainLogo: '', mainLogoSize: 180, eventLogoLeft: '', eventLogoRight: '', eventLogoLeftSize: 86, eventLogoRightSize: 86, adminPassword: 'admin123', recoveryPassword: '', functionPermissions: defaultFunctionPermissions, balanceTemplates: { prizesList: null, expenses: null }, referenceLists: defaultReferenceLists };
+    const defaultSettings = { font: 'Arial, Helvetica, sans-serif', size: 15, buttonSize: 15, totalSize: 22, brand: '#0f766e', buttonBg: '#0f766e', navButtonBg: '#2b7bbb', navButtonActiveBg: '#0f766e', navButtonColor: '#ffffff', homeCardTitleColor: '#0f766e', membreteColor: '#202426', eventInfoColor: '#667078', eventInfoFont: 'Arial, Helvetica, sans-serif', bg: '#f4f6f2', panel: '#ffffff', splash: '#123f8c', side: '#18312d', radius: '8px', mainLogo: '', mainLogoSize: 180, eventLogoLeft: '', eventLogoRight: '', eventLogoLeftSize: 86, adminPassword: 'admin123', recoveryPassword: '', functionPermissions: defaultFunctionPermissions, balanceTemplates: { prizesList: null, expenses: null } };
     let events = [];
     let settings = { ...defaultSettings };
     if (!settings.adminPassword) settings.adminPassword = defaultSettings.adminPassword;
@@ -1225,7 +1232,9 @@
       events = data.events || [];
       appUsers = data.users || appUsers;
       settings = { ...defaultSettings, ...(data.settings || {}) };
-      settings.referenceLists = normalizeReferenceLists(settings.referenceLists);
+      events.forEach(eventData => {
+        eventData.referenceLists = eventReferenceListsFromEvent(eventData, eventData.referenceLists);
+      });
       storageInfo = data.storage || null;
       settings.functionPermissions = normalizeFunctionPermissions(settings.functionPermissions);
       applySettings();
@@ -1258,9 +1267,18 @@
         towns: uniqueTextList(lists.towns)
       };
     }
-    function referenceLists() {
-      settings.referenceLists = normalizeReferenceLists(settings.referenceLists);
-      return settings.referenceLists;
+    function eventReferenceListsFromEvent(eventData, currentLists = {}) {
+      return normalizeReferenceLists({
+        sellers: currentLists.sellers,
+        admins: [...(currentLists.admins || []), eventData?.admin || ''],
+        provinces: [...(currentLists.provinces || []), eventData?.province || ''],
+        towns: [...(currentLists.towns || []), eventData?.town || '']
+      });
+    }
+    function referenceLists(eventData = activeEvent()) {
+      if (!eventData) return normalizeReferenceLists();
+      eventData.referenceLists = eventReferenceListsFromEvent(eventData, eventData.referenceLists);
+      return eventData.referenceLists;
     }
     function parseAmount(value) {
       const clean = String(value || '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
@@ -1289,8 +1307,8 @@
         records: []
       };
     }
-    function renderReferenceLists() {
-      const lists = referenceLists();
+    function renderReferenceLists(eventData = activeEvent()) {
+      const lists = referenceLists(eventData);
       Object.entries(referenceDatalists).forEach(([key, datalistId]) => {
         $(datalistId).innerHTML = (lists[key] || []).map(value => `<option value="${escapeAttr(value)}"></option>`).join('');
       });
@@ -1316,8 +1334,10 @@
       `).join('');
     }
     function saveReferenceLists() {
-      settings.referenceLists = normalizeReferenceLists(settings.referenceLists);
-      saveSettingsData();
+      const eventData = activeEvent();
+      if (!eventData) return;
+      eventData.referenceLists = eventReferenceListsFromEvent(eventData, eventData.referenceLists);
+      saveEvents();
       renderReferenceLists();
     }
     function addReferenceValue(key, value) {
@@ -2037,7 +2057,6 @@
 
     function applySettings() {
       settings.functionPermissions = normalizeFunctionPermissions(settings.functionPermissions);
-      settings.referenceLists = normalizeReferenceLists(settings.referenceLists);
       document.documentElement.style.setProperty('--font-family', settings.font);
       document.documentElement.style.setProperty('--font-size', `${settings.size}px`);
       document.documentElement.style.setProperty('--button-font-size', `${settings.buttonSize || defaultSettings.buttonSize}px`);
@@ -3434,6 +3453,7 @@
         : '<option value="">Sin eventos</option>';
       $('virtualEventSelect').value = listEvents.some(event => event.id === current) ? current : (listEvents[0]?.id || '');
       const eventData = selectedVirtualEvent();
+      renderReferenceLists(eventData);
       $('virtualSelectedEventLabel').textContent = eventData ? eventData.name : 'Sin evento';
       if (eventData && !$('virtualSeller').value) fillVirtualFormFromEvent(eventData);
       const allSheets = listEvents.flatMap(event => virtualSheetsFor(event).map(sheet => ({ event, sheet })));
@@ -3822,6 +3842,7 @@
       setImage($('eventLogoRight'), event.eventLogoRight || '');
       $('eventLogoLeft').style.width = `${event.eventLogoLeftSize || defaultSettings.eventLogoLeftSize}px`;
       $('eventLogoRight').style.width = `${event.eventLogoRightSize || defaultSettings.eventLogoRightSize}px`;
+      renderReferenceLists();
       ensureBingoControl(event);
       renderBingoClosure(event);
       fields.localidad.placeholder = event.town;
@@ -4422,25 +4443,27 @@
       const shortcut = event.target.closest('[data-page-shortcut]');
       if (shortcut) go(shortcut.dataset.pageShortcut);
       const openReferenceLists = event.target.closest('[data-open-reference-lists]');
-      if (openReferenceLists && canUsePage('settings')) {
-        go('settings');
+      if (openReferenceLists && isAdmin()) {
+        if (!activeEvent()) return alert('Primero abri un evento.');
+        $('eventReferencePanel').classList.remove('hidden');
+        renderReferenceLists();
         setTimeout(() => $('referenceListsTitle')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
       }
       const addReference = event.target.closest('[data-reference-add]');
-      if (addReference && canUsePage('settings')) {
+      if (addReference && isAdmin()) {
         const key = addReference.dataset.referenceAdd;
         const input = document.querySelector(`[data-reference-new="${CSS.escape(key)}"]`);
         addReferenceValue(key, input?.value);
       }
       const saveReference = event.target.closest('[data-reference-save]');
-      if (saveReference && canUsePage('settings')) {
+      if (saveReference && isAdmin()) {
         const key = saveReference.dataset.referenceSave;
         const index = Number(saveReference.dataset.referenceIndex);
         const input = document.querySelector(`[data-reference-value="${CSS.escape(key)}"][data-reference-index="${index}"]`);
         updateReferenceValue(key, index, input?.value);
       }
       const deleteReference = event.target.closest('[data-reference-delete]');
-      if (deleteReference && canUsePage('settings') && confirm('Eliminar este dato de la lista?')) {
+      if (deleteReference && isAdmin() && confirm('Eliminar este dato de la lista?')) {
         deleteReferenceValue(deleteReference.dataset.referenceDelete, Number(deleteReference.dataset.referenceIndex));
       }
       const open = event.target.closest('[data-open-event]');
@@ -4547,6 +4570,8 @@
         activeBingoEventId = eventData.id;
         go('bingo');
       }
+      const closeEventReferencePanel = event.target.closest('#closeEventReferencePanel');
+      if (closeEventReferencePanel) $('eventReferencePanel').classList.add('hidden');
       const saveUserButton = event.target.closest('[data-save-user]');
       if (saveUserButton && canUsePage('settings')) {
         const userId = saveUserButton.dataset.saveUser;
@@ -4657,6 +4682,7 @@
         eventLogoRightSize: Number($('eventLogoRightSize').value) || defaultSettings.eventLogoRightSize,
         notes: $('eventNotes').value.trim(),
       };
+      eventPayload.referenceLists = eventReferenceListsFromEvent(eventPayload, currentEvent?.referenceLists);
       if (editingEventId) {
         events = events.map(eventItem => eventItem.id === editingEventId ? { ...eventItem, ...eventPayload } : eventItem);
         activeEventId = editingEventId;
@@ -4698,7 +4724,10 @@
 
     $('virtualEventSelect').addEventListener('change', () => {
       const eventData = selectedVirtualEvent();
-      if (eventData) fillVirtualFormFromEvent(eventData);
+      if (eventData) {
+        renderReferenceLists(eventData);
+        fillVirtualFormFromEvent(eventData);
+      }
       renderVirtualPage();
     });
     ['virtualSheetFrom', 'virtualSheetTo', 'virtualSeriesPerSheet'].forEach(inputId => {
@@ -5079,7 +5108,6 @@
     $('exportBalancePdf').addEventListener('click', exportBalancePdf);
     $('applySettingsButton').addEventListener('click', async () => {
       const preservedSheetSales = settings.sheetSales;
-      const preservedReferenceLists = referenceLists();
       settings = {
         font: $('settingFont').value,
         size: Number($('settingSize').value),
@@ -5104,8 +5132,7 @@
         adminPassword: $('settingAdminPassword').value.trim() || settings.adminPassword,
         recoveryPassword: $('settingRecoveryPassword').value.trim() || settings.recoveryPassword,
         functionPermissions: selectedFunctionPermissions(),
-        sheetSales: preservedSheetSales,
-        referenceLists: preservedReferenceLists
+        sheetSales: preservedSheetSales
       };
       if (!saveSettingsData()) return;
       applySettings();
