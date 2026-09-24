@@ -809,7 +809,7 @@
                 <p id="accountingEventInfo" class="muted"></p>
                 <div class="accounting-mini-stat"><span>Bingos</span><strong id="accountingEventUnits">0</strong></div>
                 <div class="accounting-mini-stat"><span>INDIGO BLUE</span><strong id="accountingEventBase">$0</strong></div>
-                <div class="accounting-mini-stat"><span>Extras contables</span><strong id="accountingEventSpent">$0</strong></div>
+                <div class="accounting-mini-stat"><span>Total detalle</span><strong id="accountingEventSpent">$0</strong></div>
                 <div class="accounting-mini-stat"><span>Saldo</span><strong id="accountingEventNet">$0</strong></div>
               </aside>
               <div class="form-grid">
@@ -2709,10 +2709,7 @@
     }
     function accountingEventSpent(eventData) {
       return accountingCategoriesForRange(eventData).reduce((sum, category) => {
-        if (category.source === 'balance') return sum;
-        return sum + (category.details || []).reduce((detailSum, detail) => (
-          detail.source === 'balance' ? detailSum : detailSum + (Number(detail.amount) || 0)
-        ), 0);
+        return sum + accountingCategoryTotal(category);
       }, 0);
     }
     function activeAccountingEvent() {
