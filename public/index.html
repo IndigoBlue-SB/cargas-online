@@ -1039,7 +1039,7 @@
         <div class="event-layout">
           <form id="saleForm" class="panel form-grid">
             <div class="grid-2">
-              <label>Vendedor<input id="vendedor" required autocomplete="off" list="sellerOptions" placeholder="Nombre"></label>
+              <label>Vendedor<select id="vendedor" required><option value="">Elegir vendedor</option></select></label>
               <label>Sin Cargos<input id="sinCargos" type="number" min="0" step="1" value="0"></label>
             </div>
             <div class="grid-2">
@@ -1059,8 +1059,8 @@
               <label>Transferencia<input id="pagoTransferencia" inputmode="decimal" autocomplete="off" value="0"></label>
             </div>
             <div class="grid-2">
-              <label>Localidad<input id="localidad" required autocomplete="off" list="townOptions" placeholder="Localidad"></label>
-              <label>Provincia<input id="provincia" required autocomplete="off" list="provinceOptions" placeholder="Provincia"></label>
+              <label>Localidad<select id="localidad" required><option value="">Elegir localidad</option></select></label>
+              <label>Provincia<select id="provincia" required><option value="">Elegir provincia</option></select></label>
             </div>
             <div class="range-preview">
               <div class="preview-list" id="draftList"></div>
@@ -1315,7 +1315,12 @@
       };
     }
     function eventReferenceListsFromEvent(eventData, currentLists = {}) {
-      const currentSellers = normalizeSellerList(currentLists.sellers);
+      const currentSellers = normalizeSellerList(currentLists.sellers).map(seller => ({
+        ...seller,
+        admin: seller.admin || eventData?.admin || '',
+        town: seller.town || eventData?.town || '',
+        province: seller.province || eventData?.province || ''
+      }));
       return normalizeReferenceLists({
         sellers: currentSellers,
         admins: [...(currentLists.admins || []), ...currentSellers.map(seller => seller.admin), eventData?.admin || ''],
@@ -1347,6 +1352,27 @@
       if (!datalist) return;
       datalist.innerHTML = sellerOptionsForEvent(eventData, filters).map(seller => `<option value="${escapeAttr(seller.name)}"></option>`).join('');
     }
+    function setSelectOptions(select, values, placeholder, current = select.value) {
+      const cleanValues = uniqueTextList(values);
+      const options = current && !cleanValues.includes(current) ? [current, ...cleanValues] : cleanValues;
+      select.innerHTML = `<option value="">${placeholder}</option>` + options.map(value => `<option value="${escapeAttr(value)}">${escapeAttr(value)}</option>`).join('');
+      select.value = options.includes(current) ? current : '';
+    }
+    function renderSaleReferenceSelects(eventData = activeEvent()) {
+      if (!eventData) return;
+      const lists = referenceLists(eventData);
+      const sellers = lists.sellers || [];
+      const currentTown = fields.localidad.value;
+      const currentProvince = fields.provincia.value;
+      const currentSeller = fields.vendedor.value;
+      const towns = [...(lists.towns || []), ...sellers.map(seller => seller.town), eventData.town || ''];
+      const provinceSellers = sellers.filter(seller => !currentTown || seller.town === currentTown);
+      const provinces = [...(lists.provinces || []), ...provinceSellers.map(seller => seller.province), eventData.province || ''];
+      const sellersForTown = sellerOptionsForEvent(eventData, { town: currentTown, province: currentProvince });
+      setSelectOptions(fields.localidad, towns, 'Elegir localidad', currentTown);
+      setSelectOptions(fields.provincia, provinces, 'Elegir provincia', currentProvince);
+      setSelectOptions(fields.vendedor, sellersForTown.map(seller => seller.name), 'Elegir vendedor', currentSeller);
+    }
     function applySellerReference() {
       const eventData = activeEvent();
       if (!eventData) return;
@@ -1355,6 +1381,7 @@
       if (seller.admin) fields.saleAdmin.value = seller.admin;
       if (seller.town) fields.localidad.value = seller.town;
       if (seller.province) fields.provincia.value = seller.province;
+      renderSaleReferenceSelects(eventData);
     }
     function applyTownReference() {
       const eventData = activeEvent();
@@ -1363,6 +1390,8 @@
       renderSellerOptions(eventData, { town: fields.localidad.value });
       const provinces = uniqueTextList(matchingSellers.map(seller => seller.province));
       if (provinces.length === 1) fields.provincia.value = provinces[0];
+      if (!matchingSellers.some(seller => seller.name === fields.vendedor.value)) fields.vendedor.value = '';
+      renderSaleReferenceSelects(eventData);
     }
     function parseAmount(value) {
       const clean = String(value || '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
@@ -1447,7 +1476,10 @@
         alert('Ese dato ya esta cargado.');
         return;
       }
-      if (key === 'sellers') lists.sellers.push({ name: clean, admin: '', town: '', province: '' });
+      if (key === 'sellers') {
+        const eventData = activeEvent();
+        lists.sellers.push({ name: clean, admin: eventData?.admin || '', town: eventData?.town || '', province: eventData?.province || '' });
+      }
       else lists[key].push(clean);
       saveReferenceLists();
     }
@@ -4175,7 +4207,6 @@
       if (!loadSales.length) return;
       const first = loadSales[0];
       editingLoadId = loadId;
-      fields.vendedor.value = first.seller;
       fields.sinCargos.value = Number(first.freeUnits) || 0;
       fields.saleSellerPercent.value = saleSellerPercent(first, eventData);
       fields.saleAdmin.value = saleAdminName(first, eventData);
@@ -4185,6 +4216,8 @@
       fields.pagoTransferencia.value = Math.round(loadSales.reduce((sum, sale) => sum + saleTransfer(sale, eventData), 0));
       fields.localidad.value = first.town;
       fields.provincia.value = first.province;
+      renderSaleReferenceSelects(eventData);
+      fields.vendedor.value = first.seller;
       fields.desde.value = '';
       fields.hasta.value = '';
       draftRanges = loadSales.map(sale => ({
