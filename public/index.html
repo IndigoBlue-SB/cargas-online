@@ -3806,10 +3806,34 @@
     function uniqueSales(key) {
       return [...new Set(eventSales().map(sale => sale[key]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
     }
+    function eventReferenceSellers() {
+      return referenceLists(activeEvent()).sellers || [];
+    }
+    function filterValueList(key) {
+      const sellers = eventReferenceSellers();
+      if (key === 'town') return uniqueTextList([...uniqueSales('town'), ...sellers.map(seller => seller.town)]);
+      if (key === 'province') return uniqueTextList([...uniqueSales('province'), ...sellers.map(seller => seller.province)]);
+      if (key === 'seller') {
+        const selectedTown = $('filterLocalidad').value;
+        const selectedProvince = $('filterProvincia').value;
+        const sellerNames = sellers.filter(seller => {
+          if (selectedTown && seller.town !== selectedTown) return false;
+          if (selectedProvince && seller.province !== selectedProvince) return false;
+          return true;
+        }).map(seller => seller.name);
+        const saleNames = eventSales().filter(sale => {
+          if (selectedTown && sale.town !== selectedTown) return false;
+          if (selectedProvince && sale.province !== selectedProvince) return false;
+          return true;
+        }).map(sale => sale.seller);
+        return uniqueTextList([...sellerNames, ...saleNames]);
+      }
+      return uniqueSales(key);
+    }
 
     function fillSelect(select, values, allText) {
       const current = select.value;
-      select.innerHTML = `<option value="">${allText}</option>` + values.map(value => `<option value="${value}">${value}</option>`).join('');
+      select.innerHTML = `<option value="">${allText}</option>` + values.map(value => `<option value="${escapeAttr(value)}">${escapeAttr(value)}</option>`).join('');
       select.value = values.includes(current) ? current : '';
     }
 
@@ -3822,6 +3846,14 @@
           && (!$('filterProvincia').value || sale.province === $('filterProvincia').value)
           && (!$('filterVendedor').value || sale.seller === $('filterVendedor').value);
       });
+    }
+    function applyEventLocationFilter() {
+      const selectedTown = $('filterLocalidad').value;
+      if (!selectedTown || $('filterProvincia').value) return;
+      const provinces = uniqueTextList(eventReferenceSellers()
+        .filter(seller => seller.town === selectedTown)
+        .map(seller => seller.province));
+      if (provinces.length === 1) $('filterProvincia').value = provinces[0];
     }
 
     function groupSales(sales, key) {
@@ -4013,9 +4045,9 @@
       if (!fields.localidad.value) fields.localidad.value = event.town;
       if (!fields.provincia.value) fields.provincia.value = event.province;
       applyTownReference();
-      fillSelect($('filterLocalidad'), uniqueSales('town'), 'Todas');
-      fillSelect($('filterProvincia'), uniqueSales('province'), 'Todas');
-      fillSelect($('filterVendedor'), uniqueSales('seller'), 'Todos');
+      fillSelect($('filterLocalidad'), filterValueList('town'), 'Todas');
+      fillSelect($('filterProvincia'), filterValueList('province'), 'Todas');
+      fillSelect($('filterVendedor'), filterValueList('seller'), 'Todos');
       updateExportValues();
       const items = filteredSales();
       const totals = totalsFor(items, event);
@@ -5129,7 +5161,8 @@
       saveSheetSettings();
       alert('Configuracion de planillas guardada.');
     });
-    [$('search'), $('filterLocalidad'), $('filterProvincia'), $('filterVendedor')].forEach(input => input.addEventListener('input', renderActiveEvent));
+    $('filterLocalidad').addEventListener('input', () => { applyEventLocationFilter(); renderActiveEvent(); });
+    [$('search'), $('filterProvincia'), $('filterVendedor')].forEach(input => input.addEventListener('input', renderActiveEvent));
     viewButtons.forEach(button => button.addEventListener('click', () => { currentView = button.dataset.view; viewButtons.forEach(item => item.classList.toggle('active', item === button)); renderActiveEvent(); }));
     document.addEventListener('dblclick', event => {
       const statsCalendarDay = event.target.closest('[data-stats-calendar-day]');
