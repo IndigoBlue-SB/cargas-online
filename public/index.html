@@ -1184,6 +1184,7 @@
     let balanceAutosaveTimer = null;
     let appNoticeTimer = null;
     let lastSaveWarningAt = 0;
+    let eventsSaveQueue = Promise.resolve();
     const openAccountingCategories = new Set();
     const pendingLogos = { mainLogo: null, eventLogoLeft: null, eventLogoRight: null, balanceBgImage: null };
     const bingoCardsCache = new Map();
@@ -1237,8 +1238,12 @@
         clearTimeout(timer);
       }
     }
-    function saveEvents() {
-      api('/api/events', { method: 'PUT', body: JSON.stringify({ events }) }).catch(handleBackgroundSaveError);
+    function saveEvents({ background = true } = {}) {
+      const request = () => api('/api/events', { method: 'PUT', body: JSON.stringify({ events }) });
+      const queued = eventsSaveQueue.catch(() => {}).then(request);
+      eventsSaveQueue = queued;
+      if (background) queued.catch(handleBackgroundSaveError);
+      return queued;
     }
     function saveSettingsData() {
       try {
@@ -1468,15 +1473,21 @@
         </section>
       `).join('');
     }
-    function saveReferenceLists() {
+    async function saveReferenceLists() {
       const eventData = activeEvent();
       if (!eventData) return;
       eventData.referenceLists = eventReferenceListsFromEvent(eventData, eventData.referenceLists);
-      saveEvents();
+      try {
+        await saveEvents({ background: false });
+      } catch (error) {
+        handleBackgroundSaveError(error);
+        alert(`${error.message} No se pudo confirmar el guardado. Revisa la conexion y volve a tocar Guardar.`);
+        return;
+      }
       renderReferenceLists();
       renderSaleReferenceSelects(eventData);
     }
-    function addReferenceValue(key, value) {
+    async function addReferenceValue(key, value) {
       if (!referenceListLabels[key]) return;
       const clean = String(value || '').trim();
       if (!clean) return;
@@ -1493,9 +1504,9 @@
         lists.sellers.push({ name: clean, admin: eventData?.admin || '', town: eventData?.town || '', province: eventData?.province || '' });
       }
       else lists[key].push(clean);
-      saveReferenceLists();
+      await saveReferenceLists();
     }
-    function updateReferenceValue(key, index, value) {
+    async function updateReferenceValue(key, index, value) {
       if (!referenceListLabels[key]) return;
       const lists = referenceLists();
       if (key === 'sellers') {
@@ -1517,13 +1528,13 @@
         if (!clean) lists[key].splice(index, 1);
         else lists[key][index] = clean;
       }
-      saveReferenceLists();
+      await saveReferenceLists();
     }
-    function deleteReferenceValue(key, index) {
+    async function deleteReferenceValue(key, index) {
       if (!referenceListLabels[key]) return;
       const lists = referenceLists();
       lists[key].splice(index, 1);
-      saveReferenceLists();
+      await saveReferenceLists();
     }
     function sheetState() {
       if (!settings.sheetSales) settings.sheetSales = defaultSheetSettings();
@@ -4685,7 +4696,7 @@
       await loadAccounts().catch(() => {});
       applySession();
     });
-    document.addEventListener('click', event => {
+    document.addEventListener('click', async event => {
       const shortcut = event.target.closest('[data-page-shortcut]');
       if (shortcut) go(shortcut.dataset.pageShortcut);
       const openReferenceLists = event.target.closest('[data-open-reference-lists]');
@@ -4699,7 +4710,7 @@
       if (addReference && isAdmin()) {
         const key = addReference.dataset.referenceAdd;
         const input = document.querySelector(`[data-reference-new="${CSS.escape(key)}"]`);
-        addReferenceValue(key, input?.value);
+        await addReferenceValue(key, input?.value);
       }
       const saveReference = event.target.closest('[data-reference-save]');
       if (saveReference && isAdmin()) {
@@ -4707,7 +4718,7 @@
         const index = Number(saveReference.dataset.referenceIndex);
         if (key === 'sellers') {
           const row = saveReference.closest('[data-reference-seller-row]');
-          updateReferenceValue(key, index, {
+          await updateReferenceValue(key, index, {
             name: row?.querySelector(`[data-reference-seller-name="${index}"]`)?.value,
             admin: row?.querySelector(`[data-reference-seller-admin="${index}"]`)?.value,
             town: row?.querySelector(`[data-reference-seller-town="${index}"]`)?.value,
@@ -4715,12 +4726,12 @@
           });
         } else {
           const input = document.querySelector(`[data-reference-value="${CSS.escape(key)}"][data-reference-index="${index}"]`);
-          updateReferenceValue(key, index, input?.value);
+          await updateReferenceValue(key, index, input?.value);
         }
       }
       const deleteReference = event.target.closest('[data-reference-delete]');
       if (deleteReference && isAdmin() && confirm('Eliminar este dato de la lista?')) {
-        deleteReferenceValue(deleteReference.dataset.referenceDelete, Number(deleteReference.dataset.referenceIndex));
+        await deleteReferenceValue(deleteReference.dataset.referenceDelete, Number(deleteReference.dataset.referenceIndex));
       }
       const open = event.target.closest('[data-open-event]');
       if (open) {
@@ -5096,19 +5107,19 @@
       }
       addDraftRange();
     }, true);
-    $('referenceLists').addEventListener('keydown', event => {
+    $('referenceLists').addEventListener('keydown', async event => {
       if (event.key !== 'Enter') return;
       const addInput = event.target.closest('[data-reference-new]');
       const valueInput = event.target.closest('[data-reference-value]');
       const sellerInput = event.target.closest('[data-reference-seller-name], [data-reference-seller-admin], [data-reference-seller-town], [data-reference-seller-province]');
       if (!addInput && !valueInput && !sellerInput) return;
       event.preventDefault();
-      if (addInput) addReferenceValue(addInput.dataset.referenceNew, addInput.value);
-      if (valueInput) updateReferenceValue(valueInput.dataset.referenceValue, Number(valueInput.dataset.referenceIndex), valueInput.value);
+      if (addInput) await addReferenceValue(addInput.dataset.referenceNew, addInput.value);
+      if (valueInput) await updateReferenceValue(valueInput.dataset.referenceValue, Number(valueInput.dataset.referenceIndex), valueInput.value);
       if (sellerInput) {
         const row = sellerInput.closest('[data-reference-seller-row]');
         const index = Number(row?.dataset.referenceSellerRow);
-        updateReferenceValue('sellers', index, {
+        await updateReferenceValue('sellers', index, {
           name: row?.querySelector(`[data-reference-seller-name="${index}"]`)?.value,
           admin: row?.querySelector(`[data-reference-seller-admin="${index}"]`)?.value,
           town: row?.querySelector(`[data-reference-seller-town="${index}"]`)?.value,
