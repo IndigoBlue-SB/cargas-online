@@ -1315,12 +1315,7 @@
       };
     }
     function eventReferenceListsFromEvent(eventData, currentLists = {}) {
-      const currentSellers = normalizeSellerList(currentLists.sellers).map(seller => ({
-        ...seller,
-        admin: seller.admin || eventData?.admin || '',
-        town: seller.town || eventData?.town || '',
-        province: seller.province || eventData?.province || ''
-      }));
+      const currentSellers = normalizeSellerList(currentLists.sellers);
       return normalizeReferenceLists({
         sellers: currentSellers,
         admins: [...(currentLists.admins || []), ...currentSellers.map(seller => seller.admin), eventData?.admin || ''],
@@ -1384,9 +1379,10 @@
         ? provincesForTown(eventData, currentTown)
         : [...(lists.provinces || []), ...provinceSellers.map(seller => seller.province), eventData.province || ''];
       const sellersForTown = sellerOptionsForEvent(eventData, { town: currentTown, province: currentProvince });
+      const nextSeller = sellersForTown.some(seller => seller.name === currentSeller) ? currentSeller : '';
       setSelectOptions(fields.localidad, towns, 'Elegir localidad', currentTown);
       setSelectOptions(fields.provincia, provinces, 'Elegir provincia', currentProvince);
-      setSelectOptions(fields.vendedor, sellersForTown.map(seller => seller.name), 'Elegir vendedor', currentSeller);
+      setSelectOptions(fields.vendedor, sellersForTown.map(seller => seller.name), 'Elegir vendedor', nextSeller);
     }
     function applySellerReference() {
       const eventData = activeEvent();
@@ -1478,6 +1474,7 @@
       eventData.referenceLists = eventReferenceListsFromEvent(eventData, eventData.referenceLists);
       saveEvents();
       renderReferenceLists();
+      renderSaleReferenceSelects(eventData);
     }
     function addReferenceValue(key, value) {
       if (!referenceListLabels[key]) return;
