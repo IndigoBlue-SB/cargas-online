@@ -291,6 +291,7 @@
     #page-balance-detail .balance-add-button { margin-top: 8px; }
     .balance-line { display: grid; grid-template-columns: minmax(70px, 1fr) 82px 64px; gap: 4px; align-items: end; }
     .balance-admin-line { display: grid; grid-template-columns: minmax(104px, 1fr) 56px 52px 70px 82px 58px; gap: 4px; align-items: end; }
+    .balance-section-spacer { margin-top: 16px; padding-top: 8px; border-top: 1px solid var(--line); }
     .balance-total-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(78px, 112px); gap: 5px; align-items: center; margin-top: 5px; }
     .balance-total-line strong, .balance-total-line span { min-height: 28px; display: flex; align-items: center; border-radius: 5px; padding: 5px 8px; background: var(--button-bg); color: #fff; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
     .balance-total-line span { justify-content: flex-end; font-weight: 800; }
@@ -867,14 +868,14 @@
               <h3>Administradores</h3>
               <div id="balanceAdminsList" class="form-grid"></div>
               <button type="button" class="light hidden" id="addBalanceAdmin">Agregar administrador</button>
-              <h3>Gastos de Indigo Blue</h3>
-              <div id="balanceIndigoExpenses" class="form-grid"></div>
-              <button type="button" class="light balance-add-button" id="addBalanceIndigoExpense">Agregar gasto de Indigo</button>
             </aside>
             <div class="balance-main">
               <h3>Gastos</h3>
               <div id="balanceExpenses" class="form-grid"></div>
               <button type="button" class="light balance-add-button" id="addBalanceExpense">Agregar gasto especial</button>
+              <h3 class="balance-section-spacer">Gastos de Indigo Blue</h3>
+              <div id="balanceIndigoExpenses" class="form-grid"></div>
+              <button type="button" class="light balance-add-button" id="addBalanceIndigoExpense">Agregar gasto de Indigo</button>
             </div>
             <aside class="balance-side">
               <h3>PREMIOS</h3>
@@ -2062,20 +2063,36 @@
     function defaultBalanceAdmins() {
       return [];
     }
+    function personKey(value) {
+      return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+    }
+    function cleanPersonName(value) {
+      return String(value || '').replace(/\s+/g, ' ').trim();
+    }
     function automaticBalanceAdmins(eventData) {
       const groups = new Map();
       groupLoads(officialSales(eventData), eventData).forEach(load => {
-        const name = String(load.adminName || '').trim();
+        const name = cleanPersonName(load.adminName || '');
         if (!name) return;
         const paidUnits = Math.max((Number(load.units) || 0) - (Number(load.freeUnits) || 0), 0);
         if (!paidUnits) return;
         const percent = Number(load.adminPercent) || 0;
         const fixed = Number(load.adminFixed) || 0;
-        const key = `${normalize(name)}|${percent}|${fixed}`;
+        const amount = loadFinancials(load, eventData).adminCommission;
+        const key = personKey(name);
         if (!groups.has(key)) {
-          groups.set(key, { id: key, name, units: 0, percent, fixed, automatic: true });
+          groups.set(key, { id: key, name, units: 0, percent, fixed, amount: 0, automatic: true });
         }
-        groups.get(key).units += paidUnits;
+        const group = groups.get(key);
+        group.units += paidUnits;
+        group.amount += amount;
+        if (!group.fixed && fixed) group.fixed = fixed;
+        if (!group.percent && percent) group.percent = percent;
       });
       return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'es') || b.units - a.units);
     }
@@ -2154,6 +2171,7 @@
       return units * pct(price, percent);
     }
     function balanceAdminAmount(balance, item) {
+      if (item?.automatic && item.amount !== undefined) return Number(item.amount) || 0;
       const units = Number(item.units) || 0;
       const fixed = Number(item.fixed) || 0;
       return fixed > 0 ? units * fixed : balanceCartonPercentAmount(balance, item.percent, units);
@@ -2986,7 +3004,9 @@
           name: row.querySelector('[data-admin-name]').value.trim() || 'Administrador',
           units: Number(row.querySelector('[data-admin-units]').value) || 0,
           percent: parseAmount(row.querySelector('[data-admin-percent]').value),
-          fixed: parseAmount(row.querySelector('[data-admin-fixed]').value)
+          fixed: parseAmount(row.querySelector('[data-admin-fixed]').value),
+          automatic: row.dataset.balanceAutomatic === 'true',
+          amount: row.dataset.balanceAutomatic === 'true' ? parseAmount(row.querySelector('[data-admin-amount]').value) : undefined
         })),
         expenses: [...document.querySelectorAll('[data-balance-expense]')].map(row => ({
           id: row.dataset.balanceExpense,
@@ -3032,10 +3052,10 @@
         rows.push(
           [`% Noe (${num(balance.noePercent)}%)`, money(totals.noeAmount)],
           ['Sub Total', money(totals.afterNoe)],
+          [`Institucion (${num(100 - (balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent))}%)`, money(totals.institutionAmount)],
           [`INDIGO BLUE (${num(balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent)}%)`, money(totals.indigoAmount)],
           ['Gastos Indigo Blue', money(totals.indigoExpenses)],
           ['Neto Indigo Blue', money(totals.indigoNetAmount)],
-          [`Institucion (${num(100 - (balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent))}%)`, money(totals.institutionAmount)],
           [`% Gise (${num(balance.gisePercent)}%)`, money(totals.giseAmount)],
           [`% Laureano (${num(balance.laureanoPercent)}%)`, money(totals.laureanoAmount)]
         );
@@ -3055,7 +3075,7 @@
         const fixed = Number(item.fixed) || 0;
         const amount = balanceAdminAmount(balance, { ...item, units, percent, fixed });
         return `
-          <div class="balance-admin-line" data-balance-admin="${item.id || crypto.randomUUID()}">
+          <div class="balance-admin-line" data-balance-admin="${item.id || crypto.randomUUID()}" ${item.automatic ? 'data-balance-automatic="true"' : ''}>
             <label>Administrador<input data-admin-name autocomplete="off" ${item.automatic ? 'readonly' : ''} value="${String(item.name || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}"></label>
             <label>Cantidad<input data-admin-units type="number" min="0" step="1" ${item.automatic ? 'readonly' : ''} value="${units}"></label>
             <label>% carton<input data-admin-percent inputmode="decimal" autocomplete="off" ${item.automatic ? 'readonly' : ''} value="${percent}"></label>
@@ -3084,7 +3104,9 @@
         const percent = parseAmount(row.querySelector('[data-admin-percent]').value);
         const fixed = parseAmount(row.querySelector('[data-admin-fixed]').value);
         const amountInput = row.querySelector('[data-admin-amount]');
-        if (amountInput) amountInput.value = formatInputAmount(balanceAdminAmount(balance, { units, percent, fixed }));
+        const amount = parseAmount(amountInput?.value);
+        const automatic = row.dataset.balanceAutomatic === 'true';
+        if (amountInput) amountInput.value = formatInputAmount(balanceAdminAmount(balance, { units, percent, fixed, amount, automatic }));
       });
     }
 
@@ -4498,10 +4520,10 @@
         rows.push(
           [`Noe ${num(balance.noePercent)}%`, money(totals.noeAmount)],
           ['Sub Total', money(totals.afterNoe)],
+          [`Institucion ${num(100 - (balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent))}%`, money(totals.institutionAmount)],
           [`INDIGO BLUE ${num(balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent)}%`, money(totals.indigoAmount)],
           ['Gastos Indigo Blue', money(totals.indigoExpenses)],
           ['Neto Indigo Blue', money(totals.indigoNetAmount)],
-          [`Institucion ${num(100 - (balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : balance.indigoPercent))}%`, money(totals.institutionAmount)],
           [`Gise ${num(balance.gisePercent)}%`, money(totals.giseAmount)],
           [`Laureano ${num(balance.laureanoPercent)}%`, money(totals.laureanoAmount)]
         );
