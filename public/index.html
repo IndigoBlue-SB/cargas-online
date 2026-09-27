@@ -285,6 +285,7 @@
     #page-balance-detail .panel { padding: 8px; gap: 6px; }
     #page-balance-detail label { gap: 2px; color: var(--balance-label-color, var(--muted)); font-size: var(--balance-label-size, 11px); }
     #page-balance-detail .stat span { color: var(--balance-label-color, var(--muted)); font-size: var(--balance-label-size, 11px); }
+    #page-balance-detail .stat strong { font-size: var(--balance-amount-size, var(--total-font-size)); }
     #page-balance-detail input { min-height: 28px; padding: 5px 6px; font-size: 13px; }
     #page-balance-detail button { min-height: 30px; padding: 5px 8px; font-size: 13px; }
     #page-balance-detail .form-grid { gap: 5px; }
@@ -300,6 +301,7 @@
     .balance-account-row span:first-child { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); font-weight: 700; padding: 5px 6px; border-radius: 5px; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
     .balance-account-row input { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); font-weight: 700; border-color: transparent; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
     .balance-admin-line input, .balance-line input { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); border-color: transparent; box-shadow: 0 5px 12px rgba(5, 17, 22, .11); }
+    .balance-account-row input, .balance-total-line span, #balanceResult, [data-admin-amount], [data-expense-amount], [data-indigo-expense-amount], [data-prize-amount] { font-size: var(--balance-amount-size, 13px) !important; }
     .accounting-layout { display: grid; grid-template-columns: minmax(240px, 310px) minmax(0, 1fr); gap: 10px; align-items: stretch; }
     .accounting-events, .accounting-categories { display: grid; gap: 8px; }
     .accounting-toolbar { max-width: 100%; display: flex; gap: 6px; flex-wrap: wrap; align-items: end; margin-bottom: 8px; padding: 8px; }
@@ -921,6 +923,10 @@
           <div class="grid-2">
             <label>Tamano texto<input id="balanceConfigFontSize" type="number" min="11" max="26" step="1"></label>
             <label>Tamano titulos<input id="balanceConfigHeadingSize" type="number" min="14" max="34" step="1"></label>
+          </div>
+          <div class="grid-2">
+            <label>Tamano importes<input id="balanceConfigAmountSize" type="number" min="10" max="34" step="1"></label>
+            <span></span>
           </div>
           <div class="actions">
             <button type="button" id="applyBalanceConfig">Aplicar</button>
@@ -2104,6 +2110,7 @@
         labelSize: 11,
         fontSize: 15,
         headingSize: 22,
+        amountSize: 13,
         boxColor: '#eef2ed',
         boxTextColor: '#051116',
         bgColor: '#000000',
@@ -3194,6 +3201,7 @@
       target.style.setProperty('--balance-label-size', `${Number(style.labelSize) || defaultBalanceStyle().labelSize}px`);
       target.style.setProperty('--balance-font-size', `${Number(style.fontSize) || defaultBalanceStyle().fontSize}px`);
       target.style.setProperty('--balance-heading-size', `${Number(style.headingSize) || defaultBalanceStyle().headingSize}px`);
+      target.style.setProperty('--balance-amount-size', `${Number(style.amountSize) || defaultBalanceStyle().amountSize}px`);
       target.style.setProperty('--balance-box-bg', style.boxColor || defaultBalanceStyle().boxColor);
       target.style.setProperty('--balance-box-color', style.boxTextColor || defaultBalanceStyle().boxTextColor);
       target.style.setProperty('--balance-bg', style.bgColor || defaultBalanceStyle().bgColor);
@@ -3213,6 +3221,7 @@
       $('balanceConfigPanelColor').value = merged.panelColor;
       $('balanceConfigFontSize').value = merged.fontSize;
       $('balanceConfigHeadingSize').value = merged.headingSize;
+      $('balanceConfigAmountSize').value = merged.amountSize;
       setImage($('balanceConfigBgPreview'), merged.bgImage);
     }
 
@@ -5335,7 +5344,8 @@
         panelColor: $('balanceConfigPanelColor').value,
         bgImage: pendingLogos.balanceBgImage || balance.style?.bgImage || '',
         fontSize: Number($('balanceConfigFontSize').value) || defaultBalanceStyle().fontSize,
-        headingSize: Number($('balanceConfigHeadingSize').value) || defaultBalanceStyle().headingSize
+        headingSize: Number($('balanceConfigHeadingSize').value) || defaultBalanceStyle().headingSize,
+        amountSize: Number($('balanceConfigAmountSize').value) || defaultBalanceStyle().amountSize
       };
       pendingLogos.balanceBgImage = null;
       applyBalanceStyle(balance.style);
