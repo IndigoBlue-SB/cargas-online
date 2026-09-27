@@ -791,7 +791,7 @@
 
       <section id="page-accounting" data-screen class="hidden">
         <div class="topbar">
-          <div><h2>Contable</h2><p class="muted">Resumen semanal tomado de INDIGO BLUE de cada balance.</p></div>
+          <div><h2>Contable</h2><p class="muted">Resumen automatico de bingos, Indigo, Gise y Laureano por semana o mes.</p></div>
         </div>
         <div class="panel accounting-toolbar">
           <label>Desde<input id="accountingWeekStart" inputmode="numeric" placeholder="08-08-26"></label>
@@ -807,19 +807,20 @@
             <div id="accountingEventsList" class="accounting-events"></div>
           </section>
           <section class="panel accounting-categories">
-            <div class="accounting-workspace">
-              <aside class="panel accounting-event-summary">
-                <h3 id="accountingEventTitle">Elegir evento</h3>
-                <p id="accountingEventInfo" class="muted"></p>
-                <div class="accounting-mini-stat"><span>Bingos</span><strong id="accountingEventUnits">0</strong></div>
-                <div class="accounting-mini-stat"><span>INDIGO BLUE</span><strong id="accountingEventBase">$0</strong></div>
-                <div class="accounting-mini-stat"><span>Total detalle</span><strong id="accountingEventSpent">$0</strong></div>
-                <div class="accounting-mini-stat"><span>Saldo</span><strong id="accountingEventNet">$0</strong></div>
-              </aside>
-              <div class="form-grid">
-                <div class="actions"><button type="button" id="addAccountingCategory">Agregar categoria</button></div>
-                <div id="accountingCategoriesList" class="accounting-categories"></div>
-                <div class="actions"><button type="button" id="saveAccounting">Guardar contable</button></div>
+            <div class="accounting-summary-cards">
+              <div class="accounting-mini-stat"><span>Bingos seleccionados</span><strong id="accountingEventUnits">0</strong></div>
+              <div class="accounting-mini-stat"><span>Ingreso Indigo</span><strong id="accountingEventBase">$0</strong></div>
+              <div class="accounting-mini-stat"><span>Gise</span><strong id="accountingEventGise">$0</strong></div>
+              <div class="accounting-mini-stat"><span>Laureano</span><strong id="accountingEventLaureano">$0</strong></div>
+            </div>
+            <div class="table-wrap">
+              <div class="table-head"><h3 id="accountingEventTitle">Detalle seleccionado</h3><span id="accountingEventInfo" class="muted"></span></div>
+              <div class="scroll">
+                <table>
+                  <thead><tr><th>Evento</th><th>Periodo</th><th>Bingos</th><th>Ingreso Indigo</th><th>Gise</th><th>Laureano</th></tr></thead>
+                  <tbody id="accountingSummaryRows"></tbody>
+                </table>
+                <div id="accountingEmpty" class="empty">Selecciona uno o mas eventos con ventas en el periodo.</div>
               </div>
             </div>
           </section>
@@ -1171,7 +1172,6 @@
     let activeEventId = null;
     let activeBalanceEventId = null;
     let activeBingoEventId = null;
-    let activeAccountingEventId = null;
     let activeStatsEventId = null;
     let statsRangeStart = '';
     let statsRangeEnd = '';
@@ -1192,7 +1192,6 @@
     let appNoticeTimer = null;
     let lastSaveWarningAt = 0;
     let eventsSaveQueue = Promise.resolve();
-    const openAccountingCategories = new Set();
     const pendingLogos = { mainLogo: null, eventLogoLeft: null, eventLogoRight: null, balanceBgImage: null };
     const bingoCardsCache = new Map();
     const bingo90StorageKey = 'bingo90.events.v1';
@@ -1741,10 +1740,6 @@
     function dateInAccountingWeek(dateText) {
       ensureAccountingWeek();
       return Boolean(dateText) && dateText >= accountingWeekStart && dateText <= accountingWeekEnd;
-    }
-    function accountingPeriodOverlaps(key) {
-      const [start, end] = String(key || '').split('_');
-      return Boolean(start && end) && start <= accountingWeekEnd && end >= accountingWeekStart;
     }
     function isAdmin() { return currentUser?.role === 'admin'; }
     function normalizeFunctionPermissions(value) {
@@ -2747,77 +2742,6 @@
       return copy;
     }
 
-    function defaultAccountingCategories() {
-      return [
-        { id: crypto.randomUUID(), name: 'Gastos', details: [] },
-        { id: crypto.randomUUID(), name: 'Premios', details: [] },
-        { id: crypto.randomUUID(), name: 'Viaticos', details: [] }
-      ];
-    }
-    function normalizeAccountingCategories(categories) {
-      const source = Array.isArray(categories) ? categories : defaultAccountingCategories();
-      return source.map(category => ({
-        id: category.id || crypto.randomUUID(),
-        name: category.name || 'Categoria',
-        source: category.source || '',
-        details: Array.isArray(category.details) ? category.details.map(detail => ({
-          id: detail.id || crypto.randomUUID(),
-          name: detail.name || '',
-          amount: Number(detail.amount) || 0,
-          source: detail.source || ''
-        })) : []
-      }));
-    }
-    function balanceCategoryDetail(item, prefix) {
-      return {
-        id: `${prefix}-${item.id || normalize(item.name) || crypto.randomUUID()}`,
-        name: item.name || 'Detalle',
-        amount: Number(item.amount) || 0,
-        source: 'balance'
-      };
-    }
-    function accountingCategoriesFromBalance(eventData) {
-      const balance = eventBalance(accountingEventForWeek(eventData));
-      const expenses = normalizeBalanceLines(balance.expenses, fallbackBalanceExpenses);
-      const indigoExpenses = normalizeBalanceLines(balance.indigoExpenses, () => []);
-      const prizes = normalizeBalanceLines(balance.prizesList, fallbackBalancePrizes);
-      const viaticos = expenses.filter(item => normalize(item.name).includes('viatic'));
-      const gastos = expenses.filter(item => !normalize(item.name).includes('viatic'));
-      return [
-        { id: 'balance-gastos', name: 'Gastos', source: 'balance', details: gastos.map(item => balanceCategoryDetail(item, 'balance-expense')) },
-        { id: 'balance-gastos-indigo', name: 'Gastos Indigo Blue', source: 'balance', details: indigoExpenses.map(item => balanceCategoryDetail(item, 'balance-indigo-expense')) },
-        { id: 'balance-premios', name: 'Premios', source: 'balance', details: prizes.map(item => balanceCategoryDetail(item, 'balance-prize')) },
-        { id: 'balance-viaticos', name: 'Viaticos', source: 'balance', details: viaticos.map(item => balanceCategoryDetail(item, 'balance-viatico')) }
-      ];
-    }
-    function syncAccountingWithBalance(eventData) {
-      const key = accountingWeekKey();
-      if (!eventData.accountingByWeek) eventData.accountingByWeek = {};
-      const current = normalizeAccountingCategories(eventData.accountingByWeek[key]?.categories);
-      const balanceCategories = accountingCategoriesFromBalance(eventData);
-      const manualCategories = current.filter(category => {
-        if (category.source === 'balance') return false;
-        if (['gastos', 'premios', 'viaticos'].includes(normalize(category.name)) && !(category.details || []).length) return false;
-        return true;
-      });
-      eventData.accountingByWeek[key] = { categories: [...balanceCategories, ...manualCategories] };
-      return eventData.accountingByWeek[key];
-    }
-    function eventAccounting(eventData) {
-      const key = accountingWeekKey();
-      if (!eventData.accountingByWeek) eventData.accountingByWeek = {};
-      if (!eventData.accountingByWeek[key]) {
-        const legacyCategories = eventData.accounting && !Object.keys(eventData.accountingByWeek).length
-          ? eventData.accounting.categories
-          : null;
-        eventData.accountingByWeek[key] = { categories: normalizeAccountingCategories(legacyCategories) };
-      }
-      return syncAccountingWithBalance(eventData);
-    }
-    function accountingEventBase(eventData) {
-      const balance = eventBalance(accountingEventForWeek(eventData));
-      return balanceTotals(balance).indigoNetAmount;
-    }
     function accountingSalesForWeek(eventData) {
       ensureAccountingWeek();
       return salesForReports(eventData).filter(sale => dateInAccountingWeek(saleDate(sale) || sale.playDate));
@@ -2831,6 +2755,19 @@
           ? { ...(eventData.bingoClosure || {}), soldUnits: unitsFromSales(sales), soldUnitsTotal: totalsFor(sales, eventData).units, snapshotSales: sales }
           : eventData.bingoClosure,
         balance: eventData.balance ? { ...eventData.balance } : null
+      };
+    }
+    function accountingEventSummary(eventData) {
+      const scopedEvent = accountingEventForWeek(eventData);
+      const balance = eventBalance(scopedEvent);
+      const totals = balanceTotals(balance);
+      return {
+        event: eventData,
+        balance,
+        units: Number(balance.units) || 0,
+        indigo: totals.indigoNetAmount,
+        gise: totals.giseAmount,
+        laureano: totals.laureanoAmount
       };
     }
     function accountingEventIncludedByDefault(eventData) {
@@ -2847,148 +2784,67 @@
       const eventData = events.find(eventItem => eventItem.id === eventId);
       if (!eventData) return;
       eventData.accountingWeeks = { ...(eventData.accountingWeeks || {}), [accountingWeekKey()]: checked };
-      if (!checked && activeAccountingEventId === eventId) activeAccountingEventId = accountingIncludedEvents()[0]?.id || null;
-      if (checked && !activeAccountingEventId) activeAccountingEventId = eventId;
       saveEvents();
       renderAccounting();
-    }
-    function accountingCategoryTotal(category) {
-      return (category.details || []).reduce((sum, detail) => sum + (Number(detail.amount) || 0), 0);
-    }
-    function accountingCategoriesForRange(eventData) {
-      syncAccountingWithBalance(eventData);
-      const byWeek = eventData.accountingByWeek || {};
-      const matched = Object.entries(byWeek)
-        .filter(([key]) => accountingPeriodOverlaps(key))
-        .flatMap(([, accounting]) => normalizeAccountingCategories(accounting.categories));
-      if (matched.length) {
-        const groups = new Map();
-        matched.forEach(category => {
-          const name = category.name || 'Categoria';
-          const key = normalize(name);
-          if (!groups.has(key)) groups.set(key, { id: `range-${key}`, name, source: category.source || '', details: [] });
-          groups.get(key).details.push(...(category.details || []).map(detail => ({ ...detail, id: detail.id || crypto.randomUUID() })));
-        });
-        return [...groups.values()];
-      }
-      return eventAccounting(eventData).categories;
-    }
-    function accountingEventSpent(eventData) {
-      return accountingCategoriesForRange(eventData).reduce((sum, category) => {
-        return sum + accountingCategoryTotal(category);
-      }, 0);
-    }
-    function activeAccountingEvent() {
-      const availableEvents = accountingIncludedEvents();
-      const selected = availableEvents.find(eventItem => eventItem.id === activeAccountingEventId) || availableEvents[0] || null;
-      activeAccountingEventId = selected?.id || null;
-      return selected;
-    }
-    function accountingFromForm() {
-      return {
-        categories: [...document.querySelectorAll('[data-accounting-category]')].map(categoryRow => ({
-          id: categoryRow.dataset.accountingCategory,
-          name: categoryRow.querySelector('[data-accounting-category-name]').value.trim() || 'Categoria',
-          source: categoryRow.dataset.accountingSource || '',
-          details: [...categoryRow.querySelectorAll('[data-accounting-detail]')].map(detailRow => ({
-            id: detailRow.dataset.accountingDetail,
-            name: detailRow.querySelector('[data-accounting-detail-name]').value.trim() || 'Detalle',
-            amount: parseAmount(detailRow.querySelector('[data-accounting-detail-amount]').value),
-            source: detailRow.dataset.accountingDetailSource || ''
-          }))
-        }))
-      };
     }
     function renderAccounting() {
       ensureAccountingWeek();
       const availableEvents = visibleEvents();
       const includedEvents = accountingIncludedEvents();
-      const selected = activeAccountingEvent();
-      if (!activeAccountingEventId && selected) activeAccountingEventId = selected.id;
-      const totals = includedEvents.reduce((acc, eventData) => {
-        const balance = eventBalance(accountingEventForWeek(eventData));
-        const base = balanceTotals(balance).indigoAmount;
-        const spent = accountingEventSpent(eventData);
-        acc.base += base;
-        acc.spent += spent;
-        acc.units += Number(balance.units) || 0;
+      const summaries = includedEvents.map(accountingEventSummary);
+      const totals = summaries.reduce((acc, item) => {
+        acc.indigo += item.indigo;
+        acc.gise += item.gise;
+        acc.laureano += item.laureano;
+        acc.units += item.units;
         return acc;
-      }, { base: 0, spent: 0, units: 0 });
+      }, { indigo: 0, gise: 0, laureano: 0, units: 0 });
       $('accountingEventsTotal').textContent = num(includedEvents.length);
       $('accountingUnitsTotal').textContent = num(totals.units);
       $('accountingEventsList').innerHTML = availableEvents.length ? availableEvents.map(eventData => {
-        const base = accountingEventBase(eventData);
-        const spent = accountingEventSpent(eventData);
-        const balance = eventBalance(accountingEventForWeek(eventData));
+        const summary = accountingEventSummary(eventData);
         const included = isAccountingEventIncluded(eventData);
         return `
-          <label class="accounting-event accounting-event-toggle ${eventData.id === activeAccountingEventId ? 'active' : ''}">
+          <label class="accounting-event accounting-event-toggle ${included ? 'active' : ''}">
             <input type="checkbox" data-accounting-include="${eventData.id}" ${included ? 'checked' : ''}>
-            <span data-open-accounting="${eventData.id}">
+            <span>
               <strong>${eventData.name}</strong>
-              <span class="muted">${num(balance.units)} bingos</span>
-              <span>Saldo ${money(base - spent)}</span>
+              <span class="muted">${num(summary.units)} bingos</span>
+              <span>Indigo ${money(summary.indigo)}</span>
             </span>
           </label>
         `;
       }).join('') : '<div class="empty">No hay eventos disponibles.</div>';
-      renderAccountingDetail(selected);
+      renderAccountingSummary(summaries, totals);
     }
-    function renderAccountingDetail(eventData) {
-      if (!eventData) {
-        $('accountingEventTitle').textContent = 'Elegir evento';
-        $('accountingEventInfo').textContent = 'No hay eventos disponibles para trabajar.';
-        $('accountingEventUnits').textContent = '0';
-        $('accountingEventBase').textContent = money(0);
-        $('accountingEventSpent').textContent = money(0);
-        $('accountingEventNet').textContent = money(0);
-        $('accountingCategoriesList').innerHTML = '';
-        return;
-      }
-      const balance = eventBalance(accountingEventForWeek(eventData));
-      const base = balanceTotals(balance).indigoAmount;
-      const accounting = { categories: accountingCategoriesForRange(eventData) };
-      const spent = accountingEventSpent(eventData);
-      $('accountingEventTitle').textContent = eventData.name;
+    function renderAccountingSummary(summaries, totals) {
+      $('accountingEventTitle').textContent = 'Detalle seleccionado';
       $('accountingEventInfo').textContent = `${shortDate(accountingWeekStart)} a ${shortDate(accountingWeekEnd)}`;
-      $('accountingEventUnits').textContent = num(balance.units);
-      $('accountingEventBase').textContent = money(base);
-      $('accountingEventSpent').textContent = money(spent);
-      $('accountingEventNet').textContent = money(base - spent);
-      $('accountingCategoriesList').innerHTML = accounting.categories.map(category => {
-        const total = accountingCategoryTotal(category);
-        const isOpen = openAccountingCategories.has(category.id);
-        const details = (category.details || []).map(detail => `
-          <div class="accounting-detail-line" data-accounting-detail="${detail.id || crypto.randomUUID()}" data-accounting-detail-source="${escapeAttr(detail.source || '')}">
-            <label>Detalle<input data-accounting-detail-name value="${escapeAttr(detail.name || '')}"></label>
-            <label>Importe<input data-accounting-detail-amount inputmode="decimal" autocomplete="off" value="${formatInputAmount(detail.amount)}"></label>
-            <button type="button" class="danger" data-delete-accounting-detail>Quitar</button>
-          </div>
-        `).join('');
-        return `
-          <article class="panel accounting-category ${isOpen ? '' : 'collapsed'}" data-accounting-category="${category.id || crypto.randomUUID()}" data-accounting-source="${escapeAttr(category.source || '')}">
-            <div class="accounting-category-head">
-              <button type="button" class="accounting-toggle" data-toggle-accounting-category>${isOpen ? 'v' : '>'}</button>
-              <label>Categoria<input data-accounting-category-name value="${escapeAttr(category.name || 'Categoria')}"></label>
-              <h3>${money(total)}</h3>
-              <button type="button" class="danger" data-delete-accounting-category>Quitar categoria</button>
-            </div>
-            <div class="accounting-category-body">
-              <div class="form-grid">${details || '<div class="empty">Sin detalles cargados.</div>'}</div>
-              <button type="button" class="light" data-add-accounting-detail>Agregar detalle</button>
-            </div>
-          </article>
-        `;
-      }).join('');
-      [...$('accountingCategoriesList').querySelectorAll('[data-accounting-detail-amount]')].forEach(bindAmountFormatting);
-    }
-    function saveAccountingFromForm() {
-      const eventData = activeAccountingEvent();
-      if (!eventData) return;
-      if (!eventData.accountingByWeek) eventData.accountingByWeek = {};
-      eventData.accountingByWeek[accountingWeekKey()] = accountingFromForm();
-      saveEvents();
-      renderAccounting();
+      $('accountingEventUnits').textContent = num(totals.units);
+      $('accountingEventBase').textContent = money(totals.indigo);
+      $('accountingEventGise').textContent = money(totals.gise);
+      $('accountingEventLaureano').textContent = money(totals.laureano);
+      $('accountingEmpty').classList.toggle('hidden', summaries.length > 0);
+      $('accountingSummaryRows').innerHTML = summaries.length ? [
+        ...summaries.map(item => `
+          <tr>
+            <td><strong>${escapeAttr(item.event.name)}</strong></td>
+            <td>${shortDate(accountingWeekStart)} a ${shortDate(accountingWeekEnd)}</td>
+            <td>${num(item.units)}</td>
+            <td>${money(item.indigo)}</td>
+            <td>${money(item.gise)}</td>
+            <td>${money(item.laureano)}</td>
+          </tr>
+        `),
+        `<tr>
+          <td><strong>TOTAL</strong></td>
+          <td>${num(summaries.length)} eventos</td>
+          <td><strong>${num(totals.units)}</strong></td>
+          <td><strong>${money(totals.indigo)}</strong></td>
+          <td><strong>${money(totals.gise)}</strong></td>
+          <td><strong>${money(totals.laureano)}</strong></td>
+        </tr>`
+      ].join('') : '';
     }
     function balanceFromForm() {
       const currentBalance = activeBalanceEvent() ? eventBalance(activeBalanceEvent()) : null;
@@ -4778,8 +4634,6 @@
         eventBalance(eventData);
         go('balance-detail');
       }
-      const openAccounting = event.target.closest('[data-open-accounting]');
-      if (openAccounting) { activeAccountingEventId = openAccounting.dataset.openAccounting; renderAccounting(); }
       const openBingo = event.target.closest('[data-open-bingo]');
       if (openBingo) { activeBingoEventId = openBingo.dataset.openBingo; renderBingo(); }
       const openStats = event.target.closest('[data-open-stats]');
@@ -4803,16 +4657,6 @@
       }
       const includeAccounting = event.target.closest('[data-accounting-include]');
       if (includeAccounting) { setAccountingEventIncluded(includeAccounting.dataset.accountingInclude, includeAccounting.checked); }
-      const toggleAccountingCategory = event.target.closest('[data-toggle-accounting-category]');
-      if (toggleAccountingCategory) {
-        const category = toggleAccountingCategory.closest('[data-accounting-category]');
-        if (category) {
-          const id = category.dataset.accountingCategory;
-          if (openAccountingCategories.has(id)) openAccountingCategories.delete(id);
-          else openAccountingCategories.add(id);
-          renderAccounting();
-        }
-      }
       const editEventButton = event.target.closest('[data-edit-event]');
       if (editEventButton && canUsePage('create')) editEvent(editEventButton.dataset.editEvent);
       const del = event.target.closest('[data-delete-event]');
@@ -4931,28 +4775,6 @@
         if (row) row.remove();
         updateBalancePreview();
         persistBalanceFromForm({ renderList: true });
-      }
-      const deleteAccountingDetail = event.target.closest('[data-delete-accounting-detail]');
-      if (deleteAccountingDetail) { deleteAccountingDetail.closest('[data-accounting-detail]')?.remove(); saveAccountingFromForm(); }
-      const addAccountingDetail = event.target.closest('[data-add-accounting-detail]');
-      if (addAccountingDetail) {
-        const category = addAccountingDetail.closest('[data-accounting-category]');
-        saveAccountingFromForm();
-        const eventData = activeAccountingEvent();
-        const accounting = eventData ? eventAccounting(eventData) : null;
-        const target = accounting?.categories.find(item => item.id === category?.dataset.accountingCategory);
-        if (target) {
-          target.details.push({ id: crypto.randomUUID(), name: '', amount: 0 });
-          openAccountingCategories.add(target.id);
-        }
-        if (eventData) { saveEvents(); renderAccounting(); }
-      }
-      const deleteAccountingCategory = event.target.closest('[data-delete-accounting-category]');
-      if (deleteAccountingCategory && confirm('Quitar esta categoria contable?')) {
-        const category = deleteAccountingCategory.closest('[data-accounting-category]');
-        if (category) openAccountingCategories.delete(category.dataset.accountingCategory);
-        category?.remove();
-        saveAccountingFromForm();
       }
       const logoutTop = event.target.closest('[data-logout-top]');
       if (logoutTop) $('logoutButton').click();
@@ -5173,27 +4995,23 @@
     ['change', 'blur'].forEach(eventName => $('accountingWeekStart').addEventListener(eventName, event => {
       accountingWeekStart = readAccountingDate(event.target, accountingWeekStart || weekRange().start);
       if (accountingWeekEnd && accountingWeekEnd < accountingWeekStart) accountingWeekEnd = accountingWeekStart;
-      activeAccountingEventId = null;
       renderAccounting();
     }));
     ['change', 'blur'].forEach(eventName => $('accountingWeekEnd').addEventListener(eventName, event => {
       accountingWeekEnd = readAccountingDate(event.target, accountingWeekEnd || weekRange().end);
       if (accountingWeekStart && accountingWeekEnd < accountingWeekStart) accountingWeekStart = accountingWeekEnd;
-      activeAccountingEventId = null;
       renderAccounting();
     }));
     $('accountingCurrentWeek').addEventListener('click', () => {
       const range = weekRange();
       accountingWeekStart = range.start;
       accountingWeekEnd = range.end;
-      activeAccountingEventId = null;
       renderAccounting();
     });
     $('accountingCurrentMonth').addEventListener('click', () => {
       const range = monthRange();
       accountingWeekStart = range.start;
       accountingWeekEnd = range.end;
-      activeAccountingEventId = null;
       renderAccounting();
     });
     fields.pagoEfectivo.addEventListener('input', () => {
@@ -5393,26 +5211,6 @@
       renderBalancePrizes(current.prizesList);
       setBalanceSummary(current);
       persistBalanceFromForm({ renderList: true });
-    });
-    $('addAccountingCategory').addEventListener('click', () => {
-      const eventData = activeAccountingEvent();
-      if (!eventData) {
-        alert('No hay eventos disponibles para cargar contable.');
-        return;
-      }
-      saveAccountingFromForm();
-      eventAccounting(eventData).categories.push({ id: crypto.randomUUID(), name: 'Nueva categoria', details: [] });
-      saveEvents();
-      renderAccounting();
-    });
-    $('saveAccounting').addEventListener('click', () => {
-      const eventData = activeAccountingEvent();
-      if (!eventData) {
-        alert('No hay eventos disponibles para guardar contable.');
-        return;
-      }
-      saveAccountingFromForm();
-      alert('Contable guardado.');
     });
     $('balanceForm').addEventListener('submit', event => {
       event.preventDefault();
