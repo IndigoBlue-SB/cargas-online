@@ -2040,7 +2040,7 @@ async function handleBallImagesFolderSelection() {
   if (!files.length) return;
   const images = files
     .map((file) => ({ file, number: getBallNumberFromFileName(file.name) }))
-    .filter((item) => item.number && ["image/jpeg", "image/png"].includes(item.file.type));
+    .filter((item) => item.number && isSupportedBallImageFile(item.file));
   if (!images.length) {
     window.alert("No encontre imagenes JPG/PNG con numeros del 1 al 90 en el nombre del archivo.");
     els.eventBallImagesInput.value = "";
@@ -2065,6 +2065,12 @@ async function handleBallImagesFolderSelection() {
   if (state.eventCreated) saveCurrentEvent({ silent: true });
   renderLastBallImage(state.drawn.at(-1));
   window.alert(`Se cargaron ${savedCount} imagenes de bolillas. Usa nombres como 1.png, bolilla-9.jpg o numero_90.png.`);
+}
+
+function isSupportedBallImageFile(file) {
+  const type = String(file?.type || "").toLowerCase();
+  const name = String(file?.name || "").toLowerCase();
+  return ["image/jpeg", "image/png"].includes(type) || /\.(jpe?g|png)$/i.test(name);
 }
 
 function getBallNumberFromFileName(fileName) {
