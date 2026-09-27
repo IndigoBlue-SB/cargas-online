@@ -22,6 +22,7 @@ const defaultDb = {
     size: 15,
     buttonSize: 15,
     totalSize: 22,
+    accountingFontSize: 14,
     brand: '#0f766e',
     buttonBg: '#0f766e',
     navButtonBg: '#2b7bbb',
