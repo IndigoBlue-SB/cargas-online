@@ -29,6 +29,9 @@
       --total-font-size: 22px;
       --main-logo-size: 180px;
       --accounting-font-size: 14px;
+      --event-form-label-size: 13px;
+      --event-form-input-size: 14px;
+      --event-sales-table-size: 12px;
       --event-info-color: #667078;
       --event-info-font-family: Arial, Helvetica, sans-serif;
       --splash: #123f8c;
@@ -128,9 +131,9 @@
 
     .hidden { display: none !important; }
     .event-layout { display: grid; grid-template-columns: minmax(330px, 370px) minmax(0, 1fr); gap: 10px; align-items: start; }
-    #saleForm { gap: 9px; font-size: 14px; }
-    #saleForm label { font-size: 13px; }
-    #saleForm input, #saleForm select { min-height: 34px; padding: 7px 8px; }
+    #saleForm { gap: 9px; font-size: var(--event-form-input-size); }
+    #saleForm label { font-size: var(--event-form-label-size); }
+    #saleForm input, #saleForm select { min-height: 34px; padding: 7px 8px; font-size: var(--event-form-input-size); }
     .range-preview { display: grid; gap: 6px; border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; background: #fbfcfa; }
     .preview-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .preview-list { display: grid; gap: 4px; max-height: 140px; overflow-y: auto; }
@@ -148,6 +151,8 @@
     #page-event .toolbar { grid-template-columns: minmax(180px, 1.3fr) minmax(105px, .75fr) minmax(105px, .75fr) minmax(105px, .75fr) auto; gap: 5px; }
     #page-event .grid-3 { gap: 5px; }
     #page-event th, #page-event td { padding: 5px 6px; }
+    #page-event #tableHead, #page-event #salesTable { font-size: var(--event-sales-table-size); }
+    #page-event #tableHead th { font-size: max(10px, calc(var(--event-sales-table-size) - 1px)); }
     .event-text-settings { gap: 8px; }
     .event-text-settings-grid { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 8px; }
     .views { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -1082,6 +1087,9 @@
                 <option value="'Courier New', monospace">Courier</option>
               </select>
             </label>
+            <label>Tamano titulos carga<input id="eventFormLabelSize" type="number" min="10" max="24" step="1"></label>
+            <label>Tamano datos carga<input id="eventFormInputSize" type="number" min="10" max="28" step="1"></label>
+            <label>Tamano tabla ventas<input id="eventSalesTableSize" type="number" min="10" max="24" step="1"></label>
           </div>
           <div class="actions">
             <button type="button" id="applyEventTextSettings">Aplicar ajustes</button>
@@ -1217,7 +1225,7 @@
     const defaultReferenceLists = { sellers: [], admins: [], provinces: [], towns: [] };
     const referenceListLabels = { sellers: 'Vendedores', admins: 'Administradores', provinces: 'Provincias', towns: 'Localidades' };
     const referenceDatalists = { sellers: 'sellerOptions', admins: 'adminOptions', provinces: 'provinceOptions', towns: 'townOptions' };
-    const defaultSettings = { font: 'Arial, Helvetica, sans-serif', size: 15, buttonSize: 15, totalSize: 22, accountingFontSize: 14, brand: '#0f766e', buttonBg: '#0f766e', navButtonBg: '#2b7bbb', navButtonActiveBg: '#0f766e', navButtonColor: '#ffffff', homeCardTitleColor: '#0f766e', membreteColor: '#202426', eventInfoColor: '#667078', eventInfoFont: 'Arial, Helvetica, sans-serif', bg: '#f4f6f2', panel: '#ffffff', splash: '#123f8c', side: '#18312d', radius: '8px', mainLogo: '', mainLogoSize: 180, eventLogoLeft: '', eventLogoRight: '', eventLogoLeftSize: 86, adminPassword: 'admin123', recoveryPassword: '', functionPermissions: defaultFunctionPermissions, balanceTemplates: { prizesList: null, expenses: null } };
+    const defaultSettings = { font: 'Arial, Helvetica, sans-serif', size: 15, buttonSize: 15, totalSize: 22, accountingFontSize: 14, eventFormLabelSize: 13, eventFormInputSize: 14, eventSalesTableSize: 12, brand: '#0f766e', buttonBg: '#0f766e', navButtonBg: '#2b7bbb', navButtonActiveBg: '#0f766e', navButtonColor: '#ffffff', homeCardTitleColor: '#0f766e', membreteColor: '#202426', eventInfoColor: '#667078', eventInfoFont: 'Arial, Helvetica, sans-serif', bg: '#f4f6f2', panel: '#ffffff', splash: '#123f8c', side: '#18312d', radius: '8px', mainLogo: '', mainLogoSize: 180, eventLogoLeft: '', eventLogoRight: '', eventLogoLeftSize: 86, adminPassword: 'admin123', recoveryPassword: '', functionPermissions: defaultFunctionPermissions, balanceTemplates: { prizesList: null, expenses: null } };
     let events = [];
     let settings = { ...defaultSettings };
     if (!settings.adminPassword) settings.adminPassword = defaultSettings.adminPassword;
@@ -2324,6 +2332,9 @@
       document.documentElement.style.setProperty('--button-font-size', `${settings.buttonSize || defaultSettings.buttonSize}px`);
       document.documentElement.style.setProperty('--total-font-size', `${settings.totalSize || defaultSettings.totalSize}px`);
       document.documentElement.style.setProperty('--accounting-font-size', `${settings.accountingFontSize || defaultSettings.accountingFontSize}px`);
+      document.documentElement.style.setProperty('--event-form-label-size', `${settings.eventFormLabelSize || defaultSettings.eventFormLabelSize}px`);
+      document.documentElement.style.setProperty('--event-form-input-size', `${settings.eventFormInputSize || defaultSettings.eventFormInputSize}px`);
+      document.documentElement.style.setProperty('--event-sales-table-size', `${settings.eventSalesTableSize || defaultSettings.eventSalesTableSize}px`);
       document.documentElement.style.setProperty('--main-logo-size', `${settings.mainLogoSize || defaultSettings.mainLogoSize}px`);
       document.documentElement.style.setProperty('--brand', settings.brand);
       document.documentElement.style.setProperty('--brand-dark', settings.brand);
@@ -4021,6 +4032,9 @@
       $('eventTextMembreteColor').value = settings.membreteColor || defaultSettings.membreteColor;
       $('eventTextInfoColor').value = settings.eventInfoColor || defaultSettings.eventInfoColor;
       $('eventTextInfoFont').value = settings.eventInfoFont || settings.font || defaultSettings.font;
+      $('eventFormLabelSize').value = settings.eventFormLabelSize || defaultSettings.eventFormLabelSize;
+      $('eventFormInputSize').value = settings.eventFormInputSize || defaultSettings.eventFormInputSize;
+      $('eventSalesTableSize').value = settings.eventSalesTableSize || defaultSettings.eventSalesTableSize;
     }
 
     function renderActiveEvent() {
@@ -5337,7 +5351,10 @@
         ...settings,
         membreteColor: $('eventTextMembreteColor').value,
         eventInfoColor: $('eventTextInfoColor').value,
-        eventInfoFont: $('eventTextInfoFont').value
+        eventInfoFont: $('eventTextInfoFont').value,
+        eventFormLabelSize: Math.min(Math.max(Number($('eventFormLabelSize').value) || defaultSettings.eventFormLabelSize, 10), 24),
+        eventFormInputSize: Math.min(Math.max(Number($('eventFormInputSize').value) || defaultSettings.eventFormInputSize, 10), 28),
+        eventSalesTableSize: Math.min(Math.max(Number($('eventSalesTableSize').value) || defaultSettings.eventSalesTableSize, 10), 24)
       };
       saveEvents();
       saveSettingsData();
@@ -5373,6 +5390,9 @@
         recoveryPassword: $('settingRecoveryPassword').value.trim() || settings.recoveryPassword,
         functionPermissions: selectedFunctionPermissions(),
         accountingFontSize: Number($('accountingFontSize').value) || defaultSettings.accountingFontSize,
+        eventFormLabelSize: settings.eventFormLabelSize || defaultSettings.eventFormLabelSize,
+        eventFormInputSize: settings.eventFormInputSize || defaultSettings.eventFormInputSize,
+        eventSalesTableSize: settings.eventSalesTableSize || defaultSettings.eventSalesTableSize,
         sheetSales: preservedSheetSales
       };
       if (!saveSettingsData()) return;
