@@ -127,7 +127,10 @@
     .app-notice button { min-height: 28px; padding: 5px 8px; }
 
     .hidden { display: none !important; }
-    .event-layout { display: grid; grid-template-columns: 285px minmax(0, 1fr); gap: 10px; align-items: start; }
+    .event-layout { display: grid; grid-template-columns: minmax(330px, 370px) minmax(0, 1fr); gap: 10px; align-items: start; }
+    #saleForm { gap: 9px; font-size: 14px; }
+    #saleForm label { font-size: 13px; }
+    #saleForm input, #saleForm select { min-height: 34px; padding: 7px 8px; }
     .range-preview { display: grid; gap: 6px; border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; background: #fbfcfa; }
     .preview-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .preview-list { display: grid; gap: 4px; max-height: 140px; overflow-y: auto; }
@@ -135,8 +138,18 @@
     .preview-row.selected { border-color: var(--brand); background: var(--soft); }
     .preview-row small { color: var(--muted); }
     .draft-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .draft-summary .stat { box-shadow: none; padding: 12px; }
+    .draft-summary .stat { box-shadow: none; padding: 9px; }
     .toolbar { display: grid; grid-template-columns: 1.2fr .9fr .9fr .9fr auto; gap: 6px; align-items: end; }
+    #page-event .cards { grid-template-columns: repeat(5, minmax(105px, 1fr)); gap: 6px; }
+    #page-event .stat { padding: 7px 8px; }
+    #page-event .stat span { font-size: 10px; margin-bottom: 2px; }
+    #page-event .stat strong { font-size: max(17px, calc(var(--total-font-size) - 4px)); }
+    #page-event .panel { padding: 8px; }
+    #page-event .toolbar { grid-template-columns: minmax(180px, 1.3fr) minmax(105px, .75fr) minmax(105px, .75fr) minmax(105px, .75fr) auto; gap: 5px; }
+    #page-event .grid-3 { gap: 5px; }
+    #page-event th, #page-event td { padding: 5px 6px; }
+    .event-text-settings { gap: 8px; }
+    .event-text-settings-grid { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 8px; }
     .views { display: flex; gap: 8px; flex-wrap: wrap; }
     .views button.active { background: var(--brand); }
     .event-sheets-panel { gap: 8px; }
@@ -1026,6 +1039,7 @@
           </div>
           <div class="actions">
             <button type="button" class="secondary" data-open-reference-lists data-admin-only>Cargar vendedores</button>
+            <button type="button" class="secondary" id="openEventTextSettings" data-admin-only>Ajustes evento</button>
             <button type="button" class="secondary" data-page-shortcut="events">Volver a eventos</button>
           </div>
         </div>
@@ -1038,6 +1052,40 @@
             <button type="button" class="light" id="closeEventReferencePanel">Cerrar</button>
           </div>
           <div id="referenceLists" class="reference-grid"></div>
+        </section>
+        <section id="eventTextSettingsPanel" class="panel form-grid event-text-settings hidden">
+          <div class="table-head">
+            <div>
+              <h3>Ajustes de textos del evento</h3>
+              <span class="muted">Cambia fuente, tamano y colores del membrete de esta pantalla.</span>
+            </div>
+            <button type="button" class="light" id="closeEventTextSettings">Cerrar</button>
+          </div>
+          <div class="event-text-settings-grid">
+            <label>Fuente titulo
+              <select id="eventTextFont">
+                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                <option value="'Courier New', monospace">Courier</option>
+              </select>
+            </label>
+            <label>Tamano titulo<input id="eventTextTitleSize" type="number" min="12" max="72" step="1"></label>
+            <label>Tamano subtitulo<input id="eventTextSubtitleSize" type="number" min="10" max="60" step="1"></label>
+            <label>Color titulo/subtitulo<input id="eventTextMembreteColor" type="color"></label>
+            <label>Color fecha/localidad<input id="eventTextInfoColor" type="color"></label>
+            <label>Fuente fecha/localidad
+              <select id="eventTextInfoFont">
+                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                <option value="'Courier New', monospace">Courier</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button type="button" id="applyEventTextSettings">Aplicar ajustes</button>
+          </div>
         </section>
         <div id="bingoClosurePanel" class="bingo-closure-panel">
           <div>
@@ -1054,6 +1102,10 @@
 
         <div class="event-layout">
           <form id="saleForm" class="panel form-grid">
+            <div class="grid-2">
+              <label>Localidad<select id="localidad" required><option value="">Elegir localidad</option></select></label>
+              <label>Provincia<select id="provincia" required><option value="">Elegir provincia</option></select></label>
+            </div>
             <div class="grid-2">
               <label>Vendedor<select id="vendedor" required><option value="">Elegir vendedor</option></select></label>
               <label>Sin Cargos<input id="sinCargos" type="number" min="0" step="1" value="0"></label>
@@ -1073,10 +1125,6 @@
             <div class="grid-2">
               <label>Efectivo<input id="pagoEfectivo" inputmode="decimal" autocomplete="off" value="0"></label>
               <label>Transferencia<input id="pagoTransferencia" inputmode="decimal" autocomplete="off" value="0"></label>
-            </div>
-            <div class="grid-2">
-              <label>Localidad<select id="localidad" required><option value="">Elegir localidad</option></select></label>
-              <label>Provincia<select id="provincia" required><option value="">Elegir provincia</option></select></label>
             </div>
             <div class="range-preview">
               <div class="preview-list" id="draftList"></div>
@@ -3965,6 +4013,16 @@
       $('printArea').classList.add('hidden');
     }
 
+    function syncEventTextSettingsForm(event) {
+      if (!event || !$('eventTextTitleSize')) return;
+      $('eventTextFont').value = event.font || settings.font || defaultSettings.font;
+      $('eventTextTitleSize').value = Number(event.titleSize) || 22;
+      $('eventTextSubtitleSize').value = Number(event.subtitleSize) || 17;
+      $('eventTextMembreteColor').value = settings.membreteColor || defaultSettings.membreteColor;
+      $('eventTextInfoColor').value = settings.eventInfoColor || defaultSettings.eventInfoColor;
+      $('eventTextInfoFont').value = settings.eventInfoFont || settings.font || defaultSettings.font;
+    }
+
     function renderActiveEvent() {
       const event = activeEvent();
       if (!event) return;
@@ -3986,6 +4044,7 @@
       setImage($('eventLogoRight'), event.eventLogoRight || '');
       $('eventLogoLeft').style.width = `${event.eventLogoLeftSize || defaultSettings.eventLogoLeftSize}px`;
       $('eventLogoRight').style.width = `${event.eventLogoRightSize || defaultSettings.eventLogoRightSize}px`;
+      syncEventTextSettingsForm(event);
       renderReferenceLists();
       ensureBingoControl(event);
       renderBingoClosure(event);
@@ -4600,6 +4659,7 @@
       if (openReferenceLists && isAdmin()) {
         if (!activeEvent()) return alert('Primero abri un evento.');
         $('eventReferencePanel').classList.remove('hidden');
+        $('eventTextSettingsPanel').classList.add('hidden');
         renderReferenceLists();
         setTimeout(() => $('referenceListsTitle')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
       }
@@ -5256,6 +5316,33 @@
       eventData.seriesPerSheet = value;
       saveEvents();
       renderEventSheets(eventData);
+    });
+    $('openEventTextSettings').addEventListener('click', () => {
+      const eventData = activeEvent();
+      if (!eventData) return;
+      syncEventTextSettingsForm(eventData);
+      $('eventTextSettingsPanel').classList.remove('hidden');
+      $('eventReferencePanel').classList.add('hidden');
+    });
+    $('closeEventTextSettings').addEventListener('click', () => {
+      $('eventTextSettingsPanel').classList.add('hidden');
+    });
+    $('applyEventTextSettings').addEventListener('click', () => {
+      const eventData = activeEvent();
+      if (!eventData) return;
+      eventData.font = $('eventTextFont').value;
+      eventData.titleSize = Math.min(Math.max(Number($('eventTextTitleSize').value) || 22, 12), 72);
+      eventData.subtitleSize = Math.min(Math.max(Number($('eventTextSubtitleSize').value) || 17, 10), 60);
+      settings = {
+        ...settings,
+        membreteColor: $('eventTextMembreteColor').value,
+        eventInfoColor: $('eventTextInfoColor').value,
+        eventInfoFont: $('eventTextInfoFont').value
+      };
+      saveEvents();
+      saveSettingsData();
+      applySettings();
+      renderActiveEvent();
     });
     $('exportEventSheetsPdf').addEventListener('click', exportEventSheetsPdf);
     $('exportBalancePdf').addEventListener('click', exportBalancePdf);
