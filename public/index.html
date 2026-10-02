@@ -142,13 +142,13 @@
     .preview-row small { color: var(--muted); }
     .draft-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .draft-summary .stat { box-shadow: none; padding: 9px; }
-    .toolbar { display: grid; grid-template-columns: 1.2fr .9fr .9fr .9fr auto; gap: 6px; align-items: end; }
+    .toolbar { display: grid; grid-template-columns: 1.2fr .9fr .9fr .9fr .75fr auto; gap: 6px; align-items: end; }
     #page-event .cards { grid-template-columns: repeat(5, minmax(105px, 1fr)); gap: 6px; }
     #page-event .stat { padding: 7px 8px; }
     #page-event .stat span { font-size: 10px; margin-bottom: 2px; }
     #page-event .stat strong { font-size: max(17px, calc(var(--total-font-size) - 4px)); }
     #page-event .panel { padding: 8px; }
-    #page-event .toolbar { grid-template-columns: minmax(180px, 1.3fr) minmax(105px, .75fr) minmax(105px, .75fr) minmax(105px, .75fr) auto; gap: 5px; }
+    #page-event .toolbar { grid-template-columns: minmax(160px, 1.2fr) minmax(100px, .75fr) minmax(100px, .75fr) minmax(100px, .75fr) minmax(105px, .75fr) auto; gap: 5px; }
     #page-event .grid-3 { gap: 5px; }
     #page-event th, #page-event td { padding: 5px 6px; }
     #page-event #tableHead, #page-event #salesTable { font-size: var(--event-sales-table-size); }
@@ -1119,8 +1119,8 @@
               <label>Sin Cargos<input id="sinCargos" type="number" min="0" step="1" value="0"></label>
             </div>
             <div class="grid-2">
-              <label>Desde<input id="desde" inputmode="numeric" type="number" min="1" step="1" placeholder="100"></label>
-              <label>Hasta<input id="hasta" inputmode="numeric" type="number" min="1" step="1" placeholder="150"></label>
+              <label>Desde<input id="desde" inputmode="numeric" pattern="[0-9]*" placeholder="100"></label>
+              <label>Hasta<input id="hasta" inputmode="numeric" pattern="[0-9]*" placeholder="150"></label>
             </div>
             <div class="grid-2">
               <label>% Vendedor<input id="saleSellerPercent" inputmode="decimal" autocomplete="off" placeholder="0"></label>
@@ -1165,6 +1165,7 @@
                 <label>Localidad<select id="filterLocalidad"><option value="">Todas</option></select></label>
                 <label>Provincia<select id="filterProvincia"><option value="">Todas</option></select></label>
                 <label>Vendedor<select id="filterVendedor"><option value="">Todos</option></select></label>
+                <label>Orden cargas<select id="salesSort"><option value="created">Orden cargado</option><option value="alpha">Alfabetico</option></select></label>
                 <button type="button" class="secondary" id="openExport">Exportar</button>
               </div>
               <div class="grid-3">
@@ -1245,6 +1246,7 @@
     let eventSheetsExpanded = false;
     let draftRanges = [];
     let selectedDraftId = null;
+    let editingDraftRangeId = null;
     let editingLoadId = null;
     let editingEventId = null;
     let editingSheetId = null;
@@ -4114,7 +4116,10 @@
     function renderSalesTable(items) {
       $('salesTable').innerHTML = '';
       if (currentView === 'detalle') {
-        const loads = groupLoads(items);
+        let loads = groupLoads(items);
+        if ($('salesSort')?.value === 'alpha') {
+          loads = [...loads].sort((a, b) => String(a.seller || '').localeCompare(String(b.seller || ''), 'es', { sensitivity: 'base' }));
+        }
         const event = activeEvent();
         $('emptyState').classList.toggle('hidden', loads.length > 0);
         $('visibleCount').textContent = `${loads.length} ${loads.length === 1 ? 'carga' : 'cargas'}`;
@@ -4153,13 +4158,58 @@
       renderDraft();
     }
 
+    function selectInputTail(input, length = 2) {
+      input.focus();
+      requestAnimationFrame(() => {
+        const valueLength = String(input.value || '').length;
+        const start = Math.max(0, valueLength - length);
+        try {
+          input.setSelectionRange(start, valueLength);
+        } catch {
+          input.select();
+        }
+      });
+    }
+
+    function fillHastaFromDesde(selectTail = true) {
+      const value = String(fields.desde.value || '').trim();
+      if (!value) return;
+      fields.hasta.value = value;
+      updatePreview();
+      if (selectTail) selectInputTail(fields.hasta, 2);
+    }
+
+    function loadDraftRangeForEdit(rangeId) {
+      const range = draftRanges.find(item => item.id === rangeId);
+      if (!range) return;
+      selectedDraftId = range.id;
+      editingDraftRangeId = range.id;
+      fields.desde.value = range.desde;
+      fields.hasta.value = range.hasta;
+      updatePreview();
+      fields.desde.focus();
+      fields.desde.select();
+    }
+
     function addDraftRange() {
       const range = { id: crypto.randomUUID(), desde: Number(fields.desde.value), hasta: Number(fields.hasta.value) };
       if (!range.desde) { fields.desde.focus(); return false; }
-      if (!range.hasta) { fields.hasta.value = range.desde; updatePreview(); fields.hasta.focus(); fields.hasta.select(); return false; }
+      if (!range.hasta) { fields.hasta.value = range.desde; updatePreview(); selectInputTail(fields.hasta, 2); return false; }
       if (range.hasta < range.desde) { alert('El campo Hasta no puede ser menor que Desde.'); fields.hasta.focus(); return false; }
-      draftRanges.push(range);
-      selectedDraftId = range.id;
+      if (editingDraftRangeId) {
+        const index = draftRanges.findIndex(item => item.id === editingDraftRangeId);
+        if (index >= 0) {
+          draftRanges[index] = { ...draftRanges[index], desde: range.desde, hasta: range.hasta };
+          selectedDraftId = editingDraftRangeId;
+        } else {
+          draftRanges.push(range);
+          selectedDraftId = range.id;
+        }
+        editingDraftRangeId = null;
+      } else {
+        draftRanges.push(range);
+        selectedDraftId = range.id;
+      }
       fields.desde.value = '';
       fields.hasta.value = '';
       updatePreview();
@@ -4172,6 +4222,7 @@
       editingLoadId = null;
       draftRanges = [];
       selectedDraftId = null;
+      editingDraftRangeId = null;
       $('saleForm').reset();
       fields.localidad.value = eventData?.town || '';
       fields.provincia.value = eventData?.province || '';
@@ -4211,6 +4262,7 @@
       fields.vendedor.value = first.seller;
       fields.desde.value = '';
       fields.hasta.value = '';
+      editingDraftRangeId = null;
       draftRanges = loadSales.map(sale => ({
         id: crypto.randomUUID(),
         desde: sale.desde,
@@ -4831,7 +4883,7 @@
         renderAll();
       }
       const draft = event.target.closest('[data-draft-id]');
-      if (draft) { selectedDraftId = draft.dataset.draftId; renderDraft(); }
+      if (draft) loadDraftRangeForEdit(draft.dataset.draftId);
       const deleteExpense = event.target.closest('[data-delete-expense]');
       if (deleteExpense) {
         const row = deleteExpense.closest('[data-balance-expense]');
@@ -5036,10 +5088,7 @@
       event.preventDefault();
       event.stopPropagation();
       if (event.target === fields.desde && fields.desde.value && !fields.hasta.value) {
-        fields.hasta.value = fields.desde.value;
-        updatePreview();
-        fields.hasta.focus();
-        fields.hasta.select();
+        fillHastaFromDesde(true);
         return;
       }
       addDraftRange();
@@ -5066,6 +5115,10 @@
     });
 
     [fields.desde, fields.hasta].forEach(input => input.addEventListener('input', updatePreview));
+    fields.desde.addEventListener('change', () => fillHastaFromDesde(true));
+    fields.desde.addEventListener('blur', () => {
+      if (!fields.hasta.value && fields.desde.value) fillHastaFromDesde(true);
+    });
     fields.vendedor.addEventListener('input', applySellerReference);
     fields.vendedor.addEventListener('change', applySellerReference);
     fields.vendedor.addEventListener('blur', applySellerReference);
@@ -5161,7 +5214,7 @@
       alert('Configuracion de planillas guardada.');
     });
     $('filterLocalidad').addEventListener('input', () => { applyEventLocationFilter(); renderActiveEvent(); });
-    [$('search'), $('filterProvincia'), $('filterVendedor')].forEach(input => input.addEventListener('input', renderActiveEvent));
+    [$('search'), $('filterProvincia'), $('filterVendedor'), $('salesSort')].forEach(input => input.addEventListener('input', renderActiveEvent));
     viewButtons.forEach(button => button.addEventListener('click', () => { currentView = button.dataset.view; viewButtons.forEach(item => item.classList.toggle('active', item === button)); renderActiveEvent(); }));
     document.addEventListener('dblclick', event => {
       const statsCalendarDay = event.target.closest('[data-stats-calendar-day]');
@@ -5188,8 +5241,24 @@
       if (event.target.closest('#statsCalendar') || event.target.closest('#statsPeriodDate')) return;
       hideStatsCalendar();
     });
-    $('deleteSelectedRange').addEventListener('click', () => { draftRanges = draftRanges.filter(r => r.id !== selectedDraftId); selectedDraftId = draftRanges.at(-1)?.id || null; renderDraft(); });
-    $('clearDraftRanges').addEventListener('click', () => { if (draftRanges.length && confirm('Eliminar toda la lista previa?')) { draftRanges = []; selectedDraftId = null; renderDraft(); } });
+    $('deleteSelectedRange').addEventListener('click', () => {
+      draftRanges = draftRanges.filter(r => r.id !== selectedDraftId);
+      if (editingDraftRangeId === selectedDraftId) editingDraftRangeId = null;
+      selectedDraftId = draftRanges.at(-1)?.id || null;
+      fields.desde.value = '';
+      fields.hasta.value = '';
+      renderDraft();
+    });
+    $('clearDraftRanges').addEventListener('click', () => {
+      if (draftRanges.length && confirm('Eliminar toda la lista previa?')) {
+        draftRanges = [];
+        selectedDraftId = null;
+        editingDraftRangeId = null;
+        fields.desde.value = '';
+        fields.hasta.value = '';
+        renderDraft();
+      }
+    });
     $('clearSaleForm').addEventListener('click', resetSaleForm);
     $('openAdvancedBingo').addEventListener('click', openAdvancedBingo);
     $('openBingoSales').addEventListener('click', openBingoSalesEvent);
