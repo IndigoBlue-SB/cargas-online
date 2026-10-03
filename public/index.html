@@ -1143,6 +1143,7 @@
           <div class="actions">
             <button type="button" id="confirmBingoLoad">Confirmar carga para bingo</button>
             <button type="button" class="secondary hidden" id="restorePreviousLoad">Recuperar carga anterior</button>
+            <button type="button" class="secondary hidden" id="restoreBackupLoad">Recuperar desde respaldo</button>
             <button type="button" class="secondary hidden" id="goToConfirmedBingo">Ir a bingo</button>
             <button type="button" class="danger hidden" id="reopenBingoLoad">Reabrir carga</button>
             <button type="button" class="danger hidden" id="clearReopenedLoads">Eliminar todas las cargas</button>
@@ -4434,6 +4435,8 @@
       const canRestorePreviousLoad = !confirmed && isAdmin() && !(event.sales || []).length && recoverableSales.length;
       $('restorePreviousLoad').classList.toggle('hidden', !canRestorePreviousLoad);
       $('restorePreviousLoad').disabled = !canRestorePreviousLoad;
+      $('restoreBackupLoad').classList.toggle('hidden', confirmed || !isAdmin());
+      $('restoreBackupLoad').disabled = confirmed || !isAdmin();
       const formDisabled = confirmed;
       $('saleForm').querySelectorAll('input, button').forEach(control => {
         control.disabled = formDisabled;
@@ -4653,6 +4656,39 @@
       renderStats();
       renderEventCards();
       alert('Carga anterior recuperada. Revisala y, si esta correcta, podes confirmarla para bingo.');
+    }
+
+    async function restoreBackupLoad() {
+      const eventData = activeEvent();
+      if (!eventData || !isAdmin()) return;
+      try {
+        const inspect = await api(`/api/admin/backup-inspect?eventId=${encodeURIComponent(eventData.id)}&name=${encodeURIComponent(eventData.name || '')}`);
+        const candidates = [
+          ...((inspect.backup?.candidates || []).map(item => ({ ...item, sourceDb: 'backup' }))),
+          ...((inspect.current?.candidates || []).map(item => ({ ...item, sourceDb: 'current' })))
+        ].sort((a, b) => (
+          ((b.summary?.sellers || 0) - (a.summary?.sellers || 0))
+          || ((b.summary?.loads || 0) - (a.summary?.loads || 0))
+          || ((b.summary?.rows || 0) - (a.summary?.rows || 0))
+          || ((b.summary?.units || 0) - (a.summary?.units || 0))
+        ));
+        if (!candidates.length) return alert('No encontre cargas para este evento en el respaldo.');
+        const best = candidates[0];
+        const summary = best.summary || {};
+        const source = `${best.sourceDb}:${best.source}`;
+        const message = `Encontré en el respaldo:\n\n${num(summary.sellers || 0)} vendedores\n${num(summary.loads || 0)} cargas\n${num(summary.units || 0)} bingos/series\n\nOrigen: ${source}\n\n¿Restaurar esta carga en el evento actual?`;
+        if (!confirm(message)) return;
+        const result = await api('/api/admin/restore-sales-backup', {
+          method: 'POST',
+          body: JSON.stringify({ eventId: eventData.id, name: eventData.name, source })
+        });
+        await loadState();
+        activeEventId = eventData.id;
+        go('event');
+        alert(`Carga restaurada desde respaldo: ${num(result.summary?.sellers || 0)} vendedores, ${num(result.summary?.units || 0)} bingos/series.`);
+      } catch (error) {
+        alert(error.message || 'No se pudo restaurar desde respaldo.');
+      }
     }
 
     function confirmBingoLoad() {
@@ -5249,6 +5285,8 @@
       if (clearReopenedLoadsButton) clearReopenedLoads();
       const restorePreviousLoadButton = event.target.closest('#restorePreviousLoad');
       if (restorePreviousLoadButton) restorePreviousLoad();
+      const restoreBackupLoadButton = event.target.closest('#restoreBackupLoad');
+      if (restoreBackupLoadButton) restoreBackupLoad();
       const goToConfirmedBingoButton = event.target.closest('#goToConfirmedBingo');
       if (goToConfirmedBingoButton) {
         const eventData = activeEvent();
