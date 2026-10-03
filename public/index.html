@@ -1142,6 +1142,7 @@
           </div>
           <div class="actions">
             <button type="button" id="confirmBingoLoad">Confirmar carga para bingo</button>
+            <button type="button" class="secondary hidden" id="restorePreviousLoad">Recuperar carga anterior</button>
             <button type="button" class="secondary hidden" id="goToConfirmedBingo">Ir a bingo</button>
             <button type="button" class="danger hidden" id="reopenBingoLoad">Reabrir carga</button>
             <button type="button" class="danger hidden" id="clearReopenedLoads">Eliminar todas las cargas</button>
@@ -2226,6 +2227,24 @@
       else history.push(play);
       eventData.bingoClosureHistory = history.sort((a, b) => String(a.confirmedAt || '').localeCompare(String(b.confirmedAt || '')));
       return play.id;
+    }
+    function lastRecoverableSales(eventData) {
+      const closure = ensureBingoControl(eventData);
+      if (Array.isArray(closure.snapshotSales) && closure.snapshotSales.length) return closure.snapshotSales;
+      const history = normalizeBingoClosureHistory(eventData);
+      return history.length ? (history[history.length - 1].snapshotSales || []) : [];
+    }
+    function addDeletedSalesBackup(eventData, sales, reason = 'manual') {
+      if (!eventData || !Array.isArray(sales) || !sales.length) return;
+      eventData.deletedSalesBackups = Array.isArray(eventData.deletedSalesBackups) ? eventData.deletedSalesBackups : [];
+      eventData.deletedSalesBackups.push({
+        id: crypto.randomUUID(),
+        deletedAt: new Date().toISOString(),
+        deletedBy: currentUser?.name || 'Administrador',
+        reason,
+        sales: clonePlain(sales)
+      });
+      eventData.deletedSalesBackups = eventData.deletedSalesBackups.slice(-20);
     }
     function officialSoldUnits(eventData) {
       const closure = ensureBingoControl(eventData);
@@ -4411,6 +4430,10 @@
       $('reopenBingoLoad').classList.toggle('hidden', !confirmed || !isAdmin());
       $('clearReopenedLoads').classList.toggle('hidden', confirmed || !isAdmin() || !Array.isArray(closure.snapshotSales));
       $('clearReopenedLoads').disabled = confirmed || !isAdmin() || !(event.sales || []).length;
+      const recoverableSales = lastRecoverableSales(event);
+      const canRestorePreviousLoad = !confirmed && isAdmin() && !(event.sales || []).length && recoverableSales.length;
+      $('restorePreviousLoad').classList.toggle('hidden', !canRestorePreviousLoad);
+      $('restorePreviousLoad').disabled = !canRestorePreviousLoad;
       const formDisabled = confirmed;
       $('saleForm').querySelectorAll('input, button').forEach(control => {
         control.disabled = formDisabled;
@@ -4591,13 +4614,45 @@
       if (!eventData) return;
       if (isBingoLoadConfirmed(eventData)) return alert('La carga esta confirmada para bingo. Reabrila antes de eliminar.');
       if (!confirm('Eliminar esta carga?')) return;
-      eventData.sales = eventData.sales.filter(sale => (sale.batchId || sale.id) !== loadId);
+      const removedSales = (eventData.sales || []).filter(sale => (sale.batchId || sale.id) === loadId);
+      addDeletedSalesBackup(eventData, removedSales, 'fila');
+      eventData.sales = (eventData.sales || []).filter(sale => (sale.batchId || sale.id) !== loadId);
       if (editingLoadId === loadId) resetSaleForm();
       if (selectedSalesLoadId === loadId) selectedSalesLoadId = null;
       saveEvents();
       renderActiveEvent();
       renderStats();
       renderEventCards();
+    }
+
+    function restorePreviousLoad() {
+      const eventData = activeEvent();
+      if (!eventData || !isAdmin()) return;
+      if (isBingoLoadConfirmed(eventData)) return alert('Primero reabri la carga.');
+      if ((eventData.sales || []).length && !confirm('Ya hay cargas activas. Queres reemplazarlas por la carga anterior?')) return;
+      const sales = lastRecoverableSales(eventData);
+      if (!sales.length) return alert('No encontre una carga anterior para recuperar.');
+      eventData.sales = clonePlain(sales).map(sale => ({
+        ...sale,
+        id: sale.id || crypto.randomUUID(),
+        batchId: sale.batchId || crypto.randomUUID()
+      }));
+      eventData.bingoClosure = {
+        ...(eventData.bingoClosure || {}),
+        status: 'open',
+        restoredAt: new Date().toISOString(),
+        restoredBy: currentUser?.name || 'Administrador'
+      };
+      delete eventData.bingoClosure.activeLoadClearedAt;
+      delete eventData.bingoClosure.activeLoadClearedBy;
+      resetSaleForm();
+      saveEvents();
+      renderActiveEvent();
+      renderBalanceEvents();
+      renderAccounting();
+      renderStats();
+      renderEventCards();
+      alert('Carga anterior recuperada. Revisala y, si esta correcta, podes confirmarla para bingo.');
     }
 
     function confirmBingoLoad() {
@@ -4666,6 +4721,7 @@
         const preservedClosure = { ...closure, playId: closure.playId || crypto.randomUUID() };
         upsertBingoClosureHistory(eventData, preservedClosure);
       }
+      addDeletedSalesBackup(eventData, eventData.sales || [], 'todas');
       eventData.sales = [];
       eventData.bingoClosure = {
         ...closure,
@@ -5191,6 +5247,8 @@
       if (reopenBingoButton) reopenBingoLoad();
       const clearReopenedLoadsButton = event.target.closest('#clearReopenedLoads');
       if (clearReopenedLoadsButton) clearReopenedLoads();
+      const restorePreviousLoadButton = event.target.closest('#restorePreviousLoad');
+      if (restorePreviousLoadButton) restorePreviousLoad();
       const goToConfirmedBingoButton = event.target.closest('#goToConfirmedBingo');
       if (goToConfirmedBingoButton) {
         const eventData = activeEvent();
