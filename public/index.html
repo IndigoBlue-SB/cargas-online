@@ -159,6 +159,12 @@
     #page-event #salesTable tr.selected-sales-row td:first-child strong { color: #0b3f3a; }
     .event-text-settings { gap: 8px; }
     .event-text-settings-grid { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 8px; }
+    .voice-panel { gap: 8px; border-color: #9fc5ff; background: #f3f8ff; }
+    .voice-grid { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto; gap: 8px; align-items: end; }
+    .voice-box { border: 1px solid var(--line); border-radius: 6px; background: #fff; padding: 8px; min-height: 48px; font-size: 13px; }
+    .voice-box strong { display: block; margin-bottom: 3px; color: var(--brand); }
+    .voice-panel.listening #voiceStart { background: #dc2626; }
+    .voice-confirm { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .views { display: flex; gap: 8px; flex-wrap: wrap; }
     .views button.active { background: var(--brand); }
     .event-sheets-panel { gap: 8px; }
@@ -1049,6 +1055,7 @@
           <div class="actions">
             <button type="button" class="secondary" data-open-reference-lists data-admin-only>Cargar vendedores</button>
             <button type="button" class="secondary" id="openEventTextSettings" data-admin-only>Ajustes evento</button>
+            <button type="button" class="secondary" id="openVoicePanel">Voz</button>
             <button type="button" class="secondary" data-page-shortcut="events">Volver a eventos</button>
           </div>
         </div>
@@ -1097,6 +1104,28 @@
           </div>
           <div class="actions">
             <button type="button" id="applyEventTextSettings">Aplicar ajustes</button>
+          </div>
+        </section>
+        <section id="voicePanel" class="panel form-grid voice-panel hidden">
+          <div class="table-head">
+            <div>
+              <h3>Comandos por voz</h3>
+              <span class="muted">Habla claro: vendedor, localidad, desde/hasta, abrir ventanas o guardar carga con confirmacion.</span>
+            </div>
+            <button type="button" class="light" id="closeVoicePanel">Cerrar</button>
+          </div>
+          <div class="voice-grid">
+            <div class="voice-box"><strong>Escuche</strong><span id="voiceTranscript">Sin audio todavia.</span></div>
+            <div class="voice-box"><strong>Resultado</strong><span id="voiceFeedback">Toca Iniciar voz y acepta el microfono.</span></div>
+            <div class="actions">
+              <button type="button" id="voiceStart">Iniciar voz</button>
+              <button type="button" class="light" id="voiceStop">Detener</button>
+            </div>
+          </div>
+          <div id="voiceConfirmBox" class="voice-confirm hidden">
+            <span id="voiceConfirmText" class="badge"></span>
+            <button type="button" id="voiceConfirm">Confirmar</button>
+            <button type="button" class="light" id="voiceCancel">Cancelar</button>
           </div>
         </section>
         <div id="bingoClosurePanel" class="bingo-closure-panel">
@@ -1263,6 +1292,9 @@
     let appNoticeTimer = null;
     let lastSaveWarningAt = 0;
     let eventsSaveQueue = Promise.resolve();
+    let voiceRecognition = null;
+    let voiceListening = false;
+    let pendingVoiceAction = null;
     const pendingLogos = { mainLogo: null, eventLogoLeft: null, eventLogoRight: null, balanceBgImage: null };
     const bingoCardsCache = new Map();
     const bingo90StorageKey = 'bingo90.events.v1';
@@ -1485,6 +1517,243 @@
       if (provinces.length === 1) fields.provincia.value = provinces[0];
       if (!matchingSellers.some(seller => seller.name === fields.vendedor.value)) fields.vendedor.value = '';
       renderSaleReferenceSelects(eventData);
+    }
+    function voiceKey(value) {
+      return normalize(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[.,;:!?]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    function voiceNumber(value) {
+      const clean = voiceKey(value);
+      const digit = clean.match(/\d+/);
+      if (digit) return Number(digit[0]) || 0;
+      const values = {
+        cero: 0, un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
+        once: 11, doce: 12, trece: 13, catorce: 14, quince: 15, dieciseis: 16, diecisiete: 17, dieciocho: 18, diecinueve: 19,
+        veinte: 20, veintiuno: 21, veintidos: 22, veintitres: 23, veinticuatro: 24, veinticinco: 25, veintiseis: 26, veintisiete: 27, veintiocho: 28, veintinueve: 29,
+        treinta: 30, cuarenta: 40, cincuenta: 50, sesenta: 60, setenta: 70, ochenta: 80, noventa: 90,
+        cien: 100, ciento: 100, doscientos: 200, trescientos: 300, cuatrocientos: 400, quinientos: 500, seiscientos: 600, setecientos: 700, ochocientos: 800, novecientos: 900
+      };
+      let total = 0;
+      let current = 0;
+      clean.split(/\s+/).forEach(token => {
+        if (token === 'mil') {
+          total += (current || 1) * 1000;
+          current = 0;
+        } else if (Object.prototype.hasOwnProperty.call(values, token)) {
+          current += values[token];
+        }
+      });
+      return total + current;
+    }
+    function voiceSegment(command, aliases) {
+      const text = voiceKey(command);
+      const boundaries = ['localidad', 'provincia', 'vendedor', 'administrador', 'desde', 'hasta', 'asta', 'sin cargo', 'sin cargos', 'efectivo', 'transferencia', 'rango', 'guardar', 'confirmar', 'cancelar', 'abrir', 'ir a', 'limpiar'];
+      let start = -1;
+      let startAlias = '';
+      aliases.map(voiceKey).forEach(alias => {
+        const index = text.indexOf(alias);
+        if (index >= 0 && (start < 0 || index < start)) {
+          start = index;
+          startAlias = alias;
+        }
+      });
+      if (start < 0) return '';
+      const valueStart = start + startAlias.length;
+      let end = text.length;
+      boundaries.forEach(boundary => {
+        if (aliases.map(voiceKey).includes(boundary)) return;
+        const index = text.indexOf(` ${boundary} `, valueStart);
+        if (index >= 0 && index < end) end = index;
+      });
+      return text.slice(valueStart, end).replace(/^(a|al|el|la|los|las|de|del)\s+/, '').trim();
+    }
+    function voiceBestMatch(value, options = []) {
+      const target = voiceKey(value);
+      if (!target) return '';
+      const cleanOptions = uniqueTextList(options).map(option => ({ option, key: voiceKey(option) })).filter(item => item.key);
+      return (cleanOptions.find(item => item.key === target)
+        || cleanOptions.find(item => item.key.startsWith(target) || target.startsWith(item.key))
+        || cleanOptions.find(item => item.key.includes(target) || target.includes(item.key))
+        || cleanOptions.find(item => target.split(' ').every(part => item.key.includes(part))))?.option || '';
+    }
+    function setVoiceFeedback(message, transcript = null) {
+      if ($('voiceFeedback')) $('voiceFeedback').textContent = message || '';
+      if (transcript !== null && $('voiceTranscript')) $('voiceTranscript').textContent = transcript || 'Sin audio todavia.';
+    }
+    function setVoicePending(description, action) {
+      pendingVoiceAction = { description, action };
+      $('voiceConfirmText').textContent = description;
+      $('voiceConfirmBox').classList.remove('hidden');
+      setVoiceFeedback(`${description}. Deci confirmar o cancelar.`);
+    }
+    function clearVoicePending(message = '') {
+      pendingVoiceAction = null;
+      $('voiceConfirmBox').classList.add('hidden');
+      $('voiceConfirmText').textContent = '';
+      if (message) setVoiceFeedback(message);
+    }
+    function confirmVoicePending() {
+      if (!pendingVoiceAction) return setVoiceFeedback('No hay ninguna accion pendiente.');
+      const action = pendingVoiceAction.action;
+      clearVoicePending('Accion confirmada.');
+      action();
+    }
+    function voiceOpenPage(page) {
+      if (page === 'references') {
+        if (!activeEvent()) return 'Primero abri un evento.';
+        $('eventReferencePanel').classList.remove('hidden');
+        $('eventTextSettingsPanel').classList.add('hidden');
+        $('voicePanel').classList.add('hidden');
+        renderReferenceLists();
+        return 'Abri cargar vendedores.';
+      }
+      if (page === 'event-settings') {
+        $('eventTextSettingsPanel').classList.remove('hidden');
+        $('eventReferencePanel').classList.add('hidden');
+        return 'Abri ajustes del evento.';
+      }
+      go(page);
+      return `Abri ${page}.`;
+    }
+    function applyVoiceCommand(command) {
+      const text = voiceKey(command);
+      const eventData = activeEvent();
+      const updates = [];
+      if (!text) return setVoiceFeedback('No llegue a escuchar nada.', command);
+      if (text.includes('cancelar')) return clearVoicePending('Cancelado.');
+      if (text.includes('confirmar') && pendingVoiceAction) return confirmVoicePending();
+      if (text.includes('cargar vendedores') || text.includes('abrir vendedores')) return setVoiceFeedback(voiceOpenPage('references'), command);
+      if (text.includes('ajustes evento') || text.includes('configurar evento')) return setVoiceFeedback(voiceOpenPage('event-settings'), command);
+      const pageCommands = [
+        ['inicio', 'home'], ['eventos', 'events'], ['bingo', 'bingo'], ['balance', 'balance'], ['contable', 'accounting'],
+        ['planillas', 'sheets'], ['ventas virtuales', 'virtual'], ['estadisticas', 'stats'], ['configuraciones', 'settings']
+      ];
+      const pageMatch = pageCommands.find(([spoken]) => (text.includes('abrir') || text.includes('ir a')) && text.includes(spoken));
+      if (pageMatch) return setVoiceFeedback(voiceOpenPage(pageMatch[1]), command);
+      if (!eventData) return setVoiceFeedback('Primero abri un evento para cargar ventas.', command);
+      if (isBingoLoadConfirmed(eventData)) return setVoiceFeedback('La carga esta confirmada. Reabrila antes de cargar por voz.', command);
+      const lists = referenceLists(eventData);
+      const towns = uniqueTextList([...(lists.towns || []), ...(lists.sellers || []).map(seller => seller.town), eventData.town]);
+      const provinces = uniqueTextList([...(lists.provinces || []), ...(lists.sellers || []).map(seller => seller.province), eventData.province]);
+      const townText = voiceSegment(command, ['localidad', 'localidade']);
+      if (townText) {
+        const match = voiceBestMatch(townText, towns);
+        if (match) {
+          fields.localidad.value = match;
+          applyTownReference();
+          updates.push(`localidad ${match}`);
+        } else {
+          return setVoiceFeedback(`No encontre la localidad "${townText}".`, command);
+        }
+      }
+      const provinceText = voiceSegment(command, ['provincia']);
+      if (provinceText) {
+        const match = voiceBestMatch(provinceText, provinces);
+        if (match) {
+          fields.provincia.value = match;
+          renderSaleReferenceSelects(eventData);
+          updates.push(`provincia ${match}`);
+        } else {
+          return setVoiceFeedback(`No encontre la provincia "${provinceText}".`, command);
+        }
+      }
+      const sellerText = voiceSegment(command, ['cargar vendedor', 'vendedor']);
+      if (sellerText) {
+        const match = voiceBestMatch(sellerText, sellerOptionsForEvent(eventData, { town: fields.localidad.value, province: fields.provincia.value }).map(seller => seller.name));
+        if (match) {
+          fields.vendedor.value = match;
+          applySellerReference();
+          updates.push(`vendedor ${match}`);
+        } else {
+          return setVoiceFeedback(`No encontre el vendedor "${sellerText}" en esta localidad.`, command);
+        }
+      }
+      const adminText = voiceSegment(command, ['administrador']);
+      if (adminText) {
+        const match = voiceBestMatch(adminText, lists.admins || []);
+        fields.saleAdmin.value = match || adminText;
+        updates.push(`administrador ${fields.saleAdmin.value}`);
+      }
+      const desdeText = voiceSegment(command, ['desde']);
+      const hastaText = voiceSegment(command, ['hasta', 'asta']);
+      const rangeNumbers = text.match(/rango\s+(\d+)\s+(?:al|a|hasta|asta)?\s*(\d+)/);
+      const desde = desdeText ? voiceNumber(desdeText) : Number(rangeNumbers?.[1] || 0);
+      const hasta = hastaText ? voiceNumber(hastaText) : Number(rangeNumbers?.[2] || 0);
+      if (desde) {
+        fields.desde.value = desde;
+        updates.push(`desde ${desde}`);
+      }
+      if (hasta) {
+        fields.hasta.value = hasta;
+        updates.push(`hasta ${hasta}`);
+      }
+      if (desde && hasta && addDraftRange()) updates.push(`rango agregado`);
+      const freeText = voiceSegment(command, ['sin cargos', 'sin cargo']);
+      const free = voiceNumber(freeText);
+      if (freeText && free >= 0) {
+        fields.sinCargos.value = free;
+        updates.push(`sin cargo ${free}`);
+      }
+      const cashText = voiceSegment(command, ['efectivo']);
+      const cash = voiceNumber(cashText);
+      if (cashText && cash >= 0) {
+        fields.pagoEfectivo.value = cash;
+        lastPaymentSource = 'cash';
+        updates.push(`efectivo ${num(cash)}`);
+      }
+      const transferText = voiceSegment(command, ['transferencia']);
+      const transfer = voiceNumber(transferText);
+      if (transferText && transfer >= 0) {
+        fields.pagoTransferencia.value = transfer;
+        lastPaymentSource = 'transfer';
+        updates.push(`transferencia ${num(transfer)}`);
+      }
+      updatePreview();
+      if (text.includes('agregar rango') || text.includes('cargar rango')) {
+        if (addDraftRange()) updates.push('rango agregado');
+      }
+      if (text.includes('limpiar carga')) {
+        return setVoicePending('Limpiar carga actual', resetSaleForm);
+      }
+      if (text.includes('guardar carga') || text.includes('guardar venta')) {
+        const summary = `Guardar carga de ${fields.vendedor.value || 'sin vendedor'} con ${num(draftTotals().units)} bingos`;
+        return setVoicePending(summary, () => $('saleForm').requestSubmit());
+      }
+      if (text.includes('confirmar carga') || text.includes('confirmar bingo')) {
+        return setVoicePending('Confirmar carga para bingo', confirmBingoLoad);
+      }
+      setVoiceFeedback(updates.length ? `Listo: ${updates.join(', ')}.` : 'No encontre un comando para ejecutar.', command);
+    }
+    function startVoice() {
+      const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!Recognition) return setVoiceFeedback('Este navegador no soporta reconocimiento de voz. Proba con Chrome o Edge.');
+      if (voiceListening) return;
+      voiceRecognition = voiceRecognition || new Recognition();
+      voiceRecognition.lang = 'es-AR';
+      voiceRecognition.interimResults = false;
+      voiceRecognition.continuous = false;
+      voiceRecognition.onstart = () => {
+        voiceListening = true;
+        $('voicePanel').classList.add('listening');
+        setVoiceFeedback('Escuchando...');
+      };
+      voiceRecognition.onresult = event => {
+        const transcript = Array.from(event.results).map(result => result[0]?.transcript || '').join(' ').trim();
+        setVoiceFeedback('Procesando...', transcript);
+        applyVoiceCommand(transcript);
+      };
+      voiceRecognition.onerror = event => setVoiceFeedback(event.error === 'not-allowed' ? 'Tenes que permitir el microfono para usar voz.' : `Error de voz: ${event.error || 'no se pudo escuchar'}.`);
+      voiceRecognition.onend = () => {
+        voiceListening = false;
+        $('voicePanel').classList.remove('listening');
+      };
+      try {
+        voiceRecognition.start();
+      } catch (error) {
+        setVoiceFeedback('No pude iniciar el microfono. Volve a tocar Iniciar voz.');
+      }
+    }
+    function stopVoice() {
+      if (voiceRecognition && voiceListening) voiceRecognition.stop();
     }
     function parseAmount(value) {
       const clean = String(value || '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
@@ -4745,6 +5014,7 @@
         if (!activeEvent()) return alert('Primero abri un evento.');
         $('eventReferencePanel').classList.remove('hidden');
         $('eventTextSettingsPanel').classList.add('hidden');
+        $('voicePanel').classList.add('hidden');
         renderReferenceLists();
         setTimeout(() => $('referenceListsTitle')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
       }
@@ -4874,6 +5144,11 @@
       }
       const closeEventReferencePanel = event.target.closest('#closeEventReferencePanel');
       if (closeEventReferencePanel) $('eventReferencePanel').classList.add('hidden');
+      const closeVoicePanel = event.target.closest('#closeVoicePanel');
+      if (closeVoicePanel) {
+        stopVoice();
+        $('voicePanel').classList.add('hidden');
+      }
       const saveUserButton = event.target.closest('[data-save-user]');
       if (saveUserButton && canUsePage('settings')) {
         const userId = saveUserButton.dataset.saveUser;
@@ -5429,10 +5704,22 @@
       syncEventTextSettingsForm(eventData);
       $('eventTextSettingsPanel').classList.remove('hidden');
       $('eventReferencePanel').classList.add('hidden');
+      $('voicePanel').classList.add('hidden');
+    });
+    $('openVoicePanel').addEventListener('click', () => {
+      if (!activeEvent()) return alert('Primero abri un evento.');
+      $('voicePanel').classList.remove('hidden');
+      $('eventReferencePanel').classList.add('hidden');
+      $('eventTextSettingsPanel').classList.add('hidden');
+      setVoiceFeedback('Toca Iniciar voz y acepta el microfono.');
     });
     $('closeEventTextSettings').addEventListener('click', () => {
       $('eventTextSettingsPanel').classList.add('hidden');
     });
+    $('voiceStart').addEventListener('click', startVoice);
+    $('voiceStop').addEventListener('click', stopVoice);
+    $('voiceConfirm').addEventListener('click', confirmVoicePending);
+    $('voiceCancel').addEventListener('click', () => clearVoicePending('Cancelado.'));
     $('applyEventTextSettings').addEventListener('click', () => {
       const eventData = activeEvent();
       if (!eventData) return;
