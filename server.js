@@ -178,6 +178,34 @@ function salesSummary(sales = []) {
   };
 }
 
+function shouldBackupSales(previousSales = [], nextSales = []) {
+  const previous = salesSummary(previousSales);
+  const next = salesSummary(nextSales);
+  if (!previous.rows) return false;
+  return (
+    next.rows < previous.rows
+    || next.loads < previous.loads
+    || next.sellers < previous.sellers
+    || next.units < previous.units
+  );
+}
+
+function appendSalesBackup(event, sales, { by = 'Sistema', reason = 'auto' } = {}) {
+  if (!event || !Array.isArray(sales) || !sales.length) return event;
+  const backups = Array.isArray(event.deletedSalesBackups) ? event.deletedSalesBackups : [];
+  return {
+    ...event,
+    deletedSalesBackups: [...backups, {
+      id: crypto.randomUUID(),
+      deletedAt: new Date().toISOString(),
+      deletedBy: by,
+      reason,
+      summary: salesSummary(sales),
+      sales: JSON.parse(JSON.stringify(sales))
+    }].slice(-30)
+  };
+}
+
 function restoreCandidatesFromEvent(event) {
   if (!event) return [];
   const candidates = [];
@@ -602,7 +630,16 @@ async function handleApi(req, res) {
   if (url.pathname === '/api/events' && req.method === 'PUT') {
     const body = await readBody(req);
     if (session.role === 'admin') {
-      db.events = Array.isArray(body.events) ? body.events : [];
+      const incomingEvents = Array.isArray(body.events) ? body.events : [];
+      const previousById = new Map((db.events || []).map(event => [String(event.id), event]));
+      db.events = incomingEvents.map(event => {
+        const previous = previousById.get(String(event.id));
+        if (!previous) return event;
+        if (shouldBackupSales(previous.sales || [], event.sales || [])) {
+          return appendSalesBackup(event, previous.sales || [], { by: session.name || 'Administrador', reason: 'auto-before-replace' });
+        }
+        return event;
+      });
     } else {
       const incoming = Array.isArray(body.events) ? body.events : [];
       const incomingById = new Map(incoming.map(event => [event.id, event]));

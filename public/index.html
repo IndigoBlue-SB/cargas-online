@@ -2230,6 +2230,9 @@
       return play.id;
     }
     function lastRecoverableSales(eventData) {
+      const backups = Array.isArray(eventData?.deletedSalesBackups) ? eventData.deletedSalesBackups : [];
+      const lastBackup = [...backups].reverse().find(entry => Array.isArray(entry?.sales) && entry.sales.length);
+      if (lastBackup) return lastBackup.sales;
       const closure = ensureBingoControl(eventData);
       if (Array.isArray(closure.snapshotSales) && closure.snapshotSales.length) return closure.snapshotSales;
       const history = normalizeBingoClosureHistory(eventData);
