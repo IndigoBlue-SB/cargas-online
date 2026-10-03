@@ -146,6 +146,61 @@ function writeDb(db) {
   fs.renameSync(tempFile, DB_FILE);
 }
 
+function readDbFile(file) {
+  const raw = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
+  return { ...defaultDb, ...JSON.parse(raw) };
+}
+
+function eventMatches(event, { id, name }) {
+  if (!event) return false;
+  if (id && String(event.id) === String(id)) return true;
+  const cleanName = normalize(name);
+  if (!cleanName) return false;
+  return normalize(event.name).includes(cleanName) || cleanName.includes(normalize(event.name));
+}
+
+function rangeCount(item) {
+  const desde = Number(item?.desde) || 0;
+  const hasta = Number(item?.hasta) || 0;
+  return hasta >= desde ? hasta - desde + 1 : 0;
+}
+
+function salesSummary(sales = []) {
+  const list = Array.isArray(sales) ? sales : [];
+  const sellers = new Set(list.map(sale => String(sale.seller || '').trim()).filter(Boolean));
+  const batches = new Set(list.map(sale => String(sale.batchId || sale.id || '').trim()).filter(Boolean));
+  return {
+    rows: list.length,
+    loads: batches.size || list.length,
+    sellers: sellers.size,
+    units: list.reduce((total, sale) => total + rangeCount(sale), 0),
+    sellerNames: [...sellers].sort((a, b) => a.localeCompare(b, 'es')).slice(0, 20)
+  };
+}
+
+function restoreCandidatesFromEvent(event) {
+  if (!event) return [];
+  const candidates = [];
+  const pushCandidate = (source, sales, extra = {}) => {
+    if (!Array.isArray(sales) || !sales.length) return;
+    candidates.push({ source, sales, summary: salesSummary(sales), ...extra });
+  };
+  pushCandidate('event.sales', event.sales || []);
+  pushCandidate('event.bingoClosure.snapshotSales', event.bingoClosure?.snapshotSales || []);
+  (Array.isArray(event.bingoClosureHistory) ? event.bingoClosureHistory : []).forEach((entry, index) => {
+    pushCandidate(`event.bingoClosureHistory.${index}`, entry.snapshotSales || [], { confirmedAt: entry.confirmedAt || '' });
+  });
+  (Array.isArray(event.deletedSalesBackups) ? event.deletedSalesBackups : []).forEach((entry, index) => {
+    pushCandidate(`event.deletedSalesBackups.${index}`, entry.sales || [], { deletedAt: entry.deletedAt || '' });
+  });
+  return candidates.sort((a, b) => (
+    (b.summary.sellers - a.summary.sellers)
+    || (b.summary.loads - a.summary.loads)
+    || (b.summary.rows - a.summary.rows)
+    || (b.summary.units - a.summary.units)
+  ));
+}
+
 function storageInfo(db) {
   const isRailway = Boolean(process.env.RAILWAY_ENVIRONMENT_NAME || process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_SERVICE_ID);
   const events = Array.isArray(db.events) ? db.events : [];
@@ -459,6 +514,89 @@ async function handleApi(req, res) {
         closure: event.bingoClosure
       }));
     return sendJson(res, 200, { events: confirmedEvents });
+  }
+
+  if (url.pathname === '/api/admin/backup-inspect' && req.method === 'GET') {
+    if (session.role !== 'admin') return sendJson(res, 403, { error: 'Solo administrador' });
+    const query = { id: url.searchParams.get('eventId') || '', name: url.searchParams.get('name') || '' };
+    const backupFile = `${DB_FILE}.bak`;
+    const currentEvent = (db.events || []).find(event => eventMatches(event, query));
+    let backupEvent = null;
+    let backupError = '';
+    if (fs.existsSync(backupFile)) {
+      try {
+        const backupDb = readDbFile(backupFile);
+        backupEvent = (backupDb.events || []).find(event => eventMatches(event, query));
+      } catch (error) {
+        backupError = error.message || 'No se pudo leer el backup';
+      }
+    }
+    return sendJson(res, 200, {
+      backupExists: fs.existsSync(backupFile),
+      backupError,
+      current: currentEvent ? {
+        id: currentEvent.id,
+        name: currentEvent.name,
+        date: currentEvent.date,
+        candidates: restoreCandidatesFromEvent(currentEvent).map(item => ({ source: item.source, summary: item.summary, confirmedAt: item.confirmedAt || '', deletedAt: item.deletedAt || '' }))
+      } : null,
+      backup: backupEvent ? {
+        id: backupEvent.id,
+        name: backupEvent.name,
+        date: backupEvent.date,
+        candidates: restoreCandidatesFromEvent(backupEvent).map(item => ({ source: item.source, summary: item.summary, confirmedAt: item.confirmedAt || '', deletedAt: item.deletedAt || '' }))
+      } : null
+    });
+  }
+
+  if (url.pathname === '/api/admin/restore-sales-backup' && req.method === 'POST') {
+    if (session.role !== 'admin') return sendJson(res, 403, { error: 'Solo administrador' });
+    const body = await readBody(req);
+    const query = { id: body.eventId || '', name: body.name || '' };
+    const currentIndex = (db.events || []).findIndex(event => eventMatches(event, query));
+    if (currentIndex < 0) return sendJson(res, 404, { error: 'Evento actual no encontrado' });
+    const backupFile = `${DB_FILE}.bak`;
+    const sourceEvents = [{ label: 'current', event: db.events[currentIndex] }];
+    if (fs.existsSync(backupFile)) {
+      try {
+        const backupDb = readDbFile(backupFile);
+        const backupEvent = (backupDb.events || []).find(event => eventMatches(event, query));
+        if (backupEvent) sourceEvents.push({ label: 'backup', event: backupEvent });
+      } catch {}
+    }
+    const candidates = sourceEvents.flatMap(entry => restoreCandidatesFromEvent(entry.event).map(candidate => ({ ...candidate, sourceDb: entry.label })));
+    if (!candidates.length) return sendJson(res, 404, { error: 'No se encontraron ventas para restaurar' });
+    const selectedSource = String(body.source || '').trim();
+    const selected = selectedSource
+      ? candidates.find(candidate => `${candidate.sourceDb}:${candidate.source}` === selectedSource)
+      : candidates[0];
+    if (!selected) return sendJson(res, 404, { error: 'Origen de restauracion no encontrado' });
+    const target = db.events[currentIndex];
+    target.deletedSalesBackups = Array.isArray(target.deletedSalesBackups) ? target.deletedSalesBackups : [];
+    if (Array.isArray(target.sales) && target.sales.length) {
+      target.deletedSalesBackups.push({
+        id: crypto.randomUUID(),
+        deletedAt: new Date().toISOString(),
+        deletedBy: session.name || 'Administrador',
+        reason: 'pre-restore',
+        sales: target.sales
+      });
+    }
+    target.sales = JSON.parse(JSON.stringify(selected.sales));
+    target.bingoClosure = {
+      ...(target.bingoClosure || {}),
+      status: 'open',
+      restoredAt: new Date().toISOString(),
+      restoredBy: session.name || 'Administrador'
+    };
+    delete target.bingoClosure.activeLoadClearedAt;
+    delete target.bingoClosure.activeLoadClearedBy;
+    writeDb(db);
+    return sendJson(res, 200, {
+      ok: true,
+      restoredFrom: `${selected.sourceDb}:${selected.source}`,
+      summary: selected.summary
+    });
   }
 
   if (url.pathname === '/api/events' && req.method === 'PUT') {
