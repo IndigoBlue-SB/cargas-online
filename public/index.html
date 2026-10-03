@@ -153,6 +153,10 @@
     #page-event th, #page-event td { padding: 5px 6px; }
     #page-event #tableHead, #page-event #salesTable { font-size: var(--event-sales-table-size); }
     #page-event #tableHead th { font-size: max(10px, calc(var(--event-sales-table-size) - 1px)); }
+    #page-event #salesTable tr[data-sales-row] { cursor: pointer; }
+    #page-event #salesTable tr.selected-sales-row { background: #fff4bd; box-shadow: inset 4px 0 0 var(--brand); }
+    #page-event #salesTable tr.selected-sales-row:hover { background: #ffe99a; }
+    #page-event #salesTable tr.selected-sales-row td:first-child strong { color: #0b3f3a; }
     .event-text-settings { gap: 8px; }
     .event-text-settings-grid { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 8px; }
     .views { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -1165,7 +1169,7 @@
                 <label>Localidad<select id="filterLocalidad"><option value="">Todas</option></select></label>
                 <label>Provincia<select id="filterProvincia"><option value="">Todas</option></select></label>
                 <label>Vendedor<select id="filterVendedor"><option value="">Todos</option></select></label>
-                <label>Orden cargas<select id="salesSort"><option value="created">Orden cargado</option><option value="alpha">Alfabetico</option></select></label>
+                <label>Orden cargas<select id="salesSort"><option value="alpha">Alfabetico</option><option value="created">Orden cargado</option></select></label>
                 <button type="button" class="secondary" id="openExport">Exportar</button>
               </div>
               <div class="grid-3">
@@ -1248,6 +1252,7 @@
     let selectedDraftId = null;
     let editingDraftRangeId = null;
     let editingLoadId = null;
+    let selectedSalesLoadId = null;
     let editingEventId = null;
     let editingSheetId = null;
     let splashDone = false;
@@ -4117,9 +4122,10 @@
       $('salesTable').innerHTML = '';
       if (currentView === 'detalle') {
         let loads = groupLoads(items);
-        if ($('salesSort')?.value === 'alpha') {
+        if (($('salesSort')?.value || 'alpha') === 'alpha') {
           loads = [...loads].sort((a, b) => String(a.seller || '').localeCompare(String(b.seller || ''), 'es', { sensitivity: 'base' }));
         }
+        if (selectedSalesLoadId && !loads.some(load => load.id === selectedSalesLoadId)) selectedSalesLoadId = null;
         const event = activeEvent();
         $('emptyState').classList.toggle('hidden', loads.length > 0);
         $('visibleCount').textContent = `${loads.length} ${loads.length === 1 ? 'carga' : 'cargas'}`;
@@ -4128,7 +4134,8 @@
         $('tableHead').innerHTML = `<tr><th>Vendedor/a</th><th>Cant.</th><th>Sin cargo</th><th>Ingresos</th><th>Com. venta</th><th>Admin.</th><th>Importe</th><th>Pago</th><th>Localidad</th><th>Provincia</th>${canModifyLoads ? '<th></th>' : ''}</tr>`;
         $('salesTable').innerHTML = loads.map(load => {
           const { income, sellerCommission, adminCommission, netAmount } = loadFinancials(load, event);
-          return `<tr><td><strong>${load.seller}</strong></td><td>${num(load.units)}</td><td>${num(load.freeUnits)}</td><td>${money(income)}</td><td>${money(sellerCommission)}</td><td>${adminCellText(load.adminName, adminCommission)}</td><td>${money(netAmount)}</td><td>${paymentLabel(load)}</td><td>${load.town}</td><td>${load.province}</td>${canModifyLoads ? `<td><div class="table-actions"><button type="button" class="light" data-edit-load="${load.id}">Editar</button><button type="button" class="danger" data-delete-load="${load.id}">Eliminar</button></div></td>` : ''}</tr>`;
+          const selectedClass = load.id === selectedSalesLoadId ? ' class="selected-sales-row"' : '';
+          return `<tr${selectedClass} data-sales-row="${escapeAttr(load.id)}"><td><strong>${escapeAttr(load.seller)}</strong></td><td>${num(load.units)}</td><td>${num(load.freeUnits)}</td><td>${money(income)}</td><td>${money(sellerCommission)}</td><td>${adminCellText(load.adminName, adminCommission)}</td><td>${money(netAmount)}</td><td>${paymentLabel(load)}</td><td>${escapeAttr(load.town)}</td><td>${escapeAttr(load.province)}</td>${canModifyLoads ? `<td><div class="table-actions"><button type="button" class="light" data-edit-load="${escapeAttr(load.id)}">Editar</button><button type="button" class="danger" data-delete-load="${escapeAttr(load.id)}">Eliminar</button></div></td>` : ''}</tr>`;
         }).join('');
         return;
       }
@@ -4282,6 +4289,7 @@
       if (!confirm('Eliminar esta carga?')) return;
       eventData.sales = eventData.sales.filter(sale => (sale.batchId || sale.id) !== loadId);
       if (editingLoadId === loadId) resetSaleForm();
+      if (selectedSalesLoadId === loadId) selectedSalesLoadId = null;
       saveEvents();
       renderActiveEvent();
       renderStats();
@@ -4760,7 +4768,7 @@
       if (open) {
         const eventData = events.find(eventItem => eventItem.id === open.dataset.openEvent);
         if (!eventData || !canAccessEvent(eventData)) return;
-        activeEventId = open.dataset.openEvent; currentView = 'detalle'; go('event');
+        activeEventId = open.dataset.openEvent; currentView = 'detalle'; selectedSalesLoadId = null; go('event');
       }
       const openBalance = event.target.closest('[data-open-balance]');
       if (openBalance) {
@@ -4797,6 +4805,11 @@
       if (editEventButton && canUsePage('create')) editEvent(editEventButton.dataset.editEvent);
       const del = event.target.closest('[data-delete-event]');
       if (del && canUsePage('delete') && confirm('Eliminar este evento y todas sus ventas?')) { events = events.filter(e => e.id !== del.dataset.deleteEvent); saveEvents(); renderAll(); }
+      const salesRow = event.target.closest('[data-sales-row]');
+      if (salesRow) {
+        selectedSalesLoadId = salesRow.dataset.salesRow;
+        $('salesTable')?.querySelectorAll('[data-sales-row]').forEach(row => row.classList.toggle('selected-sales-row', row.dataset.salesRow === selectedSalesLoadId));
+      }
       const editLoadButton = event.target.closest('[data-edit-load]');
       if (editLoadButton && isAdmin()) {
         const eventData = activeEvent();
