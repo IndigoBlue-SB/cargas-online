@@ -488,7 +488,7 @@
         <button type="button" data-page="home" class="active">INICIO</button>
         <button type="button" data-page="create" data-admin-only>CREAR EVENTO</button>
         <button type="button" data-page="stats" data-admin-only>ESTADISTICAS</button>
-        <button type="button" data-page="delete" data-admin-only>ELIMINAR EVENTO</button>
+        <button type="button" data-page="delete" data-admin-only>PAPELERA</button>
         <button type="button" data-page="events">EVENTOS</button>
         <button type="button" data-page="bingo">BINGO</button>
         <button type="button" data-page="virtual" data-admin-only>VENTAS VIRTUALES</button>
@@ -519,7 +519,7 @@
         <div class="event-list">
           <button type="button" class="event-card" data-page-shortcut="create" data-admin-only><h3>CREAR EVENTO</h3><span class="muted">Configurar nombre, importes, porcentajes y ubicacion.</span></button>
           <button type="button" class="event-card" data-page-shortcut="stats" data-admin-only><h3>ESTADISTICAS</h3><span class="muted">Ver totales generales y por evento.</span></button>
-          <button type="button" class="event-card" data-page-shortcut="delete" data-admin-only><h3>ELIMINAR EVENTO</h3><span class="muted">Borrar eventos que ya no se necesiten.</span></button>
+          <button type="button" class="event-card" data-page-shortcut="delete" data-admin-only><h3>PAPELERA</h3><span class="muted">Recuperar eventos eliminados o enviarlos a papelera.</span></button>
           <button type="button" class="event-card" data-page-shortcut="events"><h3>EVENTOS</h3><span class="muted">Entrar a eventos creados para cargar ventas.</span></button>
           <button type="button" class="event-card" data-page-shortcut="bingo"><h3>BINGO</h3><span class="muted">Jugar con cargas confirmadas y cartones oficiales.</span></button>
           <button type="button" class="event-card" data-page-shortcut="virtual" data-admin-only><h3>VENTAS VIRTUALES</h3><span class="muted">Crear links para vendedoras y traer sus ventas al evento.</span></button>
@@ -676,8 +676,15 @@
       </section>
 
       <section id="page-delete" data-screen class="hidden">
-        <div class="topbar"><h2>Eliminar evento</h2></div>
-        <div id="deleteList" class="event-list"></div>
+        <div class="topbar"><div><h2>Papelera de eventos</h2><p class="muted">Los eventos eliminados quedan guardados aca para poder restaurarlos.</p></div></div>
+        <div class="panel form-grid">
+          <div class="table-head"><h3>Eventos activos</h3><span class="muted">Enviar a papelera</span></div>
+          <div id="deleteList" class="event-list"></div>
+        </div>
+        <div class="panel form-grid">
+          <div class="table-head"><h3>Papelera</h3><span class="muted">Restaurar eventos eliminados</span></div>
+          <div id="trashList" class="event-list"></div>
+        </div>
       </section>
 
       <section id="page-sheets" data-screen class="hidden">
@@ -869,7 +876,7 @@
             <button type="button" class="secondary" data-page-shortcut="home">Inicio</button>
             <button type="button" class="secondary" data-page-shortcut="create" data-admin-only>Crear evento</button>
             <button type="button" class="secondary" data-page-shortcut="stats" data-admin-only>Estadisticas</button>
-            <button type="button" class="secondary" data-page-shortcut="delete" data-admin-only>Eliminar evento</button>
+            <button type="button" class="secondary" data-page-shortcut="delete" data-admin-only>Papelera</button>
             <button type="button" class="secondary" data-page-shortcut="events">Eventos</button>
             <button type="button" class="secondary" data-page-shortcut="settings" data-admin-only>Configuraciones</button>
             <button type="button" class="danger" data-logout-top>Cerrar sesion</button>
@@ -1254,7 +1261,7 @@
 
   <script>
     const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], bingo: [], virtual: [], sheets: [], balance: [], accounting: [], settings: [] };
-    const functionLabels = { home: 'Inicio', create: 'Crear evento', stats: 'Estadisticas', delete: 'Eliminar evento', events: 'Eventos', bingo: 'Bingo', virtual: 'Ventas virtuales', sheets: 'Planillas', balance: 'Balance', accounting: 'Contable', settings: 'Configuraciones' };
+    const functionLabels = { home: 'Inicio', create: 'Crear evento', stats: 'Estadisticas', delete: 'Papelera', events: 'Eventos', bingo: 'Bingo', virtual: 'Ventas virtuales', sheets: 'Planillas', balance: 'Balance', accounting: 'Contable', settings: 'Configuraciones' };
     const userDefaultPages = ['home', 'events', 'bingo', 'balance', 'accounting'];
     const defaultReferenceLists = { sellers: [], admins: [], provinces: [], towns: [] };
     const referenceListLabels = { sellers: 'Vendedores', admins: 'Administradores', provinces: 'Provincias', towns: 'Localidades' };
@@ -2134,7 +2141,11 @@
     function eventTitleLine2(eventData) {
       return eventData?.nameLine2 || '';
     }
+    function isDeletedEvent(event) {
+      return Boolean(event?.deletedAt);
+    }
     function canAccessEvent(event) {
+      if (isDeletedEvent(event)) return false;
       if (isAdmin()) return true;
       const allowed = event.allowedUsers || [];
       return allowed.map(normalize).includes(normalize(currentUser?.name));
@@ -2145,8 +2156,8 @@
       return allowed.map(normalize).includes(normalize(currentUser?.name));
     }
     function visibleEvents() { return events.filter(canAccessEvent); }
-    function activeEvent() { return events.find(event => event.id === activeEventId); }
-    function activeBalanceEvent() { return events.find(event => event.id === activeBalanceEventId); }
+    function activeEvent() { return events.find(event => event.id === activeEventId && !isDeletedEvent(event)); }
+    function activeBalanceEvent() { return events.find(event => event.id === activeBalanceEventId && !isDeletedEvent(event)); }
     function clonePlain(value) { return JSON.parse(JSON.stringify(value)); }
     function rangeCount(item) { const d = Number(item.desde) || 0; const h = Number(item.hasta) || 0; return h >= d ? h - d + 1 : 0; }
     function unitsFromSales(sales = []) {
@@ -2833,15 +2844,28 @@
 
     function renderDeleteList() {
       const list = $('deleteList');
+      const trash = $('trashList');
       list.innerHTML = '';
+      if (trash) trash.innerHTML = '';
       if (!canUsePage('delete')) { list.innerHTML = '<div class="empty">Este usuario no tiene permiso para eliminar eventos.</div>'; return; }
-      if (!events.length) { list.innerHTML = '<div class="empty">No hay eventos para eliminar.</div>'; return; }
-      events.forEach(event => {
+      const activeItems = events.filter(event => !isDeletedEvent(event));
+      const deletedItems = events.filter(isDeletedEvent).sort((a, b) => String(b.deletedAt || '').localeCompare(String(a.deletedAt || '')));
+      if (!activeItems.length) { list.innerHTML = '<div class="empty">No hay eventos activos para enviar a papelera.</div>'; }
+      activeItems.forEach(event => {
         const sales = officialSales(event);
         const card = document.createElement('article');
         card.className = 'event-card';
-        card.innerHTML = `<h3>${event.name}</h3><div class="event-meta"><span>${event.date}</span><span>${sales.length || 0} cargas guardadas</span><span>${isBingoLoadConfirmed(event) ? 'Carga confirmada' : 'Carga abierta'}</span></div><button type="button" class="danger" data-delete-event="${event.id}">Eliminar evento</button>`;
+        card.innerHTML = `<h3>${escapeAttr(event.name)}</h3><div class="event-meta"><span>${escapeAttr(event.date)}</span><span>${sales.length || 0} cargas guardadas</span><span>${isBingoLoadConfirmed(event) ? 'Carga confirmada' : 'Carga abierta'}</span></div><button type="button" class="danger" data-delete-event="${escapeAttr(event.id)}">Enviar a papelera</button>`;
         list.appendChild(card);
+      });
+      if (!trash) return;
+      if (!deletedItems.length) { trash.innerHTML = '<div class="empty">La papelera esta vacia.</div>'; return; }
+      deletedItems.forEach(event => {
+        const sales = officialSales(event);
+        const card = document.createElement('article');
+        card.className = 'event-card';
+        card.innerHTML = `<h3>${escapeAttr(event.name)}</h3><div class="event-meta"><span>${escapeAttr(event.date || '')}</span><span>${sales.length || 0} cargas guardadas</span><span>Eliminado ${formatDateTime(event.deletedAt)}</span><span>${escapeAttr(event.deletedBy || 'Sin usuario')}</span></div><div class="actions"><button type="button" data-restore-event="${escapeAttr(event.id)}">Restaurar</button><button type="button" class="danger" data-delete-event-final="${escapeAttr(event.id)}">Eliminar definitivamente</button></div>`;
+        trash.appendChild(card);
       });
     }
 
@@ -5085,7 +5109,39 @@
       const editEventButton = event.target.closest('[data-edit-event]');
       if (editEventButton && canUsePage('create')) editEvent(editEventButton.dataset.editEvent);
       const del = event.target.closest('[data-delete-event]');
-      if (del && canUsePage('delete') && confirm('Eliminar este evento y todas sus ventas?')) { events = events.filter(e => e.id !== del.dataset.deleteEvent); saveEvents(); renderAll(); }
+      if (del && canUsePage('delete')) {
+        const eventData = events.find(e => e.id === del.dataset.deleteEvent);
+        if (eventData && confirm('Enviar este evento a Papelera? Vas a poder restaurarlo despues.')) {
+          eventData.deletedAt = new Date().toISOString();
+          eventData.deletedBy = currentUser?.name || 'Administrador';
+          if (activeEventId === eventData.id) activeEventId = null;
+          if (activeBalanceEventId === eventData.id) activeBalanceEventId = null;
+          if (activeBingoEventId === eventData.id) activeBingoEventId = null;
+          if (activeStatsEventId === eventData.id) activeStatsEventId = null;
+          saveEvents();
+          renderAll();
+        }
+      }
+      const restoreEventButton = event.target.closest('[data-restore-event]');
+      if (restoreEventButton && canUsePage('delete')) {
+        const eventData = events.find(e => e.id === restoreEventButton.dataset.restoreEvent);
+        if (eventData) {
+          delete eventData.deletedAt;
+          delete eventData.deletedBy;
+          saveEvents();
+          renderAll();
+          alert('Evento restaurado.');
+        }
+      }
+      const finalDeleteButton = event.target.closest('[data-delete-event-final]');
+      if (finalDeleteButton && canUsePage('delete')) {
+        const eventData = events.find(e => e.id === finalDeleteButton.dataset.deleteEventFinal);
+        if (eventData && confirm('Eliminar definitivamente este evento? Esta accion no se puede deshacer desde la app.') && confirm(`Confirmar eliminacion definitiva de "${eventData.name}"?`)) {
+          events = events.filter(e => e.id !== eventData.id);
+          saveEvents();
+          renderAll();
+        }
+      }
       const salesRow = event.target.closest('[data-sales-row]');
       if (salesRow) {
         selectedSalesLoadId = salesRow.dataset.salesRow;

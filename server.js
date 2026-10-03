@@ -237,6 +237,7 @@ function hasFunctionPermission(session, settings, page) {
 function visibleEventsFor(session, events) {
   if (session.role === 'admin') return events;
   return events.filter(event => {
+    if (event?.deletedAt) return false;
     const allowedUsers = event.allowedUsers || [];
     return allowedUsers.some(name => (
       normalize(name) === normalize(session.name)
@@ -252,6 +253,7 @@ function publicVirtualSheet(db, token) {
   const cleanToken = String(token || '').trim();
   if (!cleanToken) return null;
   for (const event of db.events || []) {
+    if (event?.deletedAt) continue;
     const sheet = (event.virtualSheets || []).find(item => String(item.token) === cleanToken);
     if (sheet) return { event, sheet };
   }
@@ -445,6 +447,7 @@ async function handleApi(req, res) {
 
   if (url.pathname === '/api/bingo/confirmed' && req.method === 'GET') {
     const confirmedEvents = visibleEventsFor(session, db.events || [])
+      .filter(event => !event?.deletedAt)
       .filter(isBingoLoadConfirmed)
       .map(event => ({
         id: event.id,
