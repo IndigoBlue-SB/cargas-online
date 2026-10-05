@@ -757,7 +757,8 @@ function render() {
   els.newEventBtn.disabled = state.gameFinished || state.isProjecting;
   els.saveEventStateBtn.disabled = userMode || !state.eventCreated;
   els.exportReportBtn.disabled = userMode || !state.eventCreated || state.gameFinished;
-  els.resetGameBtn.disabled = userMode || !state.eventCreated || state.gameFinished;
+  els.resetGameBtn.classList.toggle("hidden", !state.gameFinished);
+  els.resetGameBtn.disabled = userMode || !state.eventCreated || state.isProjecting;
   updateHomeActionAvailability();
 
   document.querySelectorAll(".number-cell").forEach((cell) => {
