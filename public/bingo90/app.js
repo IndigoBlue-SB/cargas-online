@@ -48,6 +48,7 @@ const state = {
   salesLoaded: false,
   soldUnits: [],
   salesDraftUnits: [],
+  cargasOfficialSoldUnits: [],
   completedGames: [],
   drawn: [],
   cards: [],
@@ -673,6 +674,27 @@ function rememberCargasLaunch() {
   if (new URLSearchParams(window.location.search).get("from") === "cargas") {
     sessionStorage.setItem(CARGAS_LAUNCH_STORAGE_KEY, "1");
   }
+}
+
+function hasCargasOfficialSales() {
+  return isLaunchedFromCargas() && Array.isArray(state.cargasOfficialSoldUnits) && state.cargasOfficialSoldUnits.length > 0;
+}
+
+function rememberCargasOfficialSales(units) {
+  const normalized = normalizeSoldUnits(units || []);
+  if (!normalized.length) return;
+  state.cargasOfficialSoldUnits = normalized;
+  state.soldUnits = [...normalized];
+  state.salesDraftUnits = [...normalized];
+  state.salesLoaded = true;
+}
+
+function enforceCargasOfficialSales() {
+  if (!hasCargasOfficialSales()) return false;
+  state.soldUnits = normalizeSoldUnits(state.cargasOfficialSoldUnits);
+  state.salesDraftUnits = [...state.soldUnits];
+  state.salesLoaded = state.soldUnits.length > 0;
+  return state.salesLoaded;
 }
 
 function returnToCargasHome() {
@@ -1792,6 +1814,7 @@ function applyLoadScreen(options = {}) {
   state.salesLoaded = false;
   state.soldUnits = [];
   state.salesDraftUnits = [];
+  enforceCargasOfficialSales();
   state.view = "sales";
   generateConfiguredCards();
   if (options.openConfig) {
@@ -2901,6 +2924,7 @@ function buildBingoEventFromCargas(event) {
     salesLoaded: soldUnits.length > 0,
     soldUnits,
     salesDraftUnits: soldUnits,
+    cargasOfficialSoldUnits: soldUnits,
     drawn,
     savedAt: panel.savedAt || new Date().toISOString(),
     cardDesign: panel.cardDesign || {},
@@ -3901,6 +3925,7 @@ function applyEventSettings() {
     state.salesLoaded = false;
     state.soldUnits = [];
     state.salesDraftUnits = [];
+    enforceCargasOfficialSales();
     generateConfiguredCards();
     showEventSettingsSavedFeedback();
     return;
@@ -3968,6 +3993,7 @@ function generateSeries(seriesCount) {
   state.salesLoaded = false;
   state.soldUnits = [];
   state.salesDraftUnits = [];
+  enforceCargasOfficialSales();
   generateConfiguredCards();
 }
 
@@ -4672,6 +4698,7 @@ function buildCurrentEventPayload() {
     salesLoaded: state.salesLoaded,
     soldUnits: state.soldUnits,
     salesDraftUnits: getSalesDraftUnits(),
+    cargasOfficialSoldUnits: state.cargasOfficialSoldUnits || [],
     completedGames: state.completedGames || [],
     savedAt: new Date().toISOString(),
     drawn: state.drawn,
@@ -4947,6 +4974,9 @@ function loadEventData(event, options = {}) {
   state.salesLoaded = !!event.salesLoaded;
   state.soldUnits = normalizeSoldUnits(event.soldUnits || []);
   state.salesDraftUnits = normalizeSoldUnits(event.salesDraftUnits || event.soldUnits || []);
+  state.cargasOfficialSoldUnits = normalizeSoldUnits(event.cargasOfficialSoldUnits || []);
+  if (isLaunchedFromCargas() && state.soldUnits.length) rememberCargasOfficialSales(state.soldUnits);
+  else enforceCargasOfficialSales();
   state.completedGames = Array.isArray(event.completedGames) ? event.completedGames : [];
   state.drawn = event.drawn || [];
   state.cards = [];
@@ -5121,6 +5151,7 @@ function getSalesUnitLabel() {
 }
 
 function getPlayableCards() {
+  enforceCargasOfficialSales();
   if (!state.salesLoaded || !state.soldUnits.length) return [];
   const sold = new Set(state.soldUnits);
   if (state.cardMode === "individual") {
@@ -5364,6 +5395,14 @@ function exportSalesFile() {
 }
 
 function clearSales() {
+  if (hasCargasOfficialSales()) {
+    enforceCargasOfficialSales();
+    window.alert("Este evento viene de Cargas: solo se puede jugar con las series/cartones confirmadas alli.");
+    generateConfiguredCards({ preserveGame: true });
+    saveCurrentEvent({ silent: true });
+    render();
+    return;
+  }
   if (!getSalesDraftUnits().length) return;
   const confirmed = window.confirm("Limpiar todas las ventas cargadas?");
   if (!confirmed) return;
@@ -5578,6 +5617,9 @@ function getConfiguredCardTotal() {
 }
 
 function getGenerationUnits() {
+  if (hasCargasOfficialSales()) {
+    return normalizeSoldUnits(state.cargasOfficialSoldUnits);
+  }
   if (state.salesLoaded && state.soldUnits.length) {
     return normalizeSoldUnits(state.soldUnits);
   }
