@@ -1388,12 +1388,14 @@
     let appNoticeTimer = null;
     let lastSaveWarningAt = 0;
     let eventsSaveQueue = Promise.resolve();
+    let pendingEventsRevision = 0;
     let voiceRecognition = null;
     let voiceListening = false;
     let pendingVoiceAction = null;
     const pendingLogos = { mainLogo: null, eventLogoLeft: null, eventLogoRight: null, balanceBgImage: null };
     const bingoCardsCache = new Map();
     const bingo90StorageKey = 'bingo90.events.v1';
+    const pendingEventsStorageKey = 'cargas.pendingEvents.v1';
 
     const $ = id => document.getElementById(id);
     const screens = document.querySelectorAll('[data-screen]');
@@ -1417,7 +1419,55 @@
       const now = Date.now();
       if (now - lastSaveWarningAt < 15000) return;
       lastSaveWarningAt = now;
-      showAppNotice(`${error.message} Si estabas guardando datos, revisa la conexion y volve a tocar Guardar si no aparece reflejado.`);
+      showAppNotice(`${error.message} La carga quedo guardada en esta compu y se va a sincronizar cuando vuelva la conexion.`);
+    }
+
+    function readPendingEventsState() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(pendingEventsStorageKey) || 'null');
+        if (!parsed || !Array.isArray(parsed.events)) return null;
+        pendingEventsRevision = Math.max(pendingEventsRevision, Number(parsed.revision) || 0);
+        return parsed;
+      } catch (error) {
+        console.warn('No se pudo leer el respaldo local de eventos.', error);
+        return null;
+      }
+    }
+
+    function writePendingEventsState(sourceEvents = events, revision = pendingEventsRevision + 1) {
+      try {
+        pendingEventsRevision = Math.max(pendingEventsRevision, revision);
+        localStorage.setItem(pendingEventsStorageKey, JSON.stringify({
+          revision,
+          savedAt: new Date().toISOString(),
+          events: clonePlain(sourceEvents || [])
+        }));
+        return revision;
+      } catch (error) {
+        console.warn('No se pudo guardar el respaldo local de eventos.', error);
+        return revision;
+      }
+    }
+
+    function clearPendingEventsState(revision = null) {
+      try {
+        const current = readPendingEventsState();
+        if (revision !== null && current && Number(current.revision) !== Number(revision)) return;
+        localStorage.removeItem(pendingEventsStorageKey);
+      } catch (error) {
+        console.warn('No se pudo limpiar el respaldo local de eventos.', error);
+      }
+    }
+
+    function mergePendingEvents(serverEvents = [], pendingState = null) {
+      const pendingEvents = Array.isArray(pendingState?.events) ? pendingState.events : [];
+      if (!pendingEvents.length) return serverEvents;
+      const merged = new Map((serverEvents || []).map(eventData => [eventData.id, eventData]));
+      pendingEvents.forEach(eventData => {
+        if (!eventData?.id) return;
+        merged.set(eventData.id, eventData);
+      });
+      return [...merged.values()];
     }
 
     async function api(path, options = {}) {
@@ -1444,7 +1494,12 @@
       }
     }
     function saveEvents({ background = true } = {}) {
-      const request = () => api('/api/events', { method: 'PUT', body: JSON.stringify({ events }) });
+      const localRevision = writePendingEventsState(events);
+      const request = () => api('/api/events', { method: 'PUT', body: JSON.stringify({ events }) })
+        .then(result => {
+          clearPendingEventsState(localRevision);
+          return result;
+        });
       const queued = eventsSaveQueue.catch(() => {}).then(request);
       eventsSaveQueue = queued;
       if (background) queued.catch(handleBackgroundSaveError);
@@ -1468,8 +1523,24 @@
       renderUsers();
     }
     async function loadState() {
-      const data = await api('/api/state');
-      events = data.events || [];
+      const pendingState = readPendingEventsState();
+      let data = null;
+      try {
+        data = await api('/api/state');
+      } catch (error) {
+        if (!pendingState) throw error;
+        events = mergePendingEvents([], pendingState);
+        events.forEach(eventData => {
+          eventData.referenceLists = eventReferenceListsFromEvent(eventData, eventData.referenceLists);
+        });
+        storageInfo = null;
+        settings.functionPermissions = normalizeFunctionPermissions(settings.functionPermissions);
+        applySettings();
+        renderAll();
+        showAppNotice('Sin conexion estable: se muestran los datos guardados en esta compu. Se van a subir cuando vuelva la conexion.', 0);
+        return;
+      }
+      events = mergePendingEvents(data.events || [], pendingState);
       appUsers = data.users || appUsers;
       settings = { ...defaultSettings, ...(data.settings || {}) };
       events.forEach(eventData => {
@@ -1479,6 +1550,10 @@
       settings.functionPermissions = normalizeFunctionPermissions(settings.functionPermissions);
       applySettings();
       renderAll();
+      if (pendingState) {
+        showAppNotice('Hay cargas guardadas localmente pendientes de sincronizar. La app las esta subiendo a Railway.', 9000);
+        saveEvents();
+      }
     }
     function setBootLoading(show, text = 'Buscando datos guardados...') {
       const panel = $('bootLoading');
@@ -1923,8 +1998,7 @@
         await saveEvents({ background: false });
       } catch (error) {
         handleBackgroundSaveError(error);
-        alert(`${error.message} No se pudo confirmar el guardado. Revisa la conexion y volve a tocar Guardar.`);
-        return;
+        alert(`${error.message} Quedo guardado en esta compu y se va a subir cuando vuelva la conexion.`);
       }
       if (shouldRender) renderReferenceLists();
       renderSaleReferenceSelects(eventData);
@@ -6327,6 +6401,12 @@
       }
     }
     bootstrap();
+    window.addEventListener('online', () => {
+      const pendingState = readPendingEventsState();
+      if (!pendingState) return;
+      showAppNotice('Conexion recuperada: sincronizando cargas guardadas en esta compu...', 9000);
+      saveEvents();
+    });
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       navigator.serviceWorker.register('./service-worker.js').catch(() => {});
     }
