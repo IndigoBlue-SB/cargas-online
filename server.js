@@ -366,7 +366,7 @@ function pdfNumber(value) {
 }
 
 function pdfText(text, x, y, size = 10, font = 'F1') {
-  return `BT /${font} ${pdfNumber(size)} Tf ${pdfNumber(x)} ${pdfNumber(y)} Td (${pdfEscape(text)}) Tj ET\n`;
+  return `0 0 0 rg BT /${font} ${pdfNumber(size)} Tf ${pdfNumber(x)} ${pdfNumber(y)} Td (${pdfEscape(text)}) Tj ET\n`;
 }
 
 function pdfRect(x, y, width, height, mode = 'S') {
