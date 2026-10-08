@@ -4055,7 +4055,8 @@ function generateConfiguredCards(options = {}) {
     }
     state.isGenerating = false;
     state.generationProgress = 100;
-    const newWinners = options.preserveGame && state.drawn.length
+    const shouldRebuildWinners = options.preserveGame && state.drawn.length && !state.gameFinished;
+    const newWinners = shouldRebuildWinners
       ? rebuildPrizeResultsAndGetNewWinners()
       : [];
     saveCurrentEvent({ silent: true });
@@ -4712,11 +4713,9 @@ function saveCurrentEvent(options = {}) {
   if (!options.skipCargasSave) saveCargasBingoPanelSettings(payload);
   renderSavedEvents();
   renderHomeSavedEvents();
-  if (options.manual && state.gameFinished && options.prepareNext !== false) {
-    prepareNextDrawAfterFinished();
-    saveCurrentEvent({ silent: true, prepareNext: false });
+  if (options.manual && state.gameFinished) {
     render();
-    window.alert("Partida guardada. El sorteo quedo preparado para la proxima jugada.");
+    window.alert("Partida guardada. El sorteo quedo finalizado. Usa Reiniciar partida solo cuando quieras jugar nuevamente.");
   }
   return payload;
 }
