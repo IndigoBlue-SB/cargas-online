@@ -369,8 +369,52 @@ function pdfText(text, x, y, size = 10, font = 'F1') {
   return `0 0 0 rg BT /${font} ${pdfNumber(size)} Tf ${pdfNumber(x)} ${pdfNumber(y)} Td (${pdfEscape(text)}) Tj ET\n`;
 }
 
+function pdfTextRight(text, rightX, y, size = 10, font = 'F1') {
+  const estimatedWidth = String(text ?? '').length * size * 0.52;
+  return pdfText(text, rightX - estimatedWidth, y, size, font);
+}
+
+function pdfTextCenter(text, centerX, y, size = 10, font = 'F1') {
+  const estimatedWidth = String(text ?? '').length * size * 0.52;
+  return pdfText(text, centerX - estimatedWidth / 2, y, size, font);
+}
+
 function pdfRect(x, y, width, height, mode = 'S') {
   return `${pdfNumber(x)} ${pdfNumber(y)} ${pdfNumber(width)} ${pdfNumber(height)} re ${mode}\n`;
+}
+
+function parseDataImage(value) {
+  const match = String(value || '').match(/^data:(image\/jpe?g);base64,(.+)$/i);
+  if (!match) return null;
+  const buffer = Buffer.from(match[2], 'base64');
+  const size = jpegSize(buffer);
+  if (!size) return null;
+  return { type: 'jpeg', buffer, width: size.width, height: size.height };
+}
+
+function jpegSize(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) return null;
+  let offset = 2;
+  while (offset < buffer.length) {
+    if (buffer[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    const marker = buffer[offset + 1];
+    const length = buffer.readUInt16BE(offset + 2);
+    if (marker >= 0xc0 && marker <= 0xc3) {
+      return {
+        height: buffer.readUInt16BE(offset + 5),
+        width: buffer.readUInt16BE(offset + 7)
+      };
+    }
+    offset += 2 + length;
+  }
+  return null;
+}
+
+function pdfImageFill(imageName, x, y, width, height) {
+  return `q ${pdfNumber(width)} 0 0 ${pdfNumber(height)} ${pdfNumber(x)} ${pdfNumber(y)} cm /${imageName} Do Q\n`;
 }
 
 function slugifyFileName(value) {
@@ -427,44 +471,46 @@ function stripPdfPageSize(design = {}) {
 
 function drawBingoCard(card, x, y, width, height, fontSize) {
   const cellW = width / 9;
-  const headerH = Math.min(16, height * 0.16);
+  const headerH = Math.min(13, height * 0.16);
   const gridH = height - headerH;
   const cellH = gridH / 3;
   let out = '';
   out += '0.85 0.05 0.12 RG 1.1 w\n';
   out += pdfRect(x, y, width, height);
-  out += pdfText(`Carton N° ${card.cardNumber}`, x + width - 72, y + height - 11, Math.max(6, fontSize * 0.55), 'F2');
-  out += '0 0 0 RG 0.55 w\n';
+  out += pdfTextRight(`Carton N° ${card.cardNumber}`, x + width - 4, y + height - 10, Math.max(6, fontSize * 0.45), 'F2');
+  out += '0.05 0.05 0.05 RG 0.45 w\n';
   card.rows.forEach((row, rowIndex) => {
     row.forEach((number, column) => {
       const cellX = x + column * cellW;
       const cellY = y + gridH - ((rowIndex + 1) * cellH);
       out += pdfRect(cellX, cellY, cellW, cellH);
       if (number) {
-        out += pdfText(number, cellX + cellW * 0.32, cellY + cellH * 0.25, fontSize, 'F2');
+        out += pdfTextCenter(number, cellX + cellW / 2, cellY + cellH * 0.28, fontSize, 'F2');
       }
     });
   });
   return out;
 }
 
-function drawSeriesStrip({ eventName, eventDetail, seriesLabel, seriesNumber, cards, x, y, width, height, fontSize, seriesFontSize }) {
-  const gap = 8;
-  const headerH = Math.max(38, Math.min(70, height * 0.16));
-  const cardAreaH = height - headerH - gap;
-  const cardW = (width - gap) / 2;
-  const cardH = (cardAreaH - gap * 2) / 3;
+function drawSeriesStrip({ eventName, eventDetail, seriesLabel, seriesNumber, cards, x, y, width, height, fontSize, seriesFontSize, backgroundImageName }) {
+  const gap = 6;
+  const paddingX = 7;
+  const paddingBottom = 8;
+  const headerH = Math.max(48, Math.min(88, height * 0.17));
+  const cardAreaH = height - headerH - paddingBottom;
+  const cardW = width - paddingX * 2;
+  const cardH = (cardAreaH - gap * 5) / 6;
   let out = '';
+  if (backgroundImageName) out += pdfImageFill(backgroundImageName, x, y, width, height);
   out += '0 0 0 RG 0.7 w\n';
-  out += pdfRect(x, y, width, height);
-  out += pdfText(eventName, x + 12, y + height - 24, Math.max(13, fontSize + 5), 'F2');
-  if (eventDetail) out += pdfText(eventDetail, x + 12, y + height - 41, Math.max(8, fontSize * 0.72), 'F1');
-  out += pdfText(`${seriesLabel || 'Serie N°'} ${seriesNumber}`, x + width - 132, y + height - 32, Math.max(10, seriesFontSize), 'F2');
+  out += pdfTextCenter(`${seriesLabel || 'Serie N°'} ${seriesNumber}`, x + width / 2, y + height - headerH + 8, Math.max(9, seriesFontSize), 'F2');
+  if (!backgroundImageName) {
+    out += pdfTextCenter(eventName, x + width / 2, y + height - 24, Math.max(11, fontSize + 1), 'F2');
+    if (eventDetail) out += pdfTextCenter(eventDetail, x + width / 2, y + height - 39, Math.max(7, fontSize * 0.58), 'F1');
+  }
   cards.forEach((card, index) => {
-    const col = index % 2;
-    const row = Math.floor(index / 2);
-    const cardX = x + col * (cardW + gap);
-    const cardY = y + cardAreaH - ((row + 1) * cardH) - row * gap;
+    const cardX = x + paddingX;
+    const cardY = y + paddingBottom + cardAreaH - ((index + 1) * cardH) - index * gap;
     out += drawBingoCard(card, cardX, cardY, cardW, cardH, Math.max(8, fontSize));
   });
   return out;
@@ -493,10 +539,20 @@ function buildSeriesPdf({ event, from, to }) {
   const pagesId = reserve();
   const fontRegularId = reserve();
   const fontBoldId = reserve();
+  const backgroundImage = parseDataImage(design.backgroundImageData);
+  const backgroundImageId = backgroundImage ? reserve() : null;
+  const backgroundImageName = backgroundImage ? 'ImBg' : '';
   const pageIds = [];
 
   set(fontRegularId, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
   set(fontBoldId, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+  if (backgroundImage) {
+    set(backgroundImageId, Buffer.concat([
+      Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${backgroundImage.width} /Height ${backgroundImage.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${backgroundImage.buffer.length} >>\nstream\n`, 'binary'),
+      backgroundImage.buffer,
+      Buffer.from('\nendstream', 'binary')
+    ]));
+  }
 
   for (let index = 0; index < series.length; index += itemsPerPage) {
     let content = '1 1 1 rg 0 0 0 RG\n';
@@ -517,7 +573,8 @@ function buildSeriesPdf({ event, from, to }) {
         width: stripW,
         height: stripH,
         fontSize,
-        seriesFontSize
+        seriesFontSize,
+        backgroundImageName
       });
     });
     const compressed = zlib.deflateSync(Buffer.from(content, 'binary'), { level: 1 });
@@ -528,7 +585,8 @@ function buildSeriesPdf({ event, from, to }) {
       compressed,
       Buffer.from('\nendstream', 'binary')
     ]));
-    set(pageId, `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pdfNumber(page.width)} ${pdfNumber(page.height)}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+    const xObjectResources = backgroundImage ? `/XObject << /${backgroundImageName} ${backgroundImageId} 0 R >>` : '';
+    set(pageId, `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pdfNumber(page.width)} ${pdfNumber(page.height)}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> ${xObjectResources} >> /Contents ${contentId} 0 R >>`);
     pageIds.push(pageId);
   }
 
