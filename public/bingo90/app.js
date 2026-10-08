@@ -428,14 +428,17 @@ function init() {
     const eventId = params.get("eventId");
     const mode = params.get("mode");
     let openConfig = false;
-    if (eventId && await loadCargasEvent(eventId, { stayHome: mode === "config", allowEmptySales: mode === "config" })) {
+    if (eventId && await loadCargasEvent(eventId, { stayHome: mode === "config", allowEmptySales: mode === "config", suppressPrizeReplay: mode === "config" })) {
       openConfig = mode === "config";
     } else if (eventId && loadSavedEvents().some((event) => event.id === eventId)) {
-      loadEvent(eventId, { stayHome: mode === "config" });
+      loadEvent(eventId, { stayHome: mode === "config", suppressPrizeReplay: mode === "config" });
       openConfig = mode === "config";
     }
     render();
-    if (openConfig) openEventConfiguration();
+    if (openConfig) {
+      closeGameOverlaysForConfiguration();
+      openEventConfiguration();
+    }
   });
 }
 
@@ -1642,6 +1645,7 @@ function openUserAccess() {
 }
 
 function openEventConfiguration() {
+  closeGameOverlaysForConfiguration();
   if (state.currentUser && state.salesLoaded) {
     window.alert("Este evento ya tiene ventas activadas. No se puede volver a configurar con usuario.");
     state.view = "user-events";
@@ -1651,6 +1655,23 @@ function openEventConfiguration() {
   fillEventDialog({ blank: !state.eventCreated });
   activateEventTab("premios");
   els.eventDialog.showModal();
+}
+
+function closeGameOverlaysForConfiguration() {
+  clearTimeout(projectionTimeoutId);
+  clearInterval(projectionCountdownId);
+  projectionTimeoutId = null;
+  projectionCountdownId = null;
+  state.isProjecting = false;
+  state.pausedForWinner = false;
+  state.pendingWinners = [];
+  state.winnerViewIndex = 0;
+  state.reviewingWinner = false;
+  if (els.projectionDialog?.open) els.projectionDialog.close();
+  if (els.winnerDialog?.open) els.winnerDialog.close();
+  els.projectionVideo?.pause();
+  els.projectionVideo?.removeAttribute("src");
+  els.projectionImage?.removeAttribute("src");
 }
 
 function openUsersAdmin() {
@@ -4055,7 +4076,7 @@ function generateConfiguredCards(options = {}) {
     }
     state.isGenerating = false;
     state.generationProgress = 100;
-    const shouldRebuildWinners = options.preserveGame && state.drawn.length && !state.gameFinished;
+    const shouldRebuildWinners = options.preserveGame && state.drawn.length && !state.gameFinished && !options.suppressPrizeReplay;
     const newWinners = shouldRebuildWinners
       ? rebuildPrizeResultsAndGetNewWinners()
       : [];
