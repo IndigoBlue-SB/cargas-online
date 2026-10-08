@@ -9,6 +9,17 @@ const MEDIA_STORE_NAME = "files";
 const CARGAS_LAUNCH_STORAGE_KEY = "bingo90.launchedFromCargas";
 const SERIES_SIZE = 6;
 const NUMBERS_PER_CARD = 15;
+const BINGO_COLUMN_RANGES = [
+  { start: 1, end: 9 },
+  { start: 10, end: 19 },
+  { start: 20, end: 29 },
+  { start: 30, end: 39 },
+  { start: 40, end: 49 },
+  { start: 50, end: 59 },
+  { start: 60, end: 69 },
+  { start: 70, end: 79 },
+  { start: 80, end: 90 },
+];
 
 const prizeDefinitions = [
   { id: "cuaterno", label: "Cuaterno", count: 4 },
@@ -4076,8 +4087,7 @@ function createSeries(seriesNumber, firstCardNumber = 1, diversityTracker = null
 function createSeriesCandidate(seriesNumber, firstCardNumber, random) {
   const pattern = createSeriesPattern(random);
   const columns = Array.from({ length: 9 }, (_, column) => {
-    const start = column * 10 + 1;
-    const end = start + 9;
+    const { start, end } = getBingoColumnRange(column);
     return shuffle(range(start, end), random);
   });
   const cards = [];
@@ -4087,14 +4097,16 @@ function createSeriesCandidate(seriesNumber, firstCardNumber, random) {
       const sourceRow = pattern[cardIndex * 3 + rowIndex];
       return sourceRow.map((hasNumber, column) => (hasNumber ? columns[column].shift() : null));
     });
-    cards.push({
+    const card = {
       id: `${state.eventSeed}-series-${seriesNumber}-${cardIndex + 1}`,
       mode: "series",
       series: seriesNumber,
       cardNumber: firstCardNumber + cardIndex,
       cardPositionInSeries: cardIndex + 1,
       rows,
-    });
+    };
+    if (!isValidBingoCard(card)) throw new Error(`Carton invalido generado: serie ${seriesNumber}, carton ${card.cardNumber}`);
+    cards.push(card);
   }
 
   return cards;
@@ -4113,6 +4125,7 @@ function createIndividualCard(cardNumber, diversityTracker = null) {
       cardNumber,
       rows: createSingleCardRows(random),
     };
+    if (!isValidBingoCard(candidate)) throw new Error(`Carton individual invalido generado: ${cardNumber}`);
     const score = diversityTracker ? scoreCardsDiversity([candidate], diversityTracker) : 0;
     if (score < bestScore) {
       bestCard = candidate;
@@ -4202,8 +4215,7 @@ function createSingleCardRows(random) {
   for (let rowIndex = 0; rowIndex < 3; rowIndex += 1) {
     const columns = shuffle(range(0, 8), random).slice(0, 5).sort((a, b) => a - b);
     columns.forEach((column) => {
-      const start = column * 10 + 1;
-      const end = start + 9;
+      const { start, end } = getBingoColumnRange(column);
       const options = range(start, end).filter((number) => !used.has(number));
       const number = shuffle(options, random)[0];
       used.add(number);
@@ -4215,7 +4227,7 @@ function createSingleCardRows(random) {
 
 function createSeriesPattern(random) {
   for (let attempt = 0; attempt < 500; attempt += 1) {
-    const columnQuotas = Array(9).fill(10);
+    const columnQuotas = BINGO_COLUMN_RANGES.map(({ start, end }) => end - start + 1);
     const rows = [];
     let failed = false;
 
@@ -4253,6 +4265,34 @@ function createSeriesPattern(random) {
   }
 
   return createFallbackSeriesPattern();
+}
+
+function getBingoColumnRange(column) {
+  return BINGO_COLUMN_RANGES[column] || BINGO_COLUMN_RANGES[0];
+}
+
+function isNumberInBingoColumn(number, column) {
+  const { start, end } = getBingoColumnRange(column);
+  return number >= start && number <= end;
+}
+
+function isValidBingoCard(card) {
+  const rows = Array.isArray(card?.rows) ? card.rows : [];
+  if (rows.length !== 3) return false;
+  const numbers = [];
+  return rows.every((row) => {
+    if (!Array.isArray(row) || row.length !== 9) return false;
+    const rowNumbers = row.filter(Boolean);
+    if (rowNumbers.length !== 5) return false;
+    row.forEach((number, column) => {
+      if (!number) return;
+      numbers.push(number);
+      if (!isNumberInBingoColumn(Number(number), column)) {
+        throw new Error(`Numero ${number} fuera de columna ${column + 1}`);
+      }
+    });
+    return true;
+  }) && numbers.length === NUMBERS_PER_CARD && new Set(numbers).size === numbers.length;
 }
 
 function createFallbackSeriesPattern() {
