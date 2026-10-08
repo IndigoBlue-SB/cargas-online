@@ -492,7 +492,7 @@ function drawBingoCard(card, x, y, width, height, fontSize) {
   return out;
 }
 
-function drawSeriesStrip({ eventName, eventDetail, seriesLabel, seriesNumber, cards, x, y, width, height, fontSize, seriesFontSize, backgroundImageName }) {
+function drawSeriesStrip({ eventName, eventDetail, seriesLabel, seriesNumber, cards, x, y, width, height, fontSize, seriesFontSize, hasPageBackground }) {
   const gap = 6;
   const paddingX = 7;
   const paddingBottom = 8;
@@ -501,10 +501,9 @@ function drawSeriesStrip({ eventName, eventDetail, seriesLabel, seriesNumber, ca
   const cardW = width - paddingX * 2;
   const cardH = (cardAreaH - gap * 5) / 6;
   let out = '';
-  if (backgroundImageName) out += pdfImageFill(backgroundImageName, x, y, width, height);
   out += '0 0 0 RG 0.7 w\n';
   out += pdfTextCenter(`${seriesLabel || 'Serie N°'} ${seriesNumber}`, x + width / 2, y + height - headerH + 8, Math.max(9, seriesFontSize), 'F2');
-  if (!backgroundImageName) {
+  if (!hasPageBackground) {
     out += pdfTextCenter(eventName, x + width / 2, y + height - 24, Math.max(11, fontSize + 1), 'F2');
     if (eventDetail) out += pdfTextCenter(eventDetail, x + width / 2, y + height - 39, Math.max(7, fontSize * 0.58), 'F1');
   }
@@ -556,6 +555,7 @@ function buildSeriesPdf({ event, from, to }) {
 
   for (let index = 0; index < series.length; index += itemsPerPage) {
     let content = '1 1 1 rg 0 0 0 RG\n';
+    if (backgroundImageName) content += pdfImageFill(backgroundImageName, 0, 0, page.width, page.height);
     const pageSeries = series.slice(index, index + itemsPerPage);
     pageSeries.forEach((seriesNumber, position) => {
       const col = position % columns;
@@ -574,7 +574,7 @@ function buildSeriesPdf({ event, from, to }) {
         height: stripH,
         fontSize,
         seriesFontSize,
-        backgroundImageName
+        hasPageBackground: Boolean(backgroundImageName)
       });
     });
     const compressed = zlib.deflateSync(Buffer.from(content, 'binary'), { level: 1 });
