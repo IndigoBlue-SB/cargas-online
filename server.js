@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 
 const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
@@ -13,6 +14,18 @@ const BUNDLED_DB_FILE = path.join(ROOT, 'data', 'db.json');
 const BUNDLE_DATA_VERSION = '2026-06-23-03';
 const sessions = new Map();
 const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], bingo: [], raffle: [], virtual: [], sheets: [], balance: [], accounting: [], settings: [] };
+const BINGO_SERIES_SIZE = 6;
+const BINGO_COLUMN_RANGES = [
+  { start: 1, end: 9 },
+  { start: 10, end: 19 },
+  { start: 20, end: 29 },
+  { start: 30, end: 39 },
+  { start: 40, end: 49 },
+  { start: 50, end: 59 },
+  { start: 60, end: 69 },
+  { start: 70, end: 79 },
+  { start: 80, end: 90 }
+];
 
 const defaultDb = {
   events: [],
@@ -239,6 +252,291 @@ function storageInfo(db) {
     eventCount: events.length,
     salesCount: events.reduce((total, event) => total + (Array.isArray(event.sales) ? event.sales.length : 0), 0),
     dbUpdatedAt: db.savedAt || null
+  };
+}
+
+function numberRange(start, end) {
+  return Array.from({ length: Math.max(0, end - start + 1) }, (_, index) => start + index);
+}
+
+function shuffleValues(values, random) {
+  const copy = [...values];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+  return copy;
+}
+
+function weightedPick(candidates, weights, random) {
+  const total = candidates.reduce((sum, column) => sum + weights[column], 0);
+  let pick = random() * total;
+  for (const column of candidates) {
+    pick -= weights[column];
+    if (pick <= 0) return column;
+  }
+  return candidates.at(-1);
+}
+
+function createSeededRandom(seedText) {
+  let seed = 2166136261;
+  for (const character of String(seedText || '')) {
+    seed ^= character.charCodeAt(0);
+    seed = Math.imul(seed, 16777619);
+  }
+  return () => {
+    seed += 0x6d2b79f5;
+    let value = seed;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function createSeriesPattern(random) {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    const columnQuotas = BINGO_COLUMN_RANGES.map(({ start, end }) => end - start + 1);
+    const rows = [];
+    let failed = false;
+
+    for (let rowIndex = 0; rowIndex < 18; rowIndex += 1) {
+      const row = Array(9).fill(false);
+      const rowsLeftAfter = 17 - rowIndex;
+      const requiredColumns = numberRange(0, 8).filter(column => columnQuotas[column] > rowsLeftAfter);
+
+      if (requiredColumns.length > 5) {
+        failed = true;
+        break;
+      }
+
+      requiredColumns.forEach(column => {
+        row[column] = true;
+        columnQuotas[column] -= 1;
+      });
+
+      while (row.filter(Boolean).length < 5) {
+        const candidates = numberRange(0, 8).filter(column => !row[column] && columnQuotas[column] > 0);
+        if (!candidates.length) {
+          failed = true;
+          break;
+        }
+        const column = weightedPick(candidates, columnQuotas, random);
+        row[column] = true;
+        columnQuotas[column] -= 1;
+      }
+
+      if (failed) break;
+      rows.push(row);
+    }
+
+    if (!failed && columnQuotas.every(quota => quota === 0)) return rows;
+  }
+
+  return Array.from({ length: 18 }, (_, rowIndex) => {
+    const row = Array(9).fill(false);
+    for (let offset = 0; offset < 5; offset += 1) row[(rowIndex * 5 + offset) % 9] = true;
+    return row;
+  });
+}
+
+function createBingoSeriesCards(eventSeed, seriesNumber) {
+  const random = createSeededRandom(`${eventSeed}:series:${seriesNumber}:v0`);
+  const pattern = createSeriesPattern(random);
+  const columns = BINGO_COLUMN_RANGES.map(({ start, end }) => shuffleValues(numberRange(start, end), random));
+  const firstCardNumber = ((Number(seriesNumber) || 1) - 1) * BINGO_SERIES_SIZE + 1;
+  return numberRange(0, BINGO_SERIES_SIZE - 1).map(cardIndex => {
+    const rows = numberRange(0, 2).map(rowIndex => {
+      const sourceRow = pattern[cardIndex * 3 + rowIndex];
+      return sourceRow.map((hasNumber, column) => (hasNumber ? columns[column].shift() : null));
+    });
+    return {
+      series: Number(seriesNumber),
+      cardNumber: firstCardNumber + cardIndex,
+      rows
+    };
+  });
+}
+
+function pdfEscape(value) {
+  return String(value ?? '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/\r?\n/g, ' ');
+}
+
+function pdfNumber(value) {
+  return Number(value || 0).toFixed(2).replace(/\.00$/, '').replace(/0$/, '');
+}
+
+function pdfText(text, x, y, size = 10, font = 'F1') {
+  return `BT /${font} ${pdfNumber(size)} Tf ${pdfNumber(x)} ${pdfNumber(y)} Td (${pdfEscape(text)}) Tj ET\n`;
+}
+
+function pdfRect(x, y, width, height, mode = 'S') {
+  return `${pdfNumber(x)} ${pdfNumber(y)} ${pdfNumber(width)} ${pdfNumber(height)} re ${mode}\n`;
+}
+
+function slugifyFileName(value) {
+  return String(value || 'cartones-bingo-90')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
+    .toLowerCase() || 'cartones-bingo-90';
+}
+
+function buildPdf(objects, rootId) {
+  const header = Buffer.from('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n', 'binary');
+  const chunks = [header];
+  const offsets = [0];
+  let offset = header.length;
+  for (let index = 1; index < objects.length; index += 1) {
+    offsets[index] = offset;
+    const body = Buffer.isBuffer(objects[index]) ? objects[index] : Buffer.from(String(objects[index]), 'binary');
+    const prefix = Buffer.from(`${index} 0 obj\n`, 'binary');
+    const suffix = Buffer.from('\nendobj\n', 'binary');
+    chunks.push(prefix, body, suffix);
+    offset += prefix.length + body.length + suffix.length;
+  }
+  const xrefOffset = offset;
+  const xrefRows = ['xref', `0 ${objects.length}`, '0000000000 65535 f '];
+  for (let index = 1; index < objects.length; index += 1) {
+    xrefRows.push(`${String(offsets[index]).padStart(10, '0')} 00000 n `);
+  }
+  const trailer = `${xrefRows.join('\n')}\ntrailer\n<< /Size ${objects.length} /Root ${rootId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  chunks.push(Buffer.from(trailer, 'binary'));
+  return Buffer.concat(chunks);
+}
+
+function createPdfBuilder() {
+  const objects = [null];
+  const reserve = () => {
+    objects.push('');
+    return objects.length - 1;
+  };
+  const set = (id, body) => { objects[id] = body; };
+  return { objects, reserve, set };
+}
+
+function stripPdfPageSize(design = {}) {
+  const sizes = {
+    a4: { width: 595.28, height: 841.89 },
+    a5: { width: 419.53, height: 595.28 },
+    legal: { width: 612, height: 1008 }
+  };
+  const base = sizes[String(design.paperSize || 'a4').toLowerCase()] || sizes.a4;
+  return design.orientation === 'portrait' ? base : { width: base.height, height: base.width };
+}
+
+function drawBingoCard(card, x, y, width, height, fontSize) {
+  const cellW = width / 9;
+  const headerH = Math.min(16, height * 0.16);
+  const gridH = height - headerH;
+  const cellH = gridH / 3;
+  let out = '';
+  out += '0.85 0.05 0.12 RG 1.1 w\n';
+  out += pdfRect(x, y, width, height);
+  out += pdfText(`Carton N° ${card.cardNumber}`, x + width - 72, y + height - 11, Math.max(6, fontSize * 0.55), 'F2');
+  out += '0 0 0 RG 0.55 w\n';
+  card.rows.forEach((row, rowIndex) => {
+    row.forEach((number, column) => {
+      const cellX = x + column * cellW;
+      const cellY = y + gridH - ((rowIndex + 1) * cellH);
+      out += pdfRect(cellX, cellY, cellW, cellH);
+      if (number) {
+        out += pdfText(number, cellX + cellW * 0.32, cellY + cellH * 0.25, fontSize, 'F2');
+      }
+    });
+  });
+  return out;
+}
+
+function drawSeriesStrip({ eventName, eventDetail, seriesLabel, seriesNumber, cards, x, y, width, height, fontSize, seriesFontSize }) {
+  const gap = 8;
+  const headerH = Math.max(38, Math.min(70, height * 0.16));
+  const cardAreaH = height - headerH - gap;
+  const cardW = (width - gap) / 2;
+  const cardH = (cardAreaH - gap * 2) / 3;
+  let out = '';
+  out += '0 0 0 RG 0.7 w\n';
+  out += pdfRect(x, y, width, height);
+  out += pdfText(eventName, x + 12, y + height - 24, Math.max(13, fontSize + 5), 'F2');
+  if (eventDetail) out += pdfText(eventDetail, x + 12, y + height - 41, Math.max(8, fontSize * 0.72), 'F1');
+  out += pdfText(`${seriesLabel || 'Serie N°'} ${seriesNumber}`, x + width - 132, y + height - 32, Math.max(10, seriesFontSize), 'F2');
+  cards.forEach((card, index) => {
+    const col = index % 2;
+    const row = Math.floor(index / 2);
+    const cardX = x + col * (cardW + gap);
+    const cardY = y + cardAreaH - ((row + 1) * cardH) - row * gap;
+    out += drawBingoCard(card, cardX, cardY, cardW, cardH, Math.max(8, fontSize));
+  });
+  return out;
+}
+
+function buildSeriesPdf({ event, from, to }) {
+  const panel = event.bingoPanelSettings || {};
+  const design = { ...(panel.stripDesign || {}) };
+  const eventSeed = panel.eventSeed || event.bingoSeed || event.id;
+  const eventName = panel.name || event.name || 'Cartones Bingo 90';
+  const eventDetail = panel.eventDetail || [event.date, event.town, event.province].filter(Boolean).join(' - ');
+  const seriesLabel = design.seriesLabel || 'Serie N°';
+  const fontSize = Math.max(8, Math.min(28, Number(design.fontSize) || 15));
+  const seriesFontSize = Math.max(9, Math.min(34, Number(design.seriesFontSize) || 13));
+  const itemsPerPage = Math.max(1, Math.min(6, Number(design.itemsPerPage) || 1));
+  const columns = Math.max(1, Math.min(itemsPerPage, Number(design.columns) || 1));
+  const rowsPerPage = Math.ceil(itemsPerPage / columns);
+  const page = stripPdfPageSize(design);
+  const margin = 18;
+  const gap = 12;
+  const stripW = (page.width - margin * 2 - gap * (columns - 1)) / columns;
+  const stripH = (page.height - margin * 2 - gap * (rowsPerPage - 1)) / rowsPerPage;
+  const series = numberRange(from, to);
+  const { objects, reserve, set } = createPdfBuilder();
+  const catalogId = reserve();
+  const pagesId = reserve();
+  const fontRegularId = reserve();
+  const fontBoldId = reserve();
+  const pageIds = [];
+
+  set(fontRegularId, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+  set(fontBoldId, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+
+  for (let index = 0; index < series.length; index += itemsPerPage) {
+    let content = '1 1 1 rg 0 0 0 RG\n';
+    const pageSeries = series.slice(index, index + itemsPerPage);
+    pageSeries.forEach((seriesNumber, position) => {
+      const col = position % columns;
+      const row = Math.floor(position / columns);
+      const x = margin + col * (stripW + gap);
+      const y = page.height - margin - ((row + 1) * stripH) - row * gap;
+      content += drawSeriesStrip({
+        eventName,
+        eventDetail,
+        seriesLabel,
+        seriesNumber,
+        cards: createBingoSeriesCards(eventSeed, seriesNumber),
+        x,
+        y,
+        width: stripW,
+        height: stripH,
+        fontSize,
+        seriesFontSize
+      });
+    });
+    const compressed = zlib.deflateSync(Buffer.from(content, 'binary'), { level: 1 });
+    const contentId = reserve();
+    const pageId = reserve();
+    set(contentId, Buffer.concat([
+      Buffer.from(`<< /Length ${compressed.length} /Filter /FlateDecode >>\nstream\n`, 'binary'),
+      compressed,
+      Buffer.from('\nendstream', 'binary')
+    ]));
+    set(pageId, `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pdfNumber(page.width)} ${pdfNumber(page.height)}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+    pageIds.push(pageId);
+  }
+
+  set(pagesId, `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map(id => `${id} 0 R`).join(' ')}] >>`);
+  set(catalogId, `<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+  return {
+    fileName: `${slugifyFileName(eventName)}-series-${from}-${to}.pdf`,
+    buffer: buildPdf(objects, catalogId)
   };
 }
 
@@ -542,6 +840,30 @@ async function handleApi(req, res) {
         closure: event.bingoClosure
       }));
     return sendJson(res, 200, { events: confirmedEvents });
+  }
+
+  if (url.pathname === '/api/export-strip-pdf' && req.method === 'GET') {
+    const eventId = String(url.searchParams.get('eventId') || '');
+    const event = visibleEventsFor(session, db.events || []).find(item => String(item.id) === eventId && !item?.deletedAt);
+    if (!event) return sendJson(res, 404, { error: 'Evento no encontrado' });
+    const panel = event.bingoPanelSettings || {};
+    const rangeStart = Math.max(1, Number(panel.rangeStart) || 1);
+    const rangeEnd = Math.max(rangeStart, Number(panel.rangeEnd) || Number(panel.configuredSeriesCount) || rangeStart);
+    const requestedFrom = Number(url.searchParams.get('from')) || rangeStart;
+    const requestedTo = Number(url.searchParams.get('to')) || rangeEnd;
+    const from = Math.max(rangeStart, Math.min(requestedFrom, requestedTo));
+    const to = Math.min(rangeEnd, Math.max(requestedFrom, requestedTo));
+    if (to < from) return sendJson(res, 400, { error: 'Rango invalido' });
+    const count = to - from + 1;
+    if (count > 25000) return sendJson(res, 400, { error: 'El rango es demasiado grande para un solo PDF. Exporta menos series por vez.' });
+    const { fileName, buffer } = buildSeriesPdf({ event, from, to });
+    res.writeHead(200, {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+      'Content-Length': buffer.length,
+      'Cache-Control': 'no-store'
+    });
+    return res.end(buffer);
   }
 
   if (url.pathname === '/api/admin/backup-inspect' && req.method === 'GET') {

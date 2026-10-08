@@ -463,7 +463,7 @@ function bindEvents() {
   els.designHomeBtn.addEventListener("click", openEventConfiguration);
   els.salesHomeBtn.addEventListener("click", openSalesScreen);
   els.stripDesignerBtn.addEventListener("click", openStripDesigner);
-  els.exportCardsPdfBtn.addEventListener("click", () => exportEventCardsPdf({ useDesignerRange: false }));
+  els.exportCardsPdfBtn.addEventListener("click", exportHomeCardsPdf);
   els.adminPlayBtn.addEventListener("click", openAdminGame);
   els.homeSaveEventBtn.addEventListener("click", () => saveCurrentEvent({ manual: true }));
   els.homeExportReportBtn.addEventListener("click", exportEventReport);
@@ -2516,12 +2516,85 @@ function buildStripHtml(seriesNumber, cards) {
   `;
 }
 
+async function exportHomeCardsPdf() {
+  if (isLaunchedFromCargas()) {
+    const handledByServer = await exportStripServerPdf({ useDesignerRange: false });
+    if (handledByServer) return;
+  }
+  await exportEventCardsPdf({ useDesignerRange: false });
+}
+
 async function exportStripPdf() {
+  if (isLaunchedFromCargas()) {
+    const handledByServer = await exportStripServerPdf({ useDesignerRange: true });
+    if (handledByServer) return;
+  }
   if (window.bingoDesktop?.savePdfFromHtml) {
     await exportStripDirectPdfFromExactHtml();
     return;
   }
   await exportEventCardsPdf({ useDesignerRange: true });
+}
+
+async function exportStripServerPdf(options = {}) {
+  if (!state.eventCreated) {
+    window.alert("Primero selecciona el evento que queres exportar.");
+    return true;
+  }
+  if (els.stripDesignerDialog?.open) {
+    applyStripDesign();
+  } else {
+    persistEventDesign();
+  }
+  if (!(await ensureCargasPanelSaved())) {
+    window.alert("No se pudo guardar el diseno del evento antes de generar el PDF. Revisa la conexion y proba nuevamente.");
+    return true;
+  }
+  const units = getPrintableStripUnits();
+  const selection = getPrintableExportSelection(units, { ...options, ignoreLimit: true });
+  if (!selection.units.length) {
+    const label = state.cardMode === "individual" ? "cartones" : "series";
+    window.alert(`El rango elegido no tiene ${label} para exportar.`);
+    return true;
+  }
+
+  const button = els.stripDesignerDialog?.open ? els.stripExportPdfBtn : els.exportCardsPdfBtn;
+  const previousText = button?.textContent;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Generando PDF rapido...";
+  }
+
+  try {
+    const params = new URLSearchParams({
+      eventId: state.eventId,
+      from: String(selection.requestedStart),
+      to: String(selection.requestedEnd),
+    });
+    const response = await fetch(`/api/export-strip-pdf?${params.toString()}`, {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    if (response.status === 404) return false;
+    if (!response.ok) {
+      const detail = await readErrorResponse(response);
+      throw new Error(detail || "No se pudo generar el PDF en Railway.");
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("content-disposition") || "";
+    const match = disposition.match(/filename="?([^";]+)"?/i);
+    const fallbackName = `${slugify(state.eventName || "cartones-bingo-90")}-series-${selection.requestedStart}-${selection.requestedEnd}.pdf`;
+    await downloadBlob(match?.[1] || fallbackName, blob);
+    return true;
+  } catch (error) {
+    window.alert(`No se pudo generar el PDF rapido: ${error.message || error}`);
+    return true;
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = previousText;
+    }
+  }
 }
 
 async function exportStripZip() {
