@@ -248,6 +248,27 @@
     .bingo-card-cell { min-height: 24px; display: grid; place-items: center; border-radius: 4px; background: #eef2ed; font-size: 12px; font-weight: 700; }
     .bingo-card-cell.empty-cell { background: #f8faf8; }
     .bingo-card-cell.hit { background: #0f766e; color: #fff; }
+    .raffle-layout { display: grid; grid-template-columns: minmax(250px, 330px) minmax(0, 1fr); gap: 10px; align-items: start; }
+    .raffle-event-list { display: grid; gap: 8px; max-height: calc(100vh - 190px); overflow-y: auto; }
+    .raffle-event-button { width: 100%; color: var(--ink); background: #fbfcfa; border: 1px solid var(--line); text-align: left; display: grid; gap: 4px; padding: 9px; }
+    .raffle-event-button.active { border-color: var(--brand); background: var(--soft); }
+    .raffle-stage { display: grid; gap: 10px; }
+    .raffle-board { position: relative; overflow: hidden; min-height: 260px; display: grid; gap: 12px; align-content: center; justify-items: center; border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; background: linear-gradient(135deg, #062a4a, #0f766e); color: #fff; box-shadow: var(--shadow); isolation: isolate; }
+    .raffle-board::before { content: ""; position: absolute; inset: 0; background-image: var(--raffle-bg, none); background-size: cover; background-position: center; opacity: .42; z-index: -2; }
+    .raffle-board::after { content: ""; position: absolute; inset: 0; background: rgba(5, 17, 22, .42); z-index: -1; }
+    .raffle-logo { max-width: min(260px, 45vw); max-height: 92px; object-fit: contain; filter: drop-shadow(0 8px 16px rgba(0,0,0,.24)); }
+    .raffle-title { text-align: center; font-size: clamp(24px, 4vw, 46px); font-weight: 900; line-height: 1.05; }
+    .raffle-subtitle { text-align: center; color: rgba(255,255,255,.86); font-weight: 700; }
+    .raffle-number-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; width: min(760px, 100%); }
+    .raffle-number { min-height: 96px; display: grid; place-items: center; border-radius: 8px; background: rgba(255,255,255,.92); color: #062a4a; font-size: clamp(30px, 5vw, 58px); font-weight: 900; box-shadow: 0 14px 34px rgba(0,0,0,.22); }
+    .raffle-config { display: grid; gap: 8px; }
+    .raffle-config-grid { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 8px; align-items: end; }
+    .raffle-extra-row { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(90px, 1fr) minmax(140px, 1.4fr) auto; gap: 6px; align-items: end; }
+    .raffle-results { display: grid; gap: 8px; max-height: 280px; overflow-y: auto; }
+    .raffle-result { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; background: #fbfcfa; }
+    .raffle-result strong { color: var(--brand); font-size: 18px; }
+    .raffle-pill-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .raffle-pill { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 8px; border-radius: 999px; background: #eef2ed; color: #26312f; font-weight: 800; }
     .virtual-layout { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 10px; align-items: start; }
     .virtual-list { display: grid; gap: 8px; max-height: calc(100vh - 360px); overflow-y: auto; }
     .virtual-card { display: grid; gap: 5px; border: 1px solid var(--line); border-left: 5px solid #2563eb; border-radius: var(--radius); padding: 8px; background: #fbfcfa; }
@@ -491,6 +512,7 @@
         <button type="button" data-page="delete" data-admin-only>PAPELERA</button>
         <button type="button" data-page="events">EVENTOS</button>
         <button type="button" data-page="bingo">BINGO</button>
+        <button type="button" data-page="raffle">SORTEADOR</button>
         <button type="button" data-page="virtual" data-admin-only>VENTAS VIRTUALES</button>
         <button type="button" data-page="sheets" data-admin-only>PLANILLAS</button>
         <button type="button" data-page="balance">BALANCE</button>
@@ -522,6 +544,7 @@
           <button type="button" class="event-card" data-page-shortcut="delete" data-admin-only><h3>PAPELERA</h3><span class="muted">Recuperar eventos eliminados o enviarlos a papelera.</span></button>
           <button type="button" class="event-card" data-page-shortcut="events"><h3>EVENTOS</h3><span class="muted">Entrar a eventos creados para cargar ventas.</span></button>
           <button type="button" class="event-card" data-page-shortcut="bingo"><h3>BINGO</h3><span class="muted">Jugar con cargas confirmadas y cartones oficiales.</span></button>
+          <button type="button" class="event-card" data-page-shortcut="raffle"><h3>SORTEADOR</h3><span class="muted">Sortear series cargadas por evento y agregar series extra.</span></button>
           <button type="button" class="event-card" data-page-shortcut="virtual" data-admin-only><h3>VENTAS VIRTUALES</h3><span class="muted">Crear links para vendedoras y traer sus ventas al evento.</span></button>
           <button type="button" class="event-card" data-page-shortcut="sheets" data-admin-only><h3>PLANILLAS</h3><span class="muted">Anotar entregas, vendedor, telefono, venta y deuda.</span></button>
           <button type="button" class="event-card" data-page-shortcut="balance"><h3>BALANCE</h3><span class="muted">Revisar premios, comisiones, recaudacion y gastos.</span></button>
@@ -771,6 +794,69 @@
               <div class="stat"><span>Cartones en juego</span><strong id="bingoPlayableCards">0</strong></div>
             </div>
             <div id="bingoSelectedInfo" class="empty">Selecciona un evento confirmado de la columna izquierda.</div>
+          </section>
+        </div>
+      </section>
+
+      <section id="page-raffle" data-screen class="hidden">
+        <div class="topbar">
+          <div><h2>Sorteador</h2><p class="muted">Sortea series oficiales del evento y agrega series extra que no juegan al bingo.</p></div>
+        </div>
+        <div class="raffle-layout">
+          <aside class="panel">
+            <h3>Eventos</h3>
+            <div id="raffleEventsList" class="raffle-event-list"></div>
+          </aside>
+          <section class="raffle-stage">
+            <div id="raffleBoard" class="raffle-board">
+              <img id="raffleLogoPreview" class="raffle-logo hidden" alt="Logo sorteo">
+              <div class="raffle-title" id="raffleBoardTitle">Selecciona un evento</div>
+              <div class="raffle-subtitle" id="raffleBoardSubtitle">El sorteador usa las series confirmadas para bingo.</div>
+              <div id="raffleNumberGrid" class="raffle-number-grid"></div>
+            </div>
+            <section class="panel raffle-config">
+              <div class="table-head">
+                <h3>Configuracion del sorteo</h3>
+                <span id="rafflePoolSummary" class="muted">0 series disponibles</span>
+              </div>
+              <div class="raffle-config-grid">
+                <label>Cantidad de sorteos<input id="raffleDrawCount" type="number" min="1" max="20" step="1" value="1"></label>
+                <label>Modo
+                  <select id="raffleDrawMode">
+                    <option value="single">De a uno</option>
+                    <option value="simultaneous">Simultaneo</option>
+                  </select>
+                </label>
+                <label>Imagen de fondo<input id="raffleBgInput" type="file" accept="image/*"></label>
+                <label>Logo<input id="raffleLogoInput" type="file" accept="image/*"></label>
+              </div>
+              <div class="actions">
+                <button type="button" id="raffleDrawOne">Sortear de a uno</button>
+                <button type="button" id="raffleDrawSimultaneous" class="secondary">Sortear simultaneo</button>
+                <button type="button" id="raffleSaveConfig" class="light">Guardar ajustes</button>
+                <button type="button" id="raffleResetResults" class="danger">Reiniciar sorteos</button>
+              </div>
+            </section>
+            <section class="panel raffle-config">
+              <div class="table-head">
+                <h3>Series extra</h3>
+                <span class="muted">No modifican la carga del bingo.</span>
+              </div>
+              <div class="raffle-extra-row">
+                <label>Desde<input id="raffleExtraFrom" type="number" min="1" step="1" placeholder="Serie"></label>
+                <label>Hasta<input id="raffleExtraTo" type="number" min="1" step="1" placeholder="Serie"></label>
+                <label>Detalle<input id="raffleExtraLabel" placeholder="Ej: sorteo especial"></label>
+                <button type="button" id="raffleAddExtra">Agregar</button>
+              </div>
+              <div id="raffleExtraList" class="raffle-results"></div>
+            </section>
+            <section class="panel">
+              <div class="table-head">
+                <h3>Resultados</h3>
+                <span id="raffleResultsCount" class="muted">0 sorteos</span>
+              </div>
+              <div id="raffleResultsList" class="raffle-results"></div>
+            </section>
           </section>
         </div>
       </section>
@@ -1262,9 +1348,9 @@
   <datalist id="provinceOptions"></datalist>
 
   <script>
-    const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], bingo: [], virtual: [], sheets: [], balance: [], accounting: [], settings: [] };
-    const functionLabels = { home: 'Inicio', create: 'Crear evento', stats: 'Estadisticas', delete: 'Papelera', events: 'Eventos', bingo: 'Bingo', virtual: 'Ventas virtuales', sheets: 'Planillas', balance: 'Balance', accounting: 'Contable', settings: 'Configuraciones' };
-    const userDefaultPages = ['home', 'events', 'bingo', 'balance', 'accounting'];
+    const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], bingo: [], raffle: [], virtual: [], sheets: [], balance: [], accounting: [], settings: [] };
+    const functionLabels = { home: 'Inicio', create: 'Crear evento', stats: 'Estadisticas', delete: 'Papelera', events: 'Eventos', bingo: 'Bingo', raffle: 'Sorteador', virtual: 'Ventas virtuales', sheets: 'Planillas', balance: 'Balance', accounting: 'Contable', settings: 'Configuraciones' };
+    const userDefaultPages = ['home', 'events', 'bingo', 'raffle', 'balance', 'accounting'];
     const defaultReferenceLists = { sellers: [], admins: [], provinces: [], towns: [] };
     const referenceListLabels = { sellers: 'Vendedores', admins: 'Administradores', provinces: 'Provincias', towns: 'Localidades' };
     const referenceDatalists = { sellers: 'sellerOptions', admins: 'adminOptions', provinces: 'provinceOptions', towns: 'townOptions' };
@@ -1279,6 +1365,7 @@
     let activeEventId = null;
     let activeBalanceEventId = null;
     let activeBingoEventId = null;
+    let activeRaffleEventId = null;
     let activeStatsEventId = null;
     let statsRangeStart = '';
     let statsRangeEnd = '';
@@ -1633,7 +1720,7 @@
       if (text.includes('cargar vendedores') || text.includes('abrir vendedores')) return setVoiceFeedback(voiceOpenPage('references'), command);
       if (text.includes('ajustes evento') || text.includes('configurar evento')) return setVoiceFeedback(voiceOpenPage('event-settings'), command);
       const pageCommands = [
-        ['inicio', 'home'], ['eventos', 'events'], ['bingo', 'bingo'], ['balance', 'balance'], ['contable', 'accounting'],
+        ['inicio', 'home'], ['eventos', 'events'], ['bingo', 'bingo'], ['sorteador', 'raffle'], ['sorteo', 'raffle'], ['balance', 'balance'], ['contable', 'accounting'],
         ['planillas', 'sheets'], ['ventas virtuales', 'virtual'], ['estadisticas', 'stats'], ['configuraciones', 'settings']
       ];
       const pageMatch = pageCommands.find(([spoken]) => (text.includes('abrir') || text.includes('ir a')) && text.includes(spoken));
@@ -2118,7 +2205,7 @@
       return userDefaultPages.includes(page);
     }
     function firstAllowedPage() {
-      return ['home', 'events', 'bingo', 'virtual', 'sheets', 'balance', 'accounting', 'stats', 'create', 'delete', 'settings'].find(canUsePage) || 'events';
+      return ['home', 'events', 'bingo', 'raffle', 'virtual', 'sheets', 'balance', 'accounting', 'stats', 'create', 'delete', 'settings'].find(canUsePage) || 'events';
     }
     function selectedFunctionPermissions() {
       const permissions = Object.fromEntries(Object.keys(defaultFunctionPermissions).map(page => [page, []]));
@@ -2356,6 +2443,201 @@
         bingoCardsCache.set(cacheKey, units.flatMap(series => createBingoSeries(eventData.bingoSeed, series)));
       }
       return bingoCardsCache.get(cacheKey);
+    }
+    function activeRaffleEvent() { return events.find(event => event.id === activeRaffleEventId && !isDeletedEvent(event)); }
+    function ensureRaffle(eventData) {
+      if (!eventData) return null;
+      eventData.raffle = {
+        drawCount: 1,
+        drawMode: 'single',
+        extraRanges: [],
+        results: [],
+        backgroundImage: '',
+        logoImage: '',
+        ...(eventData.raffle || {})
+      };
+      eventData.raffle.drawCount = Math.min(Math.max(Number(eventData.raffle.drawCount) || 1, 1), 20);
+      eventData.raffle.drawMode = eventData.raffle.drawMode === 'simultaneous' ? 'simultaneous' : 'single';
+      eventData.raffle.extraRanges = Array.isArray(eventData.raffle.extraRanges) ? eventData.raffle.extraRanges : [];
+      eventData.raffle.results = Array.isArray(eventData.raffle.results) ? eventData.raffle.results : [];
+      return eventData.raffle;
+    }
+    function raffleOfficialUnits(eventData) {
+      return [...new Set(officialSoldUnits(eventData).map(Number).filter(Number.isFinite))].sort((a, b) => a - b);
+    }
+    function raffleExtraUnits(eventData) {
+      const raffle = ensureRaffle(eventData);
+      return (raffle?.extraRanges || []).flatMap(item => {
+        const start = Math.max(1, Math.min(Number(item.from) || 0, Number(item.to) || 0));
+        const end = Math.max(Number(item.from) || 0, Number(item.to) || 0);
+        if (!start || !end || end < start) return [];
+        return Array.from({ length: end - start + 1 }, (_, index) => ({ series: start + index, source: item.label || 'Extra' }));
+      });
+    }
+    function rafflePool(eventData) {
+      const official = raffleOfficialUnits(eventData).map(series => ({ series, source: 'Bingo' }));
+      const officialSet = new Set(official.map(item => item.series));
+      const extras = raffleExtraUnits(eventData).filter(item => !officialSet.has(item.series));
+      const merged = new Map();
+      [...official, ...extras].forEach(item => {
+        if (!merged.has(item.series)) merged.set(item.series, item);
+      });
+      return [...merged.values()].sort((a, b) => a.series - b.series);
+    }
+    function raffleDrawnSeries(eventData) {
+      return new Set((ensureRaffle(eventData)?.results || []).flatMap(result => result.picks || []).map(pick => Number(pick.series)));
+    }
+    function raffleAvailablePool(eventData) {
+      const drawn = raffleDrawnSeries(eventData);
+      return rafflePool(eventData).filter(item => !drawn.has(Number(item.series)));
+    }
+    function randomIndex(max) {
+      if (max <= 1) return 0;
+      const array = new Uint32Array(1);
+      crypto.getRandomValues(array);
+      return array[0] % max;
+    }
+    function pickRaffleItems(eventData, count) {
+      const available = [...raffleAvailablePool(eventData)];
+      const picks = [];
+      while (picks.length < count && available.length) {
+        const index = randomIndex(available.length);
+        picks.push(available.splice(index, 1)[0]);
+      }
+      return picks;
+    }
+    function renderRaffle() {
+      if (!canUsePage('raffle')) return;
+      const availableEvents = visibleEvents();
+      if (!activeRaffleEventId || !availableEvents.some(event => event.id === activeRaffleEventId)) {
+        activeRaffleEventId = availableEvents[0]?.id || null;
+      }
+      $('raffleEventsList').innerHTML = availableEvents.length ? availableEvents.map(eventData => {
+        const raffle = ensureRaffle(eventData);
+        const official = raffleOfficialUnits(eventData);
+        const pool = rafflePool(eventData);
+        return `
+          <button type="button" class="raffle-event-button ${eventData.id === activeRaffleEventId ? 'active' : ''}" data-open-raffle="${escapeAttr(eventData.id)}">
+            <strong>${escapeAttr(eventData.name)}</strong>
+            <span>${escapeAttr(eventData.date || '')} - ${escapeAttr(eventData.town || '')}</span>
+            <span>${num(official.length)} oficiales - ${num(pool.length)} en sorteo - ${num((raffle.results || []).length)} resultados</span>
+          </button>
+        `;
+      }).join('') : '<div class="empty">No hay eventos disponibles.</div>';
+      renderRaffleDetail(activeRaffleEvent());
+    }
+    function renderRaffleDetail(eventData) {
+      const hasEvent = Boolean(eventData);
+      const raffle = hasEvent ? ensureRaffle(eventData) : null;
+      const official = hasEvent ? raffleOfficialUnits(eventData) : [];
+      const extras = hasEvent ? raffleExtraUnits(eventData) : [];
+      const pool = hasEvent ? rafflePool(eventData) : [];
+      const available = hasEvent ? raffleAvailablePool(eventData) : [];
+      const lastResult = raffle?.results?.[0] || null;
+      $('raffleBoard').style.setProperty('--raffle-bg', raffle?.backgroundImage ? `url("${raffle.backgroundImage}")` : 'none');
+      setImage($('raffleLogoPreview'), raffle?.logoImage || '');
+      $('raffleBoardTitle').textContent = hasEvent ? eventData.name : 'Selecciona un evento';
+      $('raffleBoardSubtitle').textContent = hasEvent
+        ? `${num(official.length)} series oficiales, ${num(extras.length)} extra, ${num(available.length)} disponibles`
+        : 'El sorteador usa las series confirmadas para bingo.';
+      $('raffleNumberGrid').innerHTML = lastResult?.picks?.length
+        ? lastResult.picks.map(pick => `<div class="raffle-number">${num(pick.series)}</div>`).join('')
+        : '<div class="raffle-number">--</div>';
+      $('rafflePoolSummary').textContent = hasEvent
+        ? `${num(pool.length)} series en sorteo - ${num(available.length)} disponibles`
+        : '0 series disponibles';
+      $('raffleDrawCount').value = raffle?.drawCount || 1;
+      $('raffleDrawMode').value = raffle?.drawMode || 'single';
+      $('raffleExtraList').innerHTML = raffle?.extraRanges?.length ? raffle.extraRanges.map(item => `
+        <div class="raffle-result">
+          <strong>${num(item.from)}-${num(item.to)}</strong>
+          <div>
+            <span>${escapeAttr(item.label || 'Extra')}</span>
+            <div class="actions"><button type="button" class="danger" data-delete-raffle-extra="${escapeAttr(item.id)}">Eliminar</button></div>
+          </div>
+        </div>
+      `).join('') : '<div class="empty">Sin series extra.</div>';
+      $('raffleResultsCount').textContent = `${num(raffle?.results?.length || 0)} sorteos`;
+      $('raffleResultsList').innerHTML = raffle?.results?.length ? raffle.results.map((result, index) => `
+        <div class="raffle-result">
+          <strong>${num((raffle.results || []).length - index)}</strong>
+          <div>
+            <div class="raffle-pill-list">${(result.picks || []).map(pick => `<span class="raffle-pill">${num(pick.series)} · ${escapeAttr(pick.source || '')}</span>`).join('')}</div>
+            <small class="muted">${formatDateTime(result.drawnAt)}</small>
+          </div>
+        </div>
+      `).join('') : '<div class="empty">Todavia no hay sorteos realizados.</div>';
+      ['raffleDrawOne', 'raffleDrawSimultaneous', 'raffleSaveConfig', 'raffleResetResults', 'raffleAddExtra'].forEach(id => {
+        if ($(id)) $(id).disabled = !hasEvent;
+      });
+    }
+    function syncRaffleSettings(eventData = activeRaffleEvent()) {
+      if (!eventData) return null;
+      const raffle = ensureRaffle(eventData);
+      raffle.drawCount = Math.min(Math.max(Number($('raffleDrawCount').value) || 1, 1), 20);
+      raffle.drawMode = $('raffleDrawMode').value === 'simultaneous' ? 'simultaneous' : 'single';
+      return raffle;
+    }
+    function saveRaffleSettings() {
+      const eventData = activeRaffleEvent();
+      if (!eventData) return alert('Primero elegi un evento.');
+      syncRaffleSettings(eventData);
+      saveEvents();
+      renderRaffle();
+    }
+    function drawRaffle(mode = null) {
+      const eventData = activeRaffleEvent();
+      if (!eventData) return alert('Primero elegi un evento.');
+      const raffle = syncRaffleSettings(eventData);
+      const selectedMode = mode || raffle.drawMode;
+      const drawCount = selectedMode === 'simultaneous' ? raffle.drawCount : 1;
+      const picks = pickRaffleItems(eventData, drawCount);
+      if (!picks.length) return alert('No quedan series disponibles para sortear.');
+      raffle.results.unshift({
+        id: crypto.randomUUID(),
+        drawnAt: new Date().toISOString(),
+        mode: selectedMode,
+        picks
+      });
+      saveEvents();
+      renderRaffle();
+    }
+    function addRaffleExtraRange() {
+      const eventData = activeRaffleEvent();
+      if (!eventData) return alert('Primero elegi un evento.');
+      const raffle = ensureRaffle(eventData);
+      const from = Number($('raffleExtraFrom').value) || 0;
+      const to = Number($('raffleExtraTo').value) || from;
+      const start = Math.max(1, Math.min(from, to));
+      const end = Math.max(from, to);
+      if (!start || !end || end < start) return alert('Carga un rango valido.');
+      raffle.extraRanges.push({
+        id: crypto.randomUUID(),
+        from: start,
+        to: end,
+        label: $('raffleExtraLabel').value.trim() || 'Extra'
+      });
+      $('raffleExtraFrom').value = '';
+      $('raffleExtraTo').value = '';
+      $('raffleExtraLabel').value = '';
+      saveEvents();
+      renderRaffle();
+    }
+    function deleteRaffleExtra(id) {
+      const eventData = activeRaffleEvent();
+      if (!eventData) return;
+      const raffle = ensureRaffle(eventData);
+      raffle.extraRanges = raffle.extraRanges.filter(item => item.id !== id);
+      saveEvents();
+      renderRaffle();
+    }
+    function resetRaffleResults() {
+      const eventData = activeRaffleEvent();
+      if (!eventData) return;
+      if (!confirm('Reiniciar los resultados del sorteador para este evento?')) return;
+      ensureRaffle(eventData).results = [];
+      saveEvents();
+      renderRaffle();
     }
     function cardNumbers(card) {
       return card.rows.flat().filter(number => Number(number));
@@ -5049,6 +5331,7 @@
       renderEventCards();
       renderDeleteList();
       if (activePage === 'bingo') renderBingo();
+      if (activePage === 'raffle') renderRaffle();
       if (activePage === 'virtual') renderVirtualPage();
       if (activePage === 'sheets') renderSheets();
       renderBalanceEvents();
@@ -5065,6 +5348,31 @@
     }
 
     navButtons.forEach(button => button.addEventListener('click', () => go(button.dataset.page)));
+    $('raffleDrawOne').addEventListener('click', () => drawRaffle('single'));
+    $('raffleDrawSimultaneous').addEventListener('click', () => drawRaffle('simultaneous'));
+    $('raffleSaveConfig').addEventListener('click', saveRaffleSettings);
+    $('raffleResetResults').addEventListener('click', resetRaffleResults);
+    $('raffleAddExtra').addEventListener('click', addRaffleExtraRange);
+    $('raffleDrawCount').addEventListener('change', saveRaffleSettings);
+    $('raffleDrawMode').addEventListener('change', saveRaffleSettings);
+    $('raffleBgInput').addEventListener('change', async () => {
+      const eventData = activeRaffleEvent();
+      if (!eventData) return;
+      const value = await readImageFile($('raffleBgInput'), 1200);
+      if (!value) return;
+      ensureRaffle(eventData).backgroundImage = value;
+      saveEvents();
+      renderRaffle();
+    });
+    $('raffleLogoInput').addEventListener('change', async () => {
+      const eventData = activeRaffleEvent();
+      if (!eventData) return;
+      const value = await readImageFile($('raffleLogoInput'), 700);
+      if (!value) return;
+      ensureRaffle(eventData).logoImage = value;
+      saveEvents();
+      renderRaffle();
+    });
     $('enterApp').addEventListener('click', () => {
       splashDone = true;
       applySession();
@@ -5181,6 +5489,10 @@
       }
       const openBingo = event.target.closest('[data-open-bingo]');
       if (openBingo) { activeBingoEventId = openBingo.dataset.openBingo; renderBingo(); }
+      const openRaffle = event.target.closest('[data-open-raffle]');
+      if (openRaffle) { activeRaffleEventId = openRaffle.dataset.openRaffle; renderRaffle(); }
+      const deleteRaffleExtraButton = event.target.closest('[data-delete-raffle-extra]');
+      if (deleteRaffleExtraButton) deleteRaffleExtra(deleteRaffleExtraButton.dataset.deleteRaffleExtra);
       const openStats = event.target.closest('[data-open-stats]');
       if (openStats) { activeStatsEventId = openStats.dataset.openStats; renderStats(); }
       const statsCalendarDay = event.target.closest('[data-stats-calendar-day]');
@@ -5213,6 +5525,7 @@
           if (activeEventId === eventData.id) activeEventId = null;
           if (activeBalanceEventId === eventData.id) activeBalanceEventId = null;
           if (activeBingoEventId === eventData.id) activeBingoEventId = null;
+          if (activeRaffleEventId === eventData.id) activeRaffleEventId = null;
           if (activeStatsEventId === eventData.id) activeStatsEventId = null;
           saveEvents();
           renderAll();
