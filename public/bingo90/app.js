@@ -5151,7 +5151,12 @@ function loadEventData(event, options = {}) {
   state.prizeSettings = normalizePrizeSettings({ ...state.prizeSettings, ...(event.prizeSettings || {}) });
   state.cardDesign = { ...state.cardDesign, ...(event.cardDesign || {}) };
   state.visualSettings = normalizeVisualSettings(event.visualSettings || {});
+  const persistedStripDesign = loadPersistedStripDesign();
   state.stripDesign = { ...createDefaultStripDesign(), ...(event.stripDesign || {}) };
+  if (!state.stripDesign.backgroundImageData && persistedStripDesign.backgroundImageData) {
+    state.stripDesign.backgroundImageData = persistedStripDesign.backgroundImageData;
+    state.stripDesign.backgroundImageName = persistedStripDesign.backgroundImageName || state.stripDesign.backgroundImageName;
+  }
   persistStripDesignDraft();
   state.projectionSettings = normalizeProjectionSettings(event.projectionSettings || {});
   state.prizeResults = event.prizeResults || [];

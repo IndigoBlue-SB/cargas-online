@@ -544,6 +544,7 @@ function buildSeriesPdf({ event, from, to }) {
   const seriesFontSize = Math.max(9, Math.min(34, Number(design.seriesFontSize) || 13));
   const itemsPerPage = Math.max(1, Math.min(6, Number(design.itemsPerPage) || 1));
   const columns = Math.max(1, Math.min(itemsPerPage, Number(design.columns) || 1));
+  const orderMode = design.orderMode || (columns > 1 ? 'columnar' : 'consecutive');
   const rowsPerPage = Math.ceil(itemsPerPage / columns);
   const page = stripPdfPageSize(design);
   const margin = 18;
@@ -575,7 +576,7 @@ function buildSeriesPdf({ event, from, to }) {
   for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
     let content = '1 1 1 rg 0 0 0 RG\n';
     if (backgroundImageName) content += pdfImageFill(backgroundImageName, 0, 0, page.width, page.height);
-    const pageSeries = (design.orderMode || 'consecutive') === 'columnar'
+    const pageSeries = orderMode === 'columnar'
       ? numberRange(0, itemsPerPage - 1).map(columnIndex => series[pageIndex + (columnIndex * pageCount)]).filter(value => value !== undefined)
       : series.slice(pageIndex * itemsPerPage, pageIndex * itemsPerPage + itemsPerPage);
     pageSeries.forEach((seriesNumber, position) => {
