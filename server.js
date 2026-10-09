@@ -383,6 +383,24 @@ function pdfRect(x, y, width, height, mode = 'S') {
   return `${pdfNumber(x)} ${pdfNumber(y)} ${pdfNumber(width)} ${pdfNumber(height)} re ${mode}\n`;
 }
 
+function pdfRoundedRect(x, y, width, height, radius, mode = 'S') {
+  const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+  if (!r) return pdfRect(x, y, width, height, mode);
+  const c = r * 0.5522847498;
+  return [
+    `${pdfNumber(x + r)} ${pdfNumber(y)} m`,
+    `${pdfNumber(x + width - r)} ${pdfNumber(y)} l`,
+    `${pdfNumber(x + width - r + c)} ${pdfNumber(y)} ${pdfNumber(x + width)} ${pdfNumber(y + r - c)} ${pdfNumber(x + width)} ${pdfNumber(y + r)} c`,
+    `${pdfNumber(x + width)} ${pdfNumber(y + height - r)} l`,
+    `${pdfNumber(x + width)} ${pdfNumber(y + height - r + c)} ${pdfNumber(x + width - r + c)} ${pdfNumber(y + height)} ${pdfNumber(x + width - r)} ${pdfNumber(y + height)} c`,
+    `${pdfNumber(x + r)} ${pdfNumber(y + height)} l`,
+    `${pdfNumber(x + r - c)} ${pdfNumber(y + height)} ${pdfNumber(x)} ${pdfNumber(y + height - r + c)} ${pdfNumber(x)} ${pdfNumber(y + height - r)} c`,
+    `${pdfNumber(x)} ${pdfNumber(y + r)} l`,
+    `${pdfNumber(x)} ${pdfNumber(y + r - c)} ${pdfNumber(x + r - c)} ${pdfNumber(y)} ${pdfNumber(x + r)} ${pdfNumber(y)} c`,
+    `${mode}`
+  ].join('\n') + '\n';
+}
+
 function parseDataImage(value) {
   const match = String(value || '').match(/^data:(image\/jpe?g);base64,(.+)$/i);
   if (!match) return null;
@@ -476,7 +494,7 @@ function drawBingoCard(card, x, y, width, height, fontSize) {
   const cellH = gridH / 3;
   let out = '';
   out += '0.85 0.05 0.12 RG 1.1 w\n';
-  out += pdfRect(x, y, width, height);
+  out += pdfRoundedRect(x, y, width, height, 4.5);
   out += pdfTextRight(`Carton N° ${card.cardNumber}`, x + width - 4, y + height - 10, Math.max(6, fontSize * 0.45), 'F2');
   out += '0.05 0.05 0.05 RG 0.45 w\n';
   card.rows.forEach((row, rowIndex) => {
@@ -533,6 +551,7 @@ function buildSeriesPdf({ event, from, to }) {
   const stripW = (page.width - margin * 2 - gap * (columns - 1)) / columns;
   const stripH = (page.height - margin * 2 - gap * (rowsPerPage - 1)) / rowsPerPage;
   const series = numberRange(from, to);
+  const pageCount = Math.max(1, Math.ceil(series.length / itemsPerPage));
   const { objects, reserve, set } = createPdfBuilder();
   const catalogId = reserve();
   const pagesId = reserve();
@@ -553,10 +572,12 @@ function buildSeriesPdf({ event, from, to }) {
     ]));
   }
 
-  for (let index = 0; index < series.length; index += itemsPerPage) {
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
     let content = '1 1 1 rg 0 0 0 RG\n';
     if (backgroundImageName) content += pdfImageFill(backgroundImageName, 0, 0, page.width, page.height);
-    const pageSeries = series.slice(index, index + itemsPerPage);
+    const pageSeries = (design.orderMode || 'consecutive') === 'columnar'
+      ? numberRange(0, itemsPerPage - 1).map(columnIndex => series[pageIndex + (columnIndex * pageCount)]).filter(value => value !== undefined)
+      : series.slice(pageIndex * itemsPerPage, pageIndex * itemsPerPage + itemsPerPage);
     pageSeries.forEach((seriesNumber, position) => {
       const col = position % columns;
       const row = Math.floor(position / columns);

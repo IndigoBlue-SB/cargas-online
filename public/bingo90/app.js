@@ -2546,6 +2546,7 @@ async function exportStripServerPdf(options = {}) {
   } else {
     persistEventDesign();
   }
+  await normalizeStripBackgroundForServerPdf();
   if (!(await ensureCargasPanelSaved())) {
     window.alert("No se pudo guardar el diseno del evento antes de generar el PDF. Revisa la conexion y proba nuevamente.");
     return true;
@@ -2595,6 +2596,38 @@ async function exportStripServerPdf(options = {}) {
       button.textContent = previousText;
     }
   }
+}
+
+async function normalizeStripBackgroundForServerPdf() {
+  const data = String(state.stripDesign.backgroundImageData || "");
+  if (!data || data.startsWith("data:image/jpeg") || data.startsWith("data:image/jpg")) return;
+  if (!data.startsWith("data:image/png")) return;
+  try {
+    const image = await loadImageElement(data);
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth || image.width;
+    canvas.height = image.naturalHeight || image.height;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0);
+    state.stripDesign.backgroundImageData = canvas.toDataURL("image/jpeg", 0.9);
+    state.stripDesign.backgroundImageName = state.stripDesign.backgroundImageName
+      ? state.stripDesign.backgroundImageName.replace(/\.(png|webp)$/i, ".jpg")
+      : "membrete.jpg";
+    persistStripDesignDraft();
+  } catch (error) {
+    console.warn("No se pudo convertir el membrete para el PDF rapido.", error);
+  }
+}
+
+function loadImageElement(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
 }
 
 async function exportStripZip() {
