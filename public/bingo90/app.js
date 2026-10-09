@@ -2567,14 +2567,17 @@ async function exportStripServerPdf(options = {}) {
   }
 
   try {
-    const params = new URLSearchParams({
-      eventId: state.eventId,
-      from: String(selection.requestedStart),
-      to: String(selection.requestedEnd),
-    });
-    const response = await fetch(`/api/export-strip-pdf?${params.toString()}`, {
+    const response = await fetch("/api/export-strip-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       cache: "no-store",
       credentials: "same-origin",
+      body: JSON.stringify({
+        eventId: state.eventId,
+        from: selection.requestedStart,
+        to: selection.requestedEnd,
+        stripDesign: state.stripDesign,
+      }),
     });
     if (response.status === 404) return false;
     if (!response.ok) {

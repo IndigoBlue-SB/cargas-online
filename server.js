@@ -533,9 +533,9 @@ function drawSeriesStrip({ eventName, eventDetail, seriesLabel, seriesNumber, ca
   return out;
 }
 
-function buildSeriesPdf({ event, from, to }) {
+function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   const panel = event.bingoPanelSettings || {};
-  const design = { ...(panel.stripDesign || {}) };
+  const design = { ...(panel.stripDesign || {}), ...(stripDesignOverride || {}) };
   const eventSeed = panel.eventSeed || event.bingoSeed || event.id;
   const eventName = panel.name || event.name || 'Cartones Bingo 90';
   const eventDetail = panel.eventDetail || [event.date, event.town, event.province].filter(Boolean).join(' - ');
@@ -922,21 +922,23 @@ async function handleApi(req, res) {
     return sendJson(res, 200, { events: confirmedEvents });
   }
 
-  if (url.pathname === '/api/export-strip-pdf' && req.method === 'GET') {
-    const eventId = String(url.searchParams.get('eventId') || '');
+  if (url.pathname === '/api/export-strip-pdf' && (req.method === 'GET' || req.method === 'POST')) {
+    const body = req.method === 'POST' ? await readBody(req) : {};
+    const eventId = String(body.eventId || url.searchParams.get('eventId') || '');
     const event = visibleEventsFor(session, db.events || []).find(item => String(item.id) === eventId && !item?.deletedAt);
     if (!event) return sendJson(res, 404, { error: 'Evento no encontrado' });
     const panel = event.bingoPanelSettings || {};
     const rangeStart = Math.max(1, Number(panel.rangeStart) || 1);
     const rangeEnd = Math.max(rangeStart, Number(panel.rangeEnd) || Number(panel.configuredSeriesCount) || rangeStart);
-    const requestedFrom = Number(url.searchParams.get('from')) || rangeStart;
-    const requestedTo = Number(url.searchParams.get('to')) || rangeEnd;
+    const requestedFrom = Number(body.from || url.searchParams.get('from')) || rangeStart;
+    const requestedTo = Number(body.to || url.searchParams.get('to')) || rangeEnd;
     const from = Math.max(rangeStart, Math.min(requestedFrom, requestedTo));
     const to = Math.min(rangeEnd, Math.max(requestedFrom, requestedTo));
     if (to < from) return sendJson(res, 400, { error: 'Rango invalido' });
     const count = to - from + 1;
     if (count > 25000) return sendJson(res, 400, { error: 'El rango es demasiado grande para un solo PDF. Exporta menos series por vez.' });
-    const { fileName, buffer } = buildSeriesPdf({ event, from, to });
+    const stripDesignOverride = body.stripDesign && typeof body.stripDesign === 'object' ? body.stripDesign : null;
+    const { fileName, buffer } = buildSeriesPdf({ event, from, to, stripDesignOverride });
     res.writeHead(200, {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${fileName}"`,
