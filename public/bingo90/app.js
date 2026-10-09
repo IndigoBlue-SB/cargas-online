@@ -2546,6 +2546,7 @@ async function exportStripServerPdf(options = {}) {
   } else {
     persistEventDesign();
   }
+  captureStripPreviewBackgroundForExport();
   await normalizeStripBackgroundForServerPdf();
   if (!(await ensureCargasPanelSaved())) {
     window.alert("No se pudo guardar el diseno del evento antes de generar el PDF. Revisa la conexion y proba nuevamente.");
@@ -2598,6 +2599,21 @@ async function exportStripServerPdf(options = {}) {
       button.disabled = false;
       button.textContent = previousText;
     }
+  }
+}
+
+function captureStripPreviewBackgroundForExport() {
+  if (String(state.stripDesign.backgroundImageData || "").startsWith("data:image/")) return;
+  const candidates = [els.stripPreview, document.querySelector(".strip-preview.print-page")].filter(Boolean);
+  for (const target of candidates) {
+    const computed = getComputedStyle(target);
+    const image = computed.getPropertyValue("--strip-bg-image") || computed.backgroundImage || "";
+    const match = image.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
+    if (!match?.[1]) continue;
+    state.stripDesign.backgroundImageData = match[1];
+    state.stripDesign.backgroundImageName = state.stripDesign.backgroundImageName || "membrete-exportado";
+    persistStripDesignDraft();
+    return;
   }
 }
 
