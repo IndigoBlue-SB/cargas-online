@@ -450,12 +450,7 @@ function pdfImageCover(imageName, image, x, y, width, height) {
     drawH = width / imageRatio;
     drawY = y - ((drawH - height) / 2);
   }
-  return [
-    'q',
-    `${pdfNumber(x)} ${pdfNumber(y)} ${pdfNumber(width)} ${pdfNumber(height)} re W n`,
-    `${pdfNumber(drawW)} 0 0 ${pdfNumber(drawH)} ${pdfNumber(drawX)} ${pdfNumber(drawY)} cm /${imageName} Do`,
-    'Q'
-  ].join('\n') + '\n';
+  return `q ${pdfNumber(drawW)} 0 0 ${pdfNumber(drawH)} ${pdfNumber(drawX)} ${pdfNumber(drawY)} cm /${imageName} Do Q\n`;
 }
 
 function slugifyFileName(value) {
