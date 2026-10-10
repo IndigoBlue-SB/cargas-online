@@ -2520,10 +2520,18 @@ function buildStripHtml(seriesNumber, cards) {
 }
 
 async function exportHomeCardsPdf() {
+  if (isLaunchedFromCargas()) {
+    const handledByServer = await exportStripServerPdf({ useDesignerRange: false });
+    if (handledByServer) return;
+  }
   await exportEventCardsPdf({ useDesignerRange: false, autoPrint: true });
 }
 
 async function exportStripPdf() {
+  if (isLaunchedFromCargas()) {
+    const handledByServer = await exportStripServerPdf({ useDesignerRange: true });
+    if (handledByServer) return;
+  }
   if (window.bingoDesktop?.savePdfFromHtml) {
     await exportStripDirectPdfFromExactHtml();
     return;
@@ -2563,7 +2571,7 @@ async function exportStripServerPdf(options = {}) {
   const previousText = button?.textContent;
   if (button) {
     button.disabled = true;
-    button.textContent = "Generando PDF rapido...";
+    button.textContent = "Generando PDF...";
   }
 
   try {

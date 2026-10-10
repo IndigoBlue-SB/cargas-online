@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const zlib = require('zlib');
+const PDFDocument = require('pdfkit');
 
 const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
@@ -553,15 +553,128 @@ function drawSeriesStrip({ eventName, eventDetail, seriesLabel, seriesNumber, ca
   return out;
 }
 
-function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
+function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
+  const fontSize = Math.max(8, Number(options.fontSize) || 12);
+  const accent = options.accentColor || '#d1223b';
+  const numberColor = options.numberColor || '#111827';
+  const cellBorder = options.cellBorderColor || '#111827';
+  const cellBg = options.cellBgEnabled ? (options.cellBgColor || '#ffffff') : null;
+  const cellW = width / 9;
+  const headerH = Math.min(13, height * 0.16);
+  const gridH = height - headerH;
+  const cellH = gridH / 3;
+
+  doc.lineWidth(1.1).strokeColor(accent).roundedRect(x, y, width, height, 4.5).stroke();
+  doc.font('Helvetica-Bold')
+    .fontSize(Math.max(6, fontSize * 0.45))
+    .fillColor(numberColor)
+    .text(`Carton N° ${card.cardNumber}`, x + 2, y + 2, { width: width - 5, align: 'right', lineBreak: false });
+
+  doc.lineWidth(0.45).strokeColor(cellBorder);
+  card.rows.forEach((row, rowIndex) => {
+    row.forEach((number, column) => {
+      const cellX = x + column * cellW;
+      const cellY = y + headerH + rowIndex * cellH;
+      if (cellBg) {
+        doc.fillColor(cellBg).rect(cellX, cellY, cellW, cellH).fill();
+      }
+      doc.strokeColor(cellBorder).rect(cellX, cellY, cellW, cellH).stroke();
+      if (number) {
+        doc.font('Helvetica-Bold')
+          .fontSize(fontSize)
+          .fillColor(numberColor)
+          .text(String(number), cellX, cellY + cellH * 0.15, {
+            width: cellW,
+            height: cellH,
+            align: 'center',
+            lineBreak: false
+          });
+      }
+    });
+  });
+}
+
+function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNumber, cards, x, y, width, height, design, hasPageBackground }) {
+  const fontSize = Math.max(8, Math.min(28, Number(design.fontSize) || 15));
+  const seriesFontSize = Math.max(9, Math.min(34, Number(design.seriesFontSize) || 13));
+  const headerH = Math.max(26, Math.min(height * 0.32, (Number(design.headerHeight) || 68) * 0.75));
+  const paddingX = 7;
+  const paddingBottom = 8;
+  const cardGap = Math.max(3, Math.min(14, Number(design.rowGap) || 6));
+  const cardAreaH = height - headerH - paddingBottom;
+  const cardW = width - paddingX * 2;
+  const cardH = (cardAreaH - cardGap * 5) / 6;
+
+  doc.font('Helvetica-Bold')
+    .fontSize(seriesFontSize)
+    .fillColor(design.seriesColor || '#111827')
+    .text(`${seriesLabel || 'Serie N°'} ${seriesNumber}`, x, y + headerH - seriesFontSize - 2, {
+      width,
+      align: 'center',
+      lineBreak: false
+    });
+
+  if (!hasPageBackground) {
+    doc.font('Helvetica-Bold')
+      .fontSize(Math.max(11, fontSize + 1))
+      .fillColor('#111827')
+      .text(eventName, x, y + 18, { width, align: 'center', lineBreak: false });
+    if (eventDetail) {
+      doc.font('Helvetica')
+        .fontSize(Math.max(7, fontSize * 0.58))
+        .fillColor('#374151')
+        .text(eventDetail, x, y + 34, { width, align: 'center', lineBreak: false });
+    }
+  }
+
+  cards.forEach((card, index) => {
+    const cardX = x + paddingX;
+    const cardY = y + headerH + index * (cardH + cardGap);
+    drawBingoCardKit(doc, card, cardX, cardY, cardW, cardH, {
+      fontSize,
+      accentColor: design.accentColor,
+      numberColor: design.numberColor,
+      cellBorderColor: design.cellBorderColor,
+      cellBgEnabled: design.cellBgEnabled,
+      cellBgColor: design.cellBgColor
+    });
+  });
+}
+
+function drawCoverImageKit(doc, image, pageWidth, pageHeight) {
+  if (!image) return;
+  const imageRatio = image.width / image.height;
+  const boxRatio = pageWidth / pageHeight;
+  let drawW = pageWidth;
+  let drawH = pageHeight;
+  let drawX = 0;
+  let drawY = 0;
+  if (imageRatio > boxRatio) {
+    drawW = pageHeight * imageRatio;
+    drawX = -((drawW - pageWidth) / 2);
+  } else {
+    drawH = pageWidth / imageRatio;
+    drawY = -((drawH - pageHeight) / 2);
+  }
+  doc.image(image, drawX, drawY, { width: drawW, height: drawH });
+}
+
+function collectPdfBuffer(doc) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+  });
+}
+
+async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   const panel = event.bingoPanelSettings || {};
   const design = { ...(panel.stripDesign || {}), ...(stripDesignOverride || {}) };
   const eventSeed = panel.eventSeed || event.bingoSeed || event.id;
   const eventName = panel.name || event.name || 'Cartones Bingo 90';
   const eventDetail = panel.eventDetail || [event.date, event.town, event.province].filter(Boolean).join(' - ');
   const seriesLabel = design.seriesLabel || 'Serie N°';
-  const fontSize = Math.max(8, Math.min(28, Number(design.fontSize) || 15));
-  const seriesFontSize = Math.max(9, Math.min(34, Number(design.seriesFontSize) || 13));
   const itemsPerPage = Math.max(1, Math.min(6, Number(design.itemsPerPage) || 1));
   const columns = Math.max(1, Math.min(itemsPerPage, Number(design.columns) || 1));
   const orderMode = design.orderMode || (columns > 1 ? 'columnar' : 'consecutive');
@@ -569,41 +682,24 @@ function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   const page = stripPdfPageSize(design);
   const margin = 18;
   const gap = 12;
-  const configuredRowGap = Math.max(3, Math.min(18, Number(design.rowGap) || 6));
-  const configuredHeaderHeight = Math.max(26, Math.min(140, (Number(design.headerHeight) || 68) * 0.75));
   const stripW = (page.width - margin * 2 - gap * (columns - 1)) / columns;
   const stripH = (page.height - margin * 2 - gap * (rowsPerPage - 1)) / rowsPerPage;
   const series = numberRange(from, to);
   const pageCount = Math.max(1, Math.ceil(series.length / itemsPerPage));
-  const { objects, reserve, set } = createPdfBuilder();
-  const catalogId = reserve();
-  const pagesId = reserve();
-  const fontRegularId = reserve();
-  const fontBoldId = reserve();
   const backgroundImage = parseDataImage(design.backgroundImageData);
-  const backgroundImageId = backgroundImage ? reserve() : null;
-  const backgroundImageName = backgroundImage ? 'ImBg' : '';
-  const pageIds = [];
-
-  set(fontRegularId, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
-  set(fontBoldId, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
-  if (backgroundImage) {
-    const imageColorSpace = backgroundImage.components === 1
-      ? '/DeviceGray'
-      : backgroundImage.components === 4
-        ? '/DeviceCMYK'
-        : '/DeviceRGB';
-    const imageDecode = backgroundImage.components === 4 ? ' /Decode [1 0 1 0 1 0 1 0]' : '';
-    set(backgroundImageId, Buffer.concat([
-      Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${backgroundImage.width} /Height ${backgroundImage.height} /ColorSpace ${imageColorSpace} /BitsPerComponent 8 /Filter /DCTDecode${imageDecode} /Length ${backgroundImage.buffer.length} >>\nstream\n`, 'binary'),
-      backgroundImage.buffer,
-      Buffer.from('\nendstream', 'binary')
-    ]));
-  }
+  const doc = new PDFDocument({
+    autoFirstPage: false,
+    compress: true,
+    info: { Title: eventName, Creator: 'Cargas Online' },
+    bufferPages: false
+  });
+  const bufferPromise = collectPdfBuffer(doc);
+  const backgroundPdfImage = backgroundImage ? doc.openImage(backgroundImage.buffer) : null;
 
   for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
-    let content = '1 1 1 rg 0 0 0 RG\n';
-    if (backgroundImageName) content += pdfImageCover(backgroundImageName, backgroundImage, 0, 0, page.width, page.height);
+    doc.addPage({ size: [page.width, page.height], margin: 0 });
+    doc.rect(0, 0, page.width, page.height).fill(design.backgroundColor || '#ffffff');
+    if (backgroundPdfImage) drawCoverImageKit(doc, backgroundPdfImage, page.width, page.height);
     const pageSeries = orderMode === 'columnar'
       ? numberRange(0, itemsPerPage - 1).map(columnIndex => series[pageIndex + (columnIndex * pageCount)]).filter(value => value !== undefined)
       : series.slice(pageIndex * itemsPerPage, pageIndex * itemsPerPage + itemsPerPage);
@@ -611,8 +707,8 @@ function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
       const col = position % columns;
       const row = Math.floor(position / columns);
       const x = margin + col * (stripW + gap);
-      const y = page.height - margin - ((row + 1) * stripH) - row * gap;
-      content += drawSeriesStrip({
+      const y = margin + row * (stripH + gap);
+      drawSeriesStripKit(doc, {
         eventName,
         eventDetail,
         seriesLabel,
@@ -622,31 +718,16 @@ function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
         y,
         width: stripW,
         height: stripH,
-        fontSize,
-        seriesFontSize,
-        headerHeight: configuredHeaderHeight,
-        rowGap: configuredRowGap,
-        hasPageBackground: Boolean(backgroundImageName)
+        design,
+        hasPageBackground: Boolean(backgroundPdfImage)
       });
     });
-    const compressed = zlib.deflateSync(Buffer.from(content, 'binary'), { level: 1 });
-    const contentId = reserve();
-    const pageId = reserve();
-    set(contentId, Buffer.concat([
-      Buffer.from(`<< /Length ${compressed.length} /Filter /FlateDecode >>\nstream\n`, 'binary'),
-      compressed,
-      Buffer.from('\nendstream', 'binary')
-    ]));
-    const xObjectResources = backgroundImage ? `/XObject << /${backgroundImageName} ${backgroundImageId} 0 R >>` : '';
-    set(pageId, `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pdfNumber(page.width)} ${pdfNumber(page.height)}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> ${xObjectResources} >> /Contents ${contentId} 0 R >>`);
-    pageIds.push(pageId);
   }
 
-  set(pagesId, `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map(id => `${id} 0 R`).join(' ')}] >>`);
-  set(catalogId, `<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+  doc.end();
   return {
     fileName: `${slugifyFileName(eventName)}-series-${from}-${to}.pdf`,
-    buffer: buildPdf(objects, catalogId)
+    buffer: await bufferPromise
   };
 }
 
@@ -968,7 +1049,7 @@ async function handleApi(req, res) {
     const count = to - from + 1;
     if (count > 25000) return sendJson(res, 400, { error: 'El rango es demasiado grande para un solo PDF. Exporta menos series por vez.' });
     const stripDesignOverride = body.stripDesign && typeof body.stripDesign === 'object' ? body.stripDesign : null;
-    const { fileName, buffer } = buildSeriesPdf({ event, from, to, stripDesignOverride });
+    const { fileName, buffer } = await buildSeriesPdf({ event, from, to, stripDesignOverride });
     res.writeHead(200, {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${fileName}"`,
