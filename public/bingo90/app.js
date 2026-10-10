@@ -2520,7 +2520,7 @@ function buildStripHtml(seriesNumber, cards) {
 }
 
 async function exportHomeCardsPdf() {
-  await exportEventCardsPdf({ useDesignerRange: false, ignoreLimit: true, autoPrint: true });
+  await exportEventCardsPdf({ useDesignerRange: false, autoPrint: true });
 }
 
 async function exportStripPdf() {
@@ -2528,7 +2528,7 @@ async function exportStripPdf() {
     await exportStripDirectPdfFromExactHtml();
     return;
   }
-  await exportEventCardsPdf({ useDesignerRange: true, ignoreLimit: true, autoPrint: true });
+  await exportEventCardsPdf({ useDesignerRange: true, autoPrint: true });
 }
 
 async function exportStripServerPdf(options = {}) {
@@ -2914,7 +2914,8 @@ async function exportEventCardsPdf(options = {}) {
       .join("");
     const pageSize = getPrintPageSize();
     const pageDimensions = getPrintPageDimensions();
-    const pagesHtml = buildPrintableStripPagesHtml(exportUnits);
+    const sharedPrintStyle = buildStripPrintStyleAttribute();
+    const pagesHtml = buildPrintableStripPagesHtml(exportUnits, { omitPageStyle: true });
     const fileName = slugify(state.eventName || "cartones-bingo-90");
     printWindow.document.open();
     printWindow.document.write(`<!doctype html>
@@ -2934,6 +2935,7 @@ async function exportEventCardsPdf(options = {}) {
             .print-toolbar button.whatsapp{background:#16a34a}
             .print-note{font-size:13px;color:#cbd5e1}
             .print-pages{padding-top:0;display:grid;place-items:start center;min-height:100vh}
+            .print-pages .strip-preview.print-page{${sharedPrintStyle}}
             .strip-preview.print-page{width:${pageDimensions.width};height:${pageDimensions.height};max-width:${pageDimensions.width};max-height:${pageDimensions.height};box-shadow:none;border:0;border-radius:0;min-height:auto;overflow:hidden;page-break-after:always;break-after:page;margin:0 auto;print-color-adjust:exact;-webkit-print-color-adjust:exact}
             .strip-preview.print-page:last-child{page-break-after:auto;break-after:auto}
             .strip-page-layout{height:100%;align-content:start}
@@ -3430,6 +3432,7 @@ function buildPrintableZipHtml({ units, pages, selection, partNumber, totalParts
   const last = units.at(-1);
   const title = `${state.eventName || "Cartones Bingo 90"} - parte ${partNumber}`;
   const styles = getExportStylesHtml();
+  const sharedPrintStyle = buildStripPrintStyleAttribute();
   return `<!doctype html>
     <html lang="es">
       <head>
@@ -3447,6 +3450,7 @@ function buildPrintableZipHtml({ units, pages, selection, partNumber, totalParts
           .print-toolbar button.whatsapp{background:#16a34a}
           .print-note{font-size:13px;color:#cbd5e1}
           .print-pages{padding-top:0;display:grid;place-items:start center;min-height:100vh}
+          .print-pages .strip-preview.print-page{${sharedPrintStyle}}
           .strip-preview.print-page{width:${pageDimensions.width};height:${pageDimensions.height};max-width:${pageDimensions.width};max-height:${pageDimensions.height};box-shadow:none;border:0;border-radius:0;min-height:auto;overflow:hidden;page-break-after:always;break-after:page;margin:0 auto;print-color-adjust:exact;-webkit-print-color-adjust:exact}
           .strip-preview.print-page:last-child{page-break-after:auto;break-after:auto}
           .strip-page-layout{height:100%;align-content:start}
@@ -3466,7 +3470,7 @@ function buildPrintableZipHtml({ units, pages, selection, partNumber, totalParts
             <button type="button" onclick="window.print()">Imprimir / Guardar como PDF</button>
           </div>
         </div>
-        <main class="print-pages">${buildPrintableStripPagesHtml(pages || units)}</main>
+        <main class="print-pages">${buildPrintableStripPagesHtml(pages || units, { omitPageStyle: true })}</main>
         ${buildPrintableJpgActionsScript({
           fileName: `${slugify(state.eventName || "cartones-bingo-90")}-parte-${String(partNumber).padStart(3, "0")}-${first}-${last}.jpg`,
           whatsappText: `Tira de bingo ${state.eventName || "Cartones Bingo 90"} - ${selection.label} ${first}-${last}`,
@@ -3561,11 +3565,11 @@ function getPrintableStripUnits() {
   return range(state.rangeStart, state.rangeEnd);
 }
 
-function buildPrintableStripPagesHtml(unitsOrPages) {
+function buildPrintableStripPagesHtml(unitsOrPages, options = {}) {
   const pages = Array.isArray(unitsOrPages?.[0])
     ? unitsOrPages
     : getPrintableStripPages(unitsOrPages);
-  return pages.map((pageUnits) => buildPrintableStripPageHtml(pageUnits)).join("");
+  return pages.map((pageUnits) => buildPrintableStripPageHtml(pageUnits, options)).join("");
 }
 
 function getPrintableStripPages(units) {
@@ -3593,9 +3597,10 @@ function getColumnarPageUnits(units, pageIndex, pageCount, itemsPerPage) {
   return pageUnits;
 }
 
-function buildPrintableStripPageHtml(units) {
+function buildPrintableStripPageHtml(units, options = {}) {
+  const styleAttribute = options.omitPageStyle ? "" : ` style="${buildStripPrintStyleAttribute()}"`;
   return `
-    <div class="strip-preview print-page" style="${buildStripPrintStyleAttribute()}">
+    <div class="strip-preview print-page"${styleAttribute}>
       <div class="strip-page-layout">
         ${units.map((unit, index) => buildPrintableStripUnitHtml(unit, index)).join("")}
       </div>
