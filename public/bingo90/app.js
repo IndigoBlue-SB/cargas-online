@@ -1954,6 +1954,7 @@ async function saveStripDesignManually() {
   let saveError = null;
   try {
     applyStripDesign({ skipPersist: true });
+    await prepareStripBackgroundForStorage();
     const savedEvent = persistEventDesign({ skipCargasSave: true });
     serverSaved = savedEvent ? await saveCargasBingoPanelSettings(savedEvent, { throwOnError: true, timeoutMs: 60000 }) : true;
   } catch (error) {
@@ -1981,10 +1982,12 @@ function handleStripBackgroundSelection() {
     return;
   }
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     state.stripDesign.backgroundImageData = String(reader.result || "");
     state.stripDesign.backgroundImageName = file.name;
-    els.stripBgImageStatus.textContent = `Imagen cargada: ${file.name}`;
+    els.stripBgImageStatus.textContent = `Preparando imagen: ${file.name}`;
+    await prepareStripBackgroundForStorage();
+    els.stripBgImageStatus.textContent = `Imagen cargada: ${state.stripDesign.backgroundImageName || file.name}`;
     renderStripPreview();
     persistEventDesign();
   };
@@ -2622,14 +2625,19 @@ function captureStripPreviewBackgroundForExport() {
 }
 
 async function normalizeStripBackgroundForServerPdf() {
+  await prepareStripBackgroundForStorage();
+}
+
+async function prepareStripBackgroundForStorage() {
   const data = String(state.stripDesign.backgroundImageData || "");
   if (!data || !data.startsWith("data:image/")) return;
+  if (/^data:image\/jpe?g;base64,/i.test(data) && data.length < 1_200_000) return;
   try {
     const image = await loadImageElement(data);
     const canvas = document.createElement("canvas");
     const sourceWidth = image.naturalWidth || image.width || 1;
     const sourceHeight = image.naturalHeight || image.height || 1;
-    const maxSide = 1800;
+    const maxSide = 1600;
     const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
     canvas.width = Math.max(1, Math.round(sourceWidth * scale));
     canvas.height = Math.max(1, Math.round(sourceHeight * scale));
@@ -2637,13 +2645,13 @@ async function normalizeStripBackgroundForServerPdf() {
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    state.stripDesign.backgroundImageData = canvas.toDataURL("image/jpeg", 0.88);
+    state.stripDesign.backgroundImageData = canvas.toDataURL("image/jpeg", 0.82);
     state.stripDesign.backgroundImageName = state.stripDesign.backgroundImageName
       ? state.stripDesign.backgroundImageName.replace(/\.(png|webp)$/i, ".jpg")
       : "membrete.jpg";
     persistStripDesignDraft();
   } catch (error) {
-    console.warn("No se pudo convertir el membrete para el PDF rapido.", error);
+    console.warn("No se pudo preparar el membrete para guardar/exportar.", error);
   }
 }
 
@@ -5004,7 +5012,7 @@ async function readErrorResponse(response) {
 
 function describeCargasPanelSaveError(error) {
   if (!error) return "No llego una respuesta valida del servidor.";
-  if (error.name === "AbortError") return "El servidor tardo demasiado en responder. Puede pasar si el diseno tiene imagenes muy pesadas.";
+  if (error.name === "AbortError") return "El servidor tardo demasiado en responder. Proba nuevamente; el membrete se prepara liviano antes de guardar.";
   if (error.status === 401) return "La sesion de Cargas esta vencida. Inicia sesion otra vez y reintenta.";
   if (error.status === 403) return "Tu usuario no tiene permiso para guardar el panel de este evento.";
   if (error.status === 404) return "Cargas no encontro este evento. Volve a abrirlo desde el listado de eventos confirmados.";
