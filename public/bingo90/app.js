@@ -2631,7 +2631,6 @@ async function normalizeStripBackgroundForServerPdf() {
 async function prepareStripBackgroundForStorage() {
   const data = String(state.stripDesign.backgroundImageData || "");
   if (!data || !data.startsWith("data:image/")) return;
-  if (/^data:image\/jpe?g;base64,/i.test(data) && data.length < 1_200_000) return;
   try {
     const image = await loadImageElement(data);
     const canvas = document.createElement("canvas");

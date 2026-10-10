@@ -407,7 +407,7 @@ function parseDataImage(value) {
   const buffer = Buffer.from(match[2], 'base64');
   const size = jpegSize(buffer);
   if (!size) return null;
-  return { type: 'jpeg', buffer, width: size.width, height: size.height };
+  return { type: 'jpeg', buffer, width: size.width, height: size.height, components: size.components || 3 };
 }
 
 function jpegSize(buffer) {
@@ -423,7 +423,8 @@ function jpegSize(buffer) {
     if (marker >= 0xc0 && marker <= 0xc3) {
       return {
         height: buffer.readUInt16BE(offset + 5),
-        width: buffer.readUInt16BE(offset + 7)
+        width: buffer.readUInt16BE(offset + 7),
+        components: buffer[offset + 9]
       };
     }
     offset += 2 + length;
@@ -587,8 +588,14 @@ function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   set(fontRegularId, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
   set(fontBoldId, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
   if (backgroundImage) {
+    const imageColorSpace = backgroundImage.components === 1
+      ? '/DeviceGray'
+      : backgroundImage.components === 4
+        ? '/DeviceCMYK'
+        : '/DeviceRGB';
+    const imageDecode = backgroundImage.components === 4 ? ' /Decode [1 0 1 0 1 0 1 0]' : '';
     set(backgroundImageId, Buffer.concat([
-      Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${backgroundImage.width} /Height ${backgroundImage.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${backgroundImage.buffer.length} >>\nstream\n`, 'binary'),
+      Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${backgroundImage.width} /Height ${backgroundImage.height} /ColorSpace ${imageColorSpace} /BitsPerComponent 8 /Filter /DCTDecode${imageDecode} /Length ${backgroundImage.buffer.length} >>\nstream\n`, 'binary'),
       backgroundImage.buffer,
       Buffer.from('\nendstream', 'binary')
     ]));
