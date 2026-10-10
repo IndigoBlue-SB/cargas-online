@@ -435,6 +435,29 @@ function pdfImageFill(imageName, x, y, width, height) {
   return `q ${pdfNumber(width)} 0 0 ${pdfNumber(height)} ${pdfNumber(x)} ${pdfNumber(y)} cm /${imageName} Do Q\n`;
 }
 
+function pdfImageCover(imageName, image, x, y, width, height) {
+  if (!image?.width || !image?.height) return pdfImageFill(imageName, x, y, width, height);
+  const imageRatio = image.width / image.height;
+  const boxRatio = width / height;
+  let drawW = width;
+  let drawH = height;
+  let drawX = x;
+  let drawY = y;
+  if (imageRatio > boxRatio) {
+    drawW = height * imageRatio;
+    drawX = x - ((drawW - width) / 2);
+  } else {
+    drawH = width / imageRatio;
+    drawY = y - ((drawH - height) / 2);
+  }
+  return [
+    'q',
+    `${pdfNumber(x)} ${pdfNumber(y)} ${pdfNumber(width)} ${pdfNumber(height)} re W n`,
+    `${pdfNumber(drawW)} 0 0 ${pdfNumber(drawH)} ${pdfNumber(drawX)} ${pdfNumber(drawY)} cm /${imageName} Do`,
+    'Q'
+  ].join('\n') + '\n';
+}
+
 function slugifyFileName(value) {
   return String(value || 'cartones-bingo-90')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -510,14 +533,15 @@ function drawBingoCard(card, x, y, width, height, fontSize) {
   return out;
 }
 
-function drawSeriesStrip({ eventName, eventDetail, seriesLabel, seriesNumber, cards, x, y, width, height, fontSize, seriesFontSize, hasPageBackground }) {
+function drawSeriesStrip({ eventName, eventDetail, seriesLabel, seriesNumber, cards, x, y, width, height, fontSize, seriesFontSize, headerHeight, rowGap, hasPageBackground }) {
   const gap = 6;
   const paddingX = 7;
   const paddingBottom = 8;
-  const headerH = Math.max(48, Math.min(88, height * 0.17));
+  const headerH = Math.max(26, Math.min(height * 0.32, Number(headerHeight) || height * 0.1));
   const cardAreaH = height - headerH - paddingBottom;
   const cardW = width - paddingX * 2;
-  const cardH = (cardAreaH - gap * 5) / 6;
+  const cardGap = Math.max(3, Math.min(14, Number(rowGap) || gap));
+  const cardH = (cardAreaH - cardGap * 5) / 6;
   let out = '';
   out += '0 0 0 RG 0.7 w\n';
   out += pdfTextCenter(`${seriesLabel || 'Serie N°'} ${seriesNumber}`, x + width / 2, y + height - headerH + 8, Math.max(9, seriesFontSize), 'F2');
@@ -527,7 +551,7 @@ function drawSeriesStrip({ eventName, eventDetail, seriesLabel, seriesNumber, ca
   }
   cards.forEach((card, index) => {
     const cardX = x + paddingX;
-    const cardY = y + paddingBottom + cardAreaH - ((index + 1) * cardH) - index * gap;
+    const cardY = y + paddingBottom + cardAreaH - ((index + 1) * cardH) - index * cardGap;
     out += drawBingoCard(card, cardX, cardY, cardW, cardH, Math.max(8, fontSize));
   });
   return out;
@@ -549,6 +573,8 @@ function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   const page = stripPdfPageSize(design);
   const margin = 18;
   const gap = 12;
+  const configuredRowGap = Math.max(3, Math.min(18, Number(design.rowGap) || 6));
+  const configuredHeaderHeight = Math.max(26, Math.min(140, (Number(design.headerHeight) || 68) * 0.75));
   const stripW = (page.width - margin * 2 - gap * (columns - 1)) / columns;
   const stripH = (page.height - margin * 2 - gap * (rowsPerPage - 1)) / rowsPerPage;
   const series = numberRange(from, to);
@@ -575,7 +601,7 @@ function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
 
   for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
     let content = '1 1 1 rg 0 0 0 RG\n';
-    if (backgroundImageName) content += pdfImageFill(backgroundImageName, 0, 0, page.width, page.height);
+    if (backgroundImageName) content += pdfImageCover(backgroundImageName, backgroundImage, 0, 0, page.width, page.height);
     const pageSeries = orderMode === 'columnar'
       ? numberRange(0, itemsPerPage - 1).map(columnIndex => series[pageIndex + (columnIndex * pageCount)]).filter(value => value !== undefined)
       : series.slice(pageIndex * itemsPerPage, pageIndex * itemsPerPage + itemsPerPage);
@@ -596,6 +622,8 @@ function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
         height: stripH,
         fontSize,
         seriesFontSize,
+        headerHeight: configuredHeaderHeight,
+        rowGap: configuredRowGap,
         hasPageBackground: Boolean(backgroundImageName)
       });
     });

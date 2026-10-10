@@ -2548,6 +2548,10 @@ async function exportStripServerPdf(options = {}) {
   }
   captureStripPreviewBackgroundForExport();
   await normalizeStripBackgroundForServerPdf();
+  if (!hasUsableStripBackgroundForServerPdf() && state.stripDesign.backgroundImageName) {
+    window.alert("El PDF no se va a descargar porque el membrete figura por nombre, pero la imagen real no esta disponible en esta sesion. Abri Disenar tira, volve a seleccionar el archivo del membrete y descarga nuevamente.");
+    return true;
+  }
   if (!(await ensureCargasPanelSaved())) {
     window.alert("No se pudo guardar el diseno del evento antes de generar el PDF. Revisa la conexion y proba nuevamente.");
     return true;
@@ -2619,18 +2623,21 @@ function captureStripPreviewBackgroundForExport() {
 
 async function normalizeStripBackgroundForServerPdf() {
   const data = String(state.stripDesign.backgroundImageData || "");
-  if (!data || data.startsWith("data:image/jpeg") || data.startsWith("data:image/jpg")) return;
-  if (!data.startsWith("data:image/png")) return;
+  if (!data || !data.startsWith("data:image/")) return;
   try {
     const image = await loadImageElement(data);
     const canvas = document.createElement("canvas");
-    canvas.width = image.naturalWidth || image.width;
-    canvas.height = image.naturalHeight || image.height;
+    const sourceWidth = image.naturalWidth || image.width || 1;
+    const sourceHeight = image.naturalHeight || image.height || 1;
+    const maxSide = 1800;
+    const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
     const context = canvas.getContext("2d");
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(image, 0, 0);
-    state.stripDesign.backgroundImageData = canvas.toDataURL("image/jpeg", 0.9);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    state.stripDesign.backgroundImageData = canvas.toDataURL("image/jpeg", 0.88);
     state.stripDesign.backgroundImageName = state.stripDesign.backgroundImageName
       ? state.stripDesign.backgroundImageName.replace(/\.(png|webp)$/i, ".jpg")
       : "membrete.jpg";
@@ -2638,6 +2645,10 @@ async function normalizeStripBackgroundForServerPdf() {
   } catch (error) {
     console.warn("No se pudo convertir el membrete para el PDF rapido.", error);
   }
+}
+
+function hasUsableStripBackgroundForServerPdf() {
+  return /^data:image\/jpe?g;base64,/i.test(String(state.stripDesign.backgroundImageData || ""));
 }
 
 function loadImageElement(src) {
