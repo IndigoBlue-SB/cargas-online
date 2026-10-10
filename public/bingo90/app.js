@@ -2520,23 +2520,15 @@ function buildStripHtml(seriesNumber, cards) {
 }
 
 async function exportHomeCardsPdf() {
-  if (isLaunchedFromCargas()) {
-    const handledByServer = await exportStripServerPdf({ useDesignerRange: false });
-    if (handledByServer) return;
-  }
-  await exportEventCardsPdf({ useDesignerRange: false });
+  await exportEventCardsPdf({ useDesignerRange: false, ignoreLimit: true, autoPrint: true });
 }
 
 async function exportStripPdf() {
-  if (isLaunchedFromCargas()) {
-    const handledByServer = await exportStripServerPdf({ useDesignerRange: true });
-    if (handledByServer) return;
-  }
   if (window.bingoDesktop?.savePdfFromHtml) {
     await exportStripDirectPdfFromExactHtml();
     return;
   }
-  await exportEventCardsPdf({ useDesignerRange: true });
+  await exportEventCardsPdf({ useDesignerRange: true, ignoreLimit: true, autoPrint: true });
 }
 
 async function exportStripServerPdf(options = {}) {
@@ -2893,7 +2885,7 @@ async function exportEventCardsPdf(options = {}) {
     } else {
       persistEventDesign();
     }
-    if (!(await ensureCargasPanelSaved())) return;
+    ensureCargasPanelSaved();
     const units = getPrintableStripUnits();
     if (!units.length) {
       window.alert("Primero configura el evento para generar cartones.");
@@ -2967,6 +2959,7 @@ async function exportEventCardsPdf(options = {}) {
             eventName: state.eventName || "Cartones Bingo 90",
             footerText: buildStripShareFooterText(),
           })}
+          ${options.autoPrint ? '<script>window.addEventListener("load",()=>setTimeout(()=>window.print(),700));</script>' : ''}
         </body>
       </html>`);
     printWindow.document.close();
