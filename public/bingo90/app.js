@@ -2491,6 +2491,36 @@ function updateStripPreviewScale() {
   els.stripPreview.style.setProperty("--strip-sheet-scale", String(Math.max(0.25, scale)));
 }
 
+function captureStripPdfLayoutMetrics() {
+  const preview = els.stripPreview;
+  if (!preview || !preview.isConnected) return null;
+  const blocks = [...preview.querySelectorAll(".strip-block")];
+  if (!blocks.length) return null;
+  const pageRect = preview.getBoundingClientRect();
+  const pageWidth = preview.offsetWidth || pageRect.width;
+  const pageHeight = preview.offsetHeight || pageRect.height;
+  if (!pageRect.width || !pageRect.height || !pageWidth || !pageHeight) return null;
+  const scaleX = pageRect.width / pageWidth;
+  const scaleY = pageRect.height / pageHeight;
+  const rectToPage = (element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      x: (rect.left - pageRect.left) / scaleX,
+      y: (rect.top - pageRect.top) / scaleY,
+      width: rect.width / scaleX,
+      height: rect.height / scaleY,
+    };
+  };
+  return {
+    page: { width: pageWidth, height: pageHeight },
+    blocks: blocks.map((block) => ({
+      box: rectToPage(block),
+      meta: rectToPage(block.querySelector(".strip-meta") || block),
+      cards: [...block.querySelectorAll(".strip-card")].map(rectToPage),
+    })),
+  };
+}
+
 function getStripCellRadius() {
   if (state.stripDesign.cellShape === "circle") return "999px";
   if (state.stripDesign.cellShape === "rounded") return "6px";
@@ -2625,6 +2655,10 @@ async function exportStripServerPdf(options = {}) {
     window.alert("El PDF no se va a descargar porque el membrete figura por nombre, pero la imagen real no esta disponible en esta sesion. Abri Disenar tira, volve a seleccionar el archivo del membrete y descarga nuevamente.");
     return true;
   }
+  const stripDesignForExport = {
+    ...state.stripDesign,
+    pdfLayoutMetrics: captureStripPdfLayoutMetrics(),
+  };
   if (!(await ensureCargasPanelSaved())) {
     window.alert("No se pudo guardar el diseno del evento antes de generar el PDF. Revisa la conexion y proba nuevamente.");
     return true;
@@ -2654,7 +2688,7 @@ async function exportStripServerPdf(options = {}) {
         eventId: state.eventId,
         from: selection.requestedStart,
         to: selection.requestedEnd,
-        stripDesign: state.stripDesign,
+        stripDesign: stripDesignForExport,
       }),
     });
     if (response.status === 404) return false;

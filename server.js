@@ -761,7 +761,7 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
   });
 }
 
-function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNumber, cards, x, y, width, height, design, hasPageBackground }) {
+function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNumber, cards, x, y, width, height, design, hasPageBackground, layout = null }) {
   const fontSize = Math.max(6, Math.min(28, (Number(design.fontSize) || 15) * CSS_PX_TO_PT));
   const seriesFontSize = Math.max(6, Math.min(34, (Number(design.seriesFontSize) || 13) * CSS_PX_TO_PT));
   const headerH = Math.max(0, Math.min(height * 0.32, (Number(design.headerHeight) || 0) * CSS_PX_TO_PT));
@@ -776,21 +776,24 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
   const cardHeaderMarginBottom = 1 * CSS_PX_TO_PT;
   const naturalCardW = (cellSize * 9 + smallGap * 8 + cardPadX * 2) * cardScale;
   const naturalCardH = cardPadTop + cardHeaderH + cardHeaderMarginBottom + cellSize * 3 + smallGap * 2 + cardPadBottom;
-  const metaBaseY = y + headerH + smallGap;
-  const metaY = metaBaseY + ((Number(design.seriesOffsetY) || 0) * CSS_PX_TO_PT);
-  const cardsTop = metaBaseY + seriesFontSize + smallGap;
+  const metaBox = layout?.meta;
+  const cardBoxes = Array.isArray(layout?.cards) ? layout.cards : null;
+  const metaBaseY = metaBox ? metaBox.y : y + headerH + smallGap;
+  const metaY = metaBox ? metaBox.y : metaBaseY + ((Number(design.seriesOffsetY) || 0) * CSS_PX_TO_PT);
+  const metaX = metaBox ? metaBox.x : x + ((Number(design.seriesOffsetX) || 0) * CSS_PX_TO_PT);
+  const metaWidth = metaBox ? metaBox.width : width;
+  const cardsTop = metaBox ? (metaBox.y + metaBox.height + smallGap) : metaBaseY + seriesFontSize + smallGap;
   const cardAreaH = height - (cardsTop - y);
   const cardW = Math.min(width, naturalCardW);
   const maxCardH = (cardAreaH - cardGap * 5) / 6;
   const cardH = Math.min(maxCardH, naturalCardH);
   const cardsStartY = cardsTop;
-  const seriesX = x + ((Number(design.seriesOffsetX) || 0) * CSS_PX_TO_PT);
 
   doc.font('Helvetica-Bold')
     .fontSize(seriesFontSize)
     .fillColor(design.seriesColor || '#111827')
-    .text(`${seriesLabel || 'Serie N°'} ${seriesNumber}`, seriesX, metaY, {
-      width,
+    .text(`${seriesLabel || 'Serie N°'} ${seriesNumber}`, metaX, metaY, {
+      width: metaWidth,
       align: 'center',
       lineBreak: false
     });
@@ -809,9 +812,12 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
   }
 
   cards.forEach((card, index) => {
-    const cardX = x + (width - cardW) / 2;
-    const cardY = cardsStartY + index * (cardH + cardGap);
-    drawBingoCardKit(doc, card, cardX, cardY, cardW, cardH, {
+    const cardBox = cardBoxes?.[index];
+    const cardX = cardBox ? cardBox.x : x + (width - cardW) / 2;
+    const cardY = cardBox ? cardBox.y : cardsStartY + index * (cardH + cardGap);
+    const exactCardW = cardBox ? cardBox.width : cardW;
+    const exactCardH = cardBox ? cardBox.height : cardH;
+    drawBingoCardKit(doc, card, cardX, cardY, exactCardW, exactCardH, {
       fontSize,
       accentColor: design.accentColor,
       numberColor: design.numberColor,
@@ -1023,6 +1029,32 @@ function collectPdfBuffer(doc) {
   });
 }
 
+function normalizeStripPdfLayoutMetrics(metrics, page) {
+  const pageMetrics = metrics?.page || {};
+  const blocks = Array.isArray(metrics?.blocks) ? metrics.blocks : [];
+  const pageWidth = Number(pageMetrics.width) || 0;
+  const pageHeight = Number(pageMetrics.height) || 0;
+  if (!pageWidth || !pageHeight || !blocks.length) return null;
+  const scaleX = page.width / pageWidth;
+  const scaleY = page.height / pageHeight;
+  const normalizeRect = (rect) => {
+    const source = rect || {};
+    return {
+      x: (Number(source.x) || 0) * scaleX,
+      y: (Number(source.y) || 0) * scaleY,
+      width: Math.max(1, (Number(source.width) || 0) * scaleX),
+      height: Math.max(1, (Number(source.height) || 0) * scaleY),
+    };
+  };
+  return {
+    blocks: blocks.map((block) => ({
+      box: normalizeRect(block?.box),
+      meta: normalizeRect(block?.meta),
+      cards: Array.isArray(block?.cards) ? block.cards.map(normalizeRect) : [],
+    })),
+  };
+}
+
 async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   const panel = event.bingoPanelSettings || {};
   const design = { ...(panel.stripDesign || {}), ...(stripDesignOverride || {}) };
@@ -1035,6 +1067,7 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   const orderMode = design.orderMode || (columns > 1 ? 'columnar' : 'consecutive');
   const rowsPerPage = Math.ceil(itemsPerPage / columns);
   const page = stripPdfPageSize(design);
+  const measuredLayout = normalizeStripPdfLayoutMetrics(design.pdfLayoutMetrics, page);
   const stripSize = getStripNaturalSize(design);
   const columnGap = Math.max(0, Number(design.gap) || 0) * CSS_PX_TO_PT;
   const rowGap = Math.max(0, Number(design.rowGap) || 0) * CSS_PX_TO_PT;
@@ -1068,6 +1101,28 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
     const pageSeries = orderMode === 'columnar'
       ? numberRange(0, itemsPerPage - 1).map(columnIndex => series[pageIndex + (columnIndex * pageCount)]).filter(value => value !== undefined)
       : series.slice(pageIndex * itemsPerPage, pageIndex * itemsPerPage + itemsPerPage);
+    if (measuredLayout) {
+      pageSeries.forEach((seriesNumber, position) => {
+        const blockLayout = measuredLayout.blocks[position];
+        const box = blockLayout?.box;
+        if (!box) return;
+        drawSeriesStripKit(doc, {
+          eventName,
+          eventDetail,
+          seriesLabel,
+          seriesNumber,
+          cards: createBingoSeriesCards(eventSeed, seriesNumber),
+          x: box.x,
+          y: box.y,
+          width: box.width,
+          height: box.height,
+          design,
+          hasPageBackground: Boolean(backgroundPdfImage),
+          layout: blockLayout
+        });
+      });
+      continue;
+    }
     doc.save();
     doc.translate(startX, startY);
     doc.scale(contentScale);
