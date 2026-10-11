@@ -582,7 +582,7 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
   doc.lineWidth(1.1).strokeColor(accent).roundedRect(x, y, width, height, 4.5).stroke();
   doc.font('Helvetica-Bold')
     .fontSize(Math.max(6, fontSize * 0.45))
-    .fillColor(numberColor)
+    .fillColor(accent)
     .text(`Carton N° ${card.cardNumber}`, x + 2, y + 2, { width: width - 5, align: 'right', lineBreak: false });
 
   doc.lineWidth(0.45).strokeColor(cellBorder);
