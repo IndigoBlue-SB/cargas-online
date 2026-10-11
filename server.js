@@ -15,6 +15,7 @@ const BUNDLE_DATA_VERSION = '2026-06-23-03';
 const sessions = new Map();
 const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], bingo: [], raffle: [], virtual: [], sheets: [], balance: [], accounting: [], settings: [] };
 const BINGO_SERIES_SIZE = 6;
+const CSS_PX_TO_PT = 0.75;
 const BINGO_COLUMN_RANGES = [
   { start: 1, end: 9 },
   { start: 10, end: 19 },
@@ -554,7 +555,7 @@ function drawSeriesStrip({ eventName, eventDetail, seriesLabel, seriesNumber, ca
 }
 
 function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
-  const fontSize = Math.max(8, Number(options.fontSize) || 12);
+  const fontSize = Math.max(6, Number(options.fontSize) || 12);
   const accent = options.accentColor || '#d1223b';
   const numberColor = options.numberColor || '#111827';
   const cellBorder = options.cellBorderColor || '#111827';
@@ -563,18 +564,19 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
   const padX = Math.max(2, Math.min(8, Number(options.padX) || 5));
   const padY = Math.max(1, Math.min(6, Number(options.padY) || 3));
   const headerH = Math.max(8, Math.min(15, Number(options.headerHeight) || 12));
-  const configuredCell = Math.max(10, Math.min(42, Number(options.cellSize) || 18));
+  const configuredCell = Math.max(8, Math.min(42, Number(options.cellSize) || 18));
   const availableCellW = (width - padX * 2 - smallGap * 8) / 9;
   const availableCellH = (height - headerH - padY * 2 - smallGap * 2) / 3;
-  const cellSize = Math.max(8, Math.min(configuredCell, availableCellW, availableCellH));
-  const gridW = cellSize * 9 + smallGap * 8;
-  const gridH = cellSize * 3 + smallGap * 2;
+  const cellW = Math.max(8, availableCellW);
+  const cellH = Math.max(8, Math.min(configuredCell, availableCellH));
+  const gridW = cellW * 9 + smallGap * 8;
+  const gridH = cellH * 3 + smallGap * 2;
   const gridX = x + (width - gridW) / 2;
   const gridY = y + headerH + padY;
   const radius = options.cellShape === 'circle'
-    ? cellSize / 2
+    ? Math.min(cellW, cellH) / 2
     : options.cellShape === 'rounded'
-      ? Math.min(6, cellSize / 3)
+      ? Math.min(6, Math.min(cellW, cellH) / 3)
       : 0;
 
   doc.lineWidth(1.1).strokeColor(accent).roundedRect(x, y, width, height, 4.5).stroke();
@@ -586,20 +588,20 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
   doc.lineWidth(0.45).strokeColor(cellBorder);
   card.rows.forEach((row, rowIndex) => {
     row.forEach((number, column) => {
-      const cellX = gridX + column * (cellSize + smallGap);
-      const cellY = gridY + rowIndex * (cellSize + smallGap);
+      const cellX = gridX + column * (cellW + smallGap);
+      const cellY = gridY + rowIndex * (cellH + smallGap);
       if (cellBg) {
-        doc.fillColor(cellBg).roundedRect(cellX, cellY, cellSize, cellSize, radius).fill();
+        doc.fillColor(cellBg).roundedRect(cellX, cellY, cellW, cellH, radius).fill();
       }
-      doc.strokeColor(cellBorder).roundedRect(cellX, cellY, cellSize, cellSize, radius).stroke();
+      doc.strokeColor(cellBorder).roundedRect(cellX, cellY, cellW, cellH, radius).stroke();
       if (number) {
-        const textSize = Math.min(fontSize, cellSize * 0.82);
+        const textSize = Math.min(fontSize, cellH * 0.82);
         doc.font('Helvetica-Bold')
           .fontSize(textSize)
           .fillColor(numberColor)
-          .text(String(number), cellX, cellY + (cellSize - textSize) * 0.42, {
-            width: cellSize,
-            height: cellSize,
+          .text(String(number), cellX, cellY + (cellH - textSize) * 0.42, {
+            width: cellW,
+            height: cellH,
             align: 'center',
             lineBreak: false
           });
@@ -609,31 +611,32 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
 }
 
 function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNumber, cards, x, y, width, height, design, hasPageBackground }) {
-  const fontSize = Math.max(8, Math.min(28, Number(design.fontSize) || 15));
-  const seriesFontSize = Math.max(9, Math.min(34, Number(design.seriesFontSize) || 13));
-  const headerH = Math.max(26, Math.min(height * 0.32, (Number(design.headerHeight) || 68) * 0.75));
-  const paddingX = 7;
-  const paddingBottom = 8;
-  const cardGap = Math.max(3, Math.min(14, Number(design.rowGap) || 6));
-  const smallGap = 2;
+  const fontSize = Math.max(6, Math.min(28, (Number(design.fontSize) || 15) * CSS_PX_TO_PT));
+  const seriesFontSize = Math.max(6, Math.min(34, (Number(design.seriesFontSize) || 13) * CSS_PX_TO_PT));
+  const headerH = Math.max(0, Math.min(height * 0.32, (Number(design.headerHeight) || 0) * CSS_PX_TO_PT));
+  const cardGap = Math.max(1, Math.min(20, (Number(design.rowGap) || 6) * cardScaleFromDesign(design) * CSS_PX_TO_PT));
+  const smallGap = 2 * CSS_PX_TO_PT;
   const cardScale = Math.max(0.6, Math.min(1.6, (Number(design.cardScale) || 100) / 100));
-  const cellSize = Math.max(10, Math.min(42, Number(design.cellSize) || 18));
-  const cardPadX = 5;
-  const cardPadY = 3;
-  const cardHeaderH = 12;
+  const cellSize = Math.max(8, Math.min(42, (Number(design.cellSize) || 18) * CSS_PX_TO_PT));
+  const cardPadX = 5 * CSS_PX_TO_PT;
+  const cardPadY = 3 * CSS_PX_TO_PT;
+  const cardHeaderH = 12 * CSS_PX_TO_PT;
   const naturalCardW = (cellSize * 9 + smallGap * 8 + cardPadX * 2) * cardScale;
   const naturalCardH = cardHeaderH + cardPadY * 2 + cellSize * 3 + smallGap * 2;
-  const cardAreaH = height - headerH - paddingBottom;
-  const cardW = Math.min(width - paddingX * 2, naturalCardW);
+  const metaY = y + headerH + ((Number(design.seriesOffsetY) || 0) * CSS_PX_TO_PT);
+  const cardsTop = metaY + seriesFontSize + smallGap;
+  const cardAreaH = height - (cardsTop - y);
+  const cardW = Math.min(width, naturalCardW);
   const maxCardH = (cardAreaH - cardGap * 5) / 6;
   const cardH = Math.min(maxCardH, naturalCardH);
   const cardsHeight = cardH * cards.length + cardGap * Math.max(0, cards.length - 1);
-  const cardsStartY = y + headerH + Math.max(0, (cardAreaH - cardsHeight) / 2);
+  const cardsStartY = cardsTop + Math.max(0, (cardAreaH - cardsHeight) / 2);
+  const seriesX = x + ((Number(design.seriesOffsetX) || 0) * CSS_PX_TO_PT);
 
   doc.font('Helvetica-Bold')
     .fontSize(seriesFontSize)
     .fillColor(design.seriesColor || '#111827')
-    .text(`${seriesLabel || 'Serie N°'} ${seriesNumber}`, x, y + headerH - seriesFontSize - 2, {
+    .text(`${seriesLabel || 'Serie N°'} ${seriesNumber}`, seriesX, metaY, {
       width,
       align: 'center',
       lineBreak: false
@@ -670,6 +673,28 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
       headerHeight: cardHeaderH
     });
   });
+}
+
+function cardScaleFromDesign(design = {}) {
+  return Math.max(0.6, Math.min(1.6, (Number(design.cardScale) || 100) / 100));
+}
+
+function getStripNaturalSize(design = {}) {
+  const cardScale = cardScaleFromDesign(design);
+  const smallGap = 2 * CSS_PX_TO_PT;
+  const cellSize = Math.max(8, Math.min(42, (Number(design.cellSize) || 18) * CSS_PX_TO_PT));
+  const cardPadX = 5 * CSS_PX_TO_PT;
+  const cardPadY = 3 * CSS_PX_TO_PT;
+  const cardHeaderH = 12 * CSS_PX_TO_PT;
+  const headerH = Math.max(0, (Number(design.headerHeight) || 0) * CSS_PX_TO_PT);
+  const seriesFontSize = Math.max(6, Math.min(34, (Number(design.seriesFontSize) || 13) * CSS_PX_TO_PT));
+  const cardGap = Math.max(1, Math.min(20, (Number(design.rowGap) || 6) * cardScale * CSS_PX_TO_PT));
+  const cardW = (cellSize * 9 + smallGap * 8 + cardPadX * 2) * cardScale;
+  const cardH = cardHeaderH + cardPadY * 2 + cellSize * 3 + smallGap * 2;
+  return {
+    width: cardW,
+    height: headerH + seriesFontSize + smallGap + (cardH * BINGO_SERIES_SIZE) + (cardGap * (BINGO_SERIES_SIZE - 1))
+  };
 }
 
 function drawCoverImageKit(doc, image, pageWidth, pageHeight) {
@@ -711,10 +736,14 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   const orderMode = design.orderMode || (columns > 1 ? 'columnar' : 'consecutive');
   const rowsPerPage = Math.ceil(itemsPerPage / columns);
   const page = stripPdfPageSize(design);
-  const margin = 18;
-  const gap = 12;
-  const stripW = (page.width - margin * 2 - gap * (columns - 1)) / columns;
-  const stripH = (page.height - margin * 2 - gap * (rowsPerPage - 1)) / rowsPerPage;
+  const stripSize = getStripNaturalSize(design);
+  const columnGap = Math.max(0, Number(design.gap) || 0) * CSS_PX_TO_PT;
+  const rowGap = Math.max(0, Number(design.rowGap) || 0) * CSS_PX_TO_PT;
+  const offsetX = (Number(design.offsetX) || 0) * CSS_PX_TO_PT;
+  const offsetY = (Number(design.offsetY) || 0) * CSS_PX_TO_PT;
+  const layoutWidth = (columns * stripSize.width) + ((columns - 1) * columnGap);
+  const startX = ((page.width - layoutWidth) / 2) + offsetX;
+  const startY = offsetY;
   const series = numberRange(from, to);
   const pageCount = Math.max(1, Math.ceil(series.length / itemsPerPage));
   const backgroundImage = parseDataImage(design.backgroundImageData);
@@ -737,8 +766,8 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
     pageSeries.forEach((seriesNumber, position) => {
       const col = position % columns;
       const row = Math.floor(position / columns);
-      const x = margin + col * (stripW + gap);
-      const y = margin + row * (stripH + gap);
+      const x = startX + col * (stripSize.width + columnGap);
+      const y = startY + row * (stripSize.height + rowGap);
       drawSeriesStripKit(doc, {
         eventName,
         eventDetail,
@@ -747,8 +776,8 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
         cards: createBingoSeriesCards(eventSeed, seriesNumber),
         x,
         y,
-        width: stripW,
-        height: stripH,
+        width: stripSize.width,
+        height: stripSize.height,
         design,
         hasPageBackground: Boolean(backgroundPdfImage)
       });
