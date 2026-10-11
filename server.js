@@ -1412,7 +1412,7 @@ async function handleApi(req, res) {
     const body = await readBody(req);
     const content = String(body.content || '');
     if (!content.trim()) return sendJson(res, 400, { error: 'Archivo .repx vacio' });
-    if (content.length > 2_500_000) return sendJson(res, 400, { error: 'La plantilla .repx es demasiado grande' });
+    if (content.length > 10_000_000) return sendJson(res, 400, { error: 'La plantilla .repx es demasiado grande. Usa un archivo menor a 10 MB.' });
     try {
       const template = parseDesofRepxTemplate(content, body.name || '');
       const rows = getDesofTemplateRowsPerPage(template);
