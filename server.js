@@ -559,10 +559,23 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
   const numberColor = options.numberColor || '#111827';
   const cellBorder = options.cellBorderColor || '#111827';
   const cellBg = options.cellBgEnabled ? (options.cellBgColor || '#ffffff') : null;
-  const cellW = width / 9;
-  const headerH = Math.min(13, height * 0.16);
-  const gridH = height - headerH;
-  const cellH = gridH / 3;
+  const smallGap = Math.max(1, Math.min(5, Number(options.smallGap) || 2));
+  const padX = Math.max(2, Math.min(8, Number(options.padX) || 5));
+  const padY = Math.max(1, Math.min(6, Number(options.padY) || 3));
+  const headerH = Math.max(8, Math.min(15, Number(options.headerHeight) || 12));
+  const configuredCell = Math.max(10, Math.min(42, Number(options.cellSize) || 18));
+  const availableCellW = (width - padX * 2 - smallGap * 8) / 9;
+  const availableCellH = (height - headerH - padY * 2 - smallGap * 2) / 3;
+  const cellSize = Math.max(8, Math.min(configuredCell, availableCellW, availableCellH));
+  const gridW = cellSize * 9 + smallGap * 8;
+  const gridH = cellSize * 3 + smallGap * 2;
+  const gridX = x + (width - gridW) / 2;
+  const gridY = y + headerH + padY;
+  const radius = options.cellShape === 'circle'
+    ? cellSize / 2
+    : options.cellShape === 'rounded'
+      ? Math.min(6, cellSize / 3)
+      : 0;
 
   doc.lineWidth(1.1).strokeColor(accent).roundedRect(x, y, width, height, 4.5).stroke();
   doc.font('Helvetica-Bold')
@@ -573,19 +586,20 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
   doc.lineWidth(0.45).strokeColor(cellBorder);
   card.rows.forEach((row, rowIndex) => {
     row.forEach((number, column) => {
-      const cellX = x + column * cellW;
-      const cellY = y + headerH + rowIndex * cellH;
+      const cellX = gridX + column * (cellSize + smallGap);
+      const cellY = gridY + rowIndex * (cellSize + smallGap);
       if (cellBg) {
-        doc.fillColor(cellBg).rect(cellX, cellY, cellW, cellH).fill();
+        doc.fillColor(cellBg).roundedRect(cellX, cellY, cellSize, cellSize, radius).fill();
       }
-      doc.strokeColor(cellBorder).rect(cellX, cellY, cellW, cellH).stroke();
+      doc.strokeColor(cellBorder).roundedRect(cellX, cellY, cellSize, cellSize, radius).stroke();
       if (number) {
+        const textSize = Math.min(fontSize, cellSize * 0.82);
         doc.font('Helvetica-Bold')
-          .fontSize(fontSize)
+          .fontSize(textSize)
           .fillColor(numberColor)
-          .text(String(number), cellX, cellY + cellH * 0.15, {
-            width: cellW,
-            height: cellH,
+          .text(String(number), cellX, cellY + (cellSize - textSize) * 0.42, {
+            width: cellSize,
+            height: cellSize,
             align: 'center',
             lineBreak: false
           });
@@ -601,9 +615,20 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
   const paddingX = 7;
   const paddingBottom = 8;
   const cardGap = Math.max(3, Math.min(14, Number(design.rowGap) || 6));
+  const smallGap = 2;
+  const cardScale = Math.max(0.6, Math.min(1.6, (Number(design.cardScale) || 100) / 100));
+  const cellSize = Math.max(10, Math.min(42, Number(design.cellSize) || 18));
+  const cardPadX = 5;
+  const cardPadY = 3;
+  const cardHeaderH = 12;
+  const naturalCardW = (cellSize * 9 + smallGap * 8 + cardPadX * 2) * cardScale;
+  const naturalCardH = cardHeaderH + cardPadY * 2 + cellSize * 3 + smallGap * 2;
   const cardAreaH = height - headerH - paddingBottom;
-  const cardW = width - paddingX * 2;
-  const cardH = (cardAreaH - cardGap * 5) / 6;
+  const cardW = Math.min(width - paddingX * 2, naturalCardW);
+  const maxCardH = (cardAreaH - cardGap * 5) / 6;
+  const cardH = Math.min(maxCardH, naturalCardH);
+  const cardsHeight = cardH * cards.length + cardGap * Math.max(0, cards.length - 1);
+  const cardsStartY = y + headerH + Math.max(0, (cardAreaH - cardsHeight) / 2);
 
   doc.font('Helvetica-Bold')
     .fontSize(seriesFontSize)
@@ -628,15 +653,21 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
   }
 
   cards.forEach((card, index) => {
-    const cardX = x + paddingX;
-    const cardY = y + headerH + index * (cardH + cardGap);
+    const cardX = x + (width - cardW) / 2;
+    const cardY = cardsStartY + index * (cardH + cardGap);
     drawBingoCardKit(doc, card, cardX, cardY, cardW, cardH, {
       fontSize,
       accentColor: design.accentColor,
       numberColor: design.numberColor,
       cellBorderColor: design.cellBorderColor,
       cellBgEnabled: design.cellBgEnabled,
-      cellBgColor: design.cellBgColor
+      cellBgColor: design.cellBgColor,
+      cellSize,
+      cellShape: design.cellShape,
+      smallGap,
+      padX: cardPadX,
+      padY: cardPadY,
+      headerHeight: cardHeaderH
     });
   });
 }
