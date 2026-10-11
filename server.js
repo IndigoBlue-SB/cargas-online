@@ -679,6 +679,10 @@ function cardScaleFromDesign(design = {}) {
   return Math.max(0.6, Math.min(1.6, (Number(design.cardScale) || 100) / 100));
 }
 
+function clampNumber(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
 function getStripNaturalSize(design = {}) {
   const cardScale = cardScaleFromDesign(design);
   const smallGap = 2 * CSS_PX_TO_PT;
@@ -742,8 +746,24 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   const offsetX = (Number(design.offsetX) || 0) * CSS_PX_TO_PT;
   const offsetY = (Number(design.offsetY) || 0) * CSS_PX_TO_PT;
   const layoutWidth = (columns * stripSize.width) + ((columns - 1) * columnGap);
-  const startX = ((page.width - layoutWidth) / 2) + offsetX;
-  const startY = offsetY;
+  const layoutHeight = (rowsPerPage * stripSize.height) + ((rowsPerPage - 1) * rowGap);
+  const fitPadding = 6;
+  const widthToFit = layoutWidth + Math.abs(offsetX) * 2;
+  const heightToFit = layoutHeight + Math.max(0, offsetY);
+  const contentScale = Math.min(
+    1,
+    (page.width - fitPadding * 2) / Math.max(1, widthToFit),
+    (page.height - fitPadding * 2) / Math.max(1, heightToFit)
+  );
+  const scaledLayoutWidth = layoutWidth * contentScale;
+  const scaledLayoutHeight = layoutHeight * contentScale;
+  const scaledOffsetX = offsetX * contentScale;
+  const scaledOffsetY = offsetY * contentScale;
+  const centeredX = ((page.width - scaledLayoutWidth) / 2) + scaledOffsetX;
+  const maxStartX = Math.max(fitPadding, page.width - scaledLayoutWidth - fitPadding);
+  const startX = clampNumber(centeredX, fitPadding, maxStartX);
+  const verticalRemainder = page.height - scaledOffsetY - scaledLayoutHeight;
+  const startY = Math.max(fitPadding, scaledOffsetY + Math.max(0, verticalRemainder / 2));
   const series = numberRange(from, to);
   const pageCount = Math.max(1, Math.ceil(series.length / itemsPerPage));
   const backgroundImage = parseDataImage(design.backgroundImageData);
@@ -763,11 +783,14 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
     const pageSeries = orderMode === 'columnar'
       ? numberRange(0, itemsPerPage - 1).map(columnIndex => series[pageIndex + (columnIndex * pageCount)]).filter(value => value !== undefined)
       : series.slice(pageIndex * itemsPerPage, pageIndex * itemsPerPage + itemsPerPage);
+    doc.save();
+    doc.translate(startX, startY);
+    doc.scale(contentScale);
     pageSeries.forEach((seriesNumber, position) => {
       const col = position % columns;
       const row = Math.floor(position / columns);
-      const x = startX + col * (stripSize.width + columnGap);
-      const y = startY + row * (stripSize.height + rowGap);
+      const x = col * (stripSize.width + columnGap);
+      const y = row * (stripSize.height + rowGap);
       drawSeriesStripKit(doc, {
         eventName,
         eventDetail,
@@ -782,6 +805,7 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
         hasPageBackground: Boolean(backgroundPdfImage)
       });
     });
+    doc.restore();
   }
 
   doc.end();
