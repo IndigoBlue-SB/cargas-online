@@ -834,6 +834,29 @@ function getDesofTemplateRowsPerPage(template) {
   return Math.max(1, Math.floor(available / detailHeight));
 }
 
+function getDesofTemplateContentBounds(template) {
+  const panel = template.panel || {};
+  const labels = Array.isArray(template.labels) ? template.labels : [];
+  const bounds = labels.reduce((acc, label) => {
+    const originX = label.parent ? Number(panel.x) || 0 : 0;
+    const originY = label.parent ? Number(panel.y) || 0 : 0;
+    const x = originX + (Number(label.x) || 0);
+    const y = originY + (Number(label.y) || 0);
+    const width = Math.max(0, Number(label.width) || 0);
+    const height = Math.max(0, Number(label.height) || 0);
+    return {
+      minX: Math.min(acc.minX, x),
+      minY: Math.min(acc.minY, y),
+      maxX: Math.max(acc.maxX, x + width),
+      maxY: Math.max(acc.maxY, y + height)
+    };
+  }, { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+  if (!Number.isFinite(bounds.minX) || !Number.isFinite(bounds.maxX)) {
+    return { minX: 0, minY: 0, maxX: Number(panel.x || 0) + Number(panel.width || 0), maxY: Number(panel.y || 0) + Number(panel.height || 0) };
+  }
+  return bounds;
+}
+
 function drawDesofText(doc, label, text, x, y, width, height) {
   const value = text === null || text === undefined ? '' : String(text);
   if (!value) return;
@@ -908,8 +931,16 @@ async function buildDesofTemplatePdf({ event, from, to, design, template }) {
   const columns = Math.max(1, Math.min(12, Number(template.detail.columns) || 1));
   const rowsPerPage = Math.max(BINGO_SERIES_SIZE, getDesofTemplateRowsPerPage(template));
   const detailHeight = desofToPt(template.detail.height);
-  const columnWidth = page.width / columns;
+  const printableWidth = page.width - desofToPt(template.margins.left) - desofToPt(template.margins.right);
+  const columnWidth = printableWidth / columns;
   const topMargin = desofToPt(template.margins.top);
+  const leftMargin = desofToPt(template.margins.left);
+  const contentBounds = getDesofTemplateContentBounds(template);
+  const contentWidth = desofToPt(contentBounds.maxX - contentBounds.minX);
+  const contentLeft = desofToPt(contentBounds.minX);
+  const centeredContentShiftX = ((columnWidth - contentWidth) / 2) - contentLeft;
+  const offsetX = (Number(design.offsetX) || 0) * CSS_PX_TO_PT;
+  const offsetY = (Number(design.offsetY) || 0) * CSS_PX_TO_PT;
   const series = numberRange(from, to);
   const seriesPerPage = Math.max(1, columns);
   const orderMode = design.orderMode || 'columnar';
@@ -933,14 +964,14 @@ async function buildDesofTemplatePdf({ event, from, to, design, template }) {
       : series.slice(pageIndex * seriesPerPage, pageIndex * seriesPerPage + seriesPerPage);
     pageSeries.forEach((seriesNumber, columnIndex) => {
       const cards = createBingoSeriesCards(eventSeed, seriesNumber);
-      const baseX = (columnIndex % columns) * columnWidth;
+      const baseX = leftMargin + (columnIndex % columns) * columnWidth + centeredContentShiftX + offsetX;
       cards.slice(0, Math.min(BINGO_SERIES_SIZE, rowsPerPage)).forEach((card, cardIndex) => {
         drawDesofCardRecord(doc, template, {
           card,
           seriesNumber,
           seriesLabel,
           x: baseX,
-          y: topMargin + cardIndex * detailHeight,
+          y: topMargin + offsetY + cardIndex * detailHeight,
           design,
           drawSeries: cardIndex === 0
         });
