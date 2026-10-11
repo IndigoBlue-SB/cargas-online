@@ -1043,7 +1043,11 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   const pageInset = 9 * CSS_PX_TO_PT;
   const pageContentWidth = Math.max(1, page.width - pageInset * 2);
   const layoutWidth = (columns * stripSize.width) + ((columns - 1) * columnGap);
-  const startX = pageInset + ((pageContentWidth - layoutWidth) / 2) + offsetX;
+  const horizontalFootprint = layoutWidth + Math.abs(offsetX) * 2;
+  const contentScale = Math.min(1, pageContentWidth / Math.max(1, horizontalFootprint));
+  const scaledLayoutWidth = layoutWidth * contentScale;
+  const centeredX = pageInset + ((pageContentWidth - scaledLayoutWidth) / 2) + offsetX;
+  const startX = clampNumber(centeredX, 0, Math.max(0, page.width - scaledLayoutWidth));
   const startY = pageInset + offsetY;
   const series = numberRange(from, to);
   const pageCount = Math.max(1, Math.ceil(series.length / itemsPerPage));
@@ -1064,11 +1068,14 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
     const pageSeries = orderMode === 'columnar'
       ? numberRange(0, itemsPerPage - 1).map(columnIndex => series[pageIndex + (columnIndex * pageCount)]).filter(value => value !== undefined)
       : series.slice(pageIndex * itemsPerPage, pageIndex * itemsPerPage + itemsPerPage);
+    doc.save();
+    doc.translate(startX, startY);
+    doc.scale(contentScale);
     pageSeries.forEach((seriesNumber, position) => {
       const col = position % columns;
       const row = Math.floor(position / columns);
-      const x = startX + col * (stripSize.width + columnGap);
-      const y = startY + row * (stripSize.height + rowGap);
+      const x = col * (stripSize.width + columnGap);
+      const y = row * (stripSize.height + rowGap);
       drawSeriesStripKit(doc, {
         eventName,
         eventDetail,
@@ -1083,6 +1090,7 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
         hasPageBackground: Boolean(backgroundPdfImage)
       });
     });
+    doc.restore();
   }
 
   doc.end();
