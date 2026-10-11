@@ -355,6 +355,7 @@ const els = {
   stripRowGapInput: document.querySelector("#stripRowGapInput"),
   stripOffsetXInput: document.querySelector("#stripOffsetXInput"),
   stripOffsetYInput: document.querySelector("#stripOffsetYInput"),
+  stripFitToPageInput: document.querySelector("#stripFitToPageInput"),
   stripFontSizeInput: document.querySelector("#stripFontSizeInput"),
   stripFontFamilyInput: document.querySelector("#stripFontFamilyInput"),
   stripSeriesLabelInput: document.querySelector("#stripSeriesLabelInput"),
@@ -655,6 +656,7 @@ function bindEvents() {
     els.stripRowGapInput,
     els.stripOffsetXInput,
     els.stripOffsetYInput,
+    els.stripFitToPageInput,
     els.stripFontSizeInput,
     els.stripFontFamilyInput,
     els.stripSeriesLabelInput,
@@ -673,6 +675,7 @@ function bindEvents() {
     els.stripAccentInput,
     els.stripBgInput,
   ].forEach((input) => {
+    if (!input) return;
     input.addEventListener("input", () => applyStripDesign());
     input.addEventListener("change", () => applyStripDesign());
   });
@@ -1892,6 +1895,7 @@ function fillStripDesigner() {
   els.stripRowGapInput.value = state.stripDesign.rowGap;
   els.stripOffsetXInput.value = state.stripDesign.offsetX;
   els.stripOffsetYInput.value = state.stripDesign.offsetY;
+  if (els.stripFitToPageInput) els.stripFitToPageInput.checked = state.stripDesign.fitToPage !== false;
   els.stripFontSizeInput.value = state.stripDesign.fontSize;
   els.stripFontFamilyInput.value = state.stripDesign.fontFamily;
   els.stripSeriesLabelInput.value = state.stripDesign.seriesLabel;
@@ -1933,6 +1937,7 @@ function applyStripDesign(options = {}) {
   state.stripDesign.rowGap = clamp(Number(els.stripRowGapInput.value) || 0, 0, 1000);
   state.stripDesign.offsetX = clamp(Number(els.stripOffsetXInput.value) || 0, -120, 120);
   state.stripDesign.offsetY = clamp(Number(els.stripOffsetYInput.value) || 0, -120, 120);
+  state.stripDesign.fitToPage = els.stripFitToPageInput ? els.stripFitToPageInput.checked : state.stripDesign.fitToPage !== false;
   state.stripDesign.fontSize = clamp(Number(els.stripFontSizeInput.value) || 16, 10, 200);
   state.stripDesign.fontFamily = els.stripFontFamilyInput.value;
   state.stripDesign.seriesLabel = els.stripSeriesLabelInput.value.trim() || "Serie N°";
@@ -2357,6 +2362,7 @@ function renderStripPreview() {
   applyStripPreviewStyles(els.stripPreview);
   const seriesNumber = clamp(Number(els.stripSeriesInput.value) || 1, 1, 20000);
   els.stripPreview.innerHTML = buildStripSheetHtml(seriesNumber);
+  updateStripContentFitScale();
   window.requestAnimationFrame(updateStripPreviewScale);
 }
 
@@ -2480,8 +2486,7 @@ function applyStripPreviewStyles(target) {
 function updateStripPreviewScale() {
   if (!els.stripPreviewShell || !els.stripPreview) return;
   els.stripPreview.style.transform = "";
-  els.stripPreview.style.setProperty("--strip-content-scale", "1");
-  state.stripDesign.printContentScale = 1;
+  updateStripContentFitScale();
 
   const availableWidth = Math.max(1, els.stripPreviewShell.clientWidth - 18);
   const availableHeight = Math.max(1, els.stripPreviewShell.clientHeight - 18);
@@ -2491,7 +2496,36 @@ function updateStripPreviewScale() {
   els.stripPreview.style.setProperty("--strip-sheet-scale", String(Math.max(0.25, scale)));
 }
 
+function updateStripContentFitScale() {
+  const preview = els.stripPreview;
+  const layout = preview?.querySelector(".strip-page-layout");
+  if (!preview || !layout) return 1;
+  preview.style.setProperty("--strip-content-scale", "1");
+  state.stripDesign.printContentScale = 1;
+  if (state.stripDesign.fitToPage === false) return 1;
+  const pageRect = preview.getBoundingClientRect();
+  const layoutRect = layout.getBoundingClientRect();
+  if (!pageRect.width || !pageRect.height || !layoutRect.width || !layoutRect.height) return 1;
+  const safeInset = 2;
+  const overflowLeft = Math.max(0, pageRect.left + safeInset - layoutRect.left);
+  const overflowTop = Math.max(0, pageRect.top + safeInset - layoutRect.top);
+  const overflowRight = Math.max(0, layoutRect.right - pageRect.right + safeInset);
+  const overflowBottom = Math.max(0, layoutRect.bottom - pageRect.bottom + safeInset);
+  const neededWidth = layoutRect.width + overflowLeft + overflowRight;
+  const neededHeight = layoutRect.height + overflowTop + overflowBottom;
+  const scale = Math.min(
+    1,
+    (pageRect.width - safeInset * 2) / Math.max(1, neededWidth),
+    (pageRect.height - safeInset * 2) / Math.max(1, neededHeight)
+  );
+  const safeScale = Math.max(0.2, scale);
+  preview.style.setProperty("--strip-content-scale", String(safeScale));
+  state.stripDesign.printContentScale = safeScale;
+  return safeScale;
+}
+
 function captureStripPdfLayoutMetrics() {
+  updateStripContentFitScale();
   const preview = els.stripPreview;
   if (!preview || !preview.isConnected) return null;
   const blocks = [...preview.querySelectorAll(".strip-block")];
@@ -3744,7 +3778,9 @@ function getPrintableCardForUnit(unit) {
 }
 
 function buildStripPrintStyleAttribute() {
+  updateStripContentFitScale();
   const bgImage = state.stripDesign.backgroundImageData ? `url('${state.stripDesign.backgroundImageData}')` : "none";
+  const contentScale = state.stripDesign.fitToPage === false ? 1 : (state.stripDesign.printContentScale || 1);
   return [
     `--strip-accent:${state.stripDesign.accentColor}`,
     `--strip-bg:${state.stripDesign.backgroundColor}`,
@@ -3779,7 +3815,7 @@ function buildStripPrintStyleAttribute() {
     `--strip-columns:${state.stripDesign.columns}`,
     `--strip-offset-x:${state.stripDesign.offsetX}px`,
     `--strip-offset-y:${state.stripDesign.offsetY}px`,
-    `--strip-content-scale:1`,
+    `--strip-content-scale:${contentScale}`,
     `--strip-bg-image:${bgImage}`,
   ].join(";");
 }
@@ -6197,6 +6233,7 @@ function createDefaultStripDesign() {
     rowGap: 8,
     offsetX: 0,
     offsetY: 0,
+    fitToPage: true,
     accentColor: "#d1223b",
     backgroundColor: "#ffffff",
     fontSize: 16,
