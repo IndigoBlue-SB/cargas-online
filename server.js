@@ -16,6 +16,7 @@ const sessions = new Map();
 const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], bingo: [], raffle: [], virtual: [], sheets: [], balance: [], accounting: [], settings: [] };
 const BINGO_SERIES_SIZE = 6;
 const CSS_PX_TO_PT = 0.75;
+const DESOF_TENTH_MM_TO_PT = 72 / 254;
 const BINGO_COLUMN_RANGES = [
   { start: 1, end: 9 },
   { start: 10, end: 19 },
@@ -411,6 +412,154 @@ function parseDataImage(value) {
   return { type: 'jpeg', buffer, width: size.width, height: size.height, components: size.components || 3 };
 }
 
+function parseDesofNumber(value, fallback = 0) {
+  const number = Number(String(value || '').replace(/F\b/g, '').replace(',', '.').trim());
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function parseDesofPoint(value) {
+  const match = String(value || '').match(/PointFloat\(([^,]+),\s*([^)]+)\)/);
+  if (!match) return { x: 0, y: 0 };
+  return { x: parseDesofNumber(match[1]), y: parseDesofNumber(match[2]) };
+}
+
+function parseDesofSize(value) {
+  const match = String(value || '').match(/SizeF\(([^,]+),\s*([^)]+)\)/);
+  if (!match) return { width: 0, height: 0 };
+  return { width: parseDesofNumber(match[1]), height: parseDesofNumber(match[2]) };
+}
+
+function getDesofAssignment(source, name, prop) {
+  const match = String(source || '').match(new RegExp(`this\\.${name}\\.${prop} = ([^;]+);`, 'm'));
+  return match ? match[1].trim() : '';
+}
+
+function parseDesofColor(value, fallback = '#000000') {
+  const source = String(value || '');
+  if (/Transparent/i.test(source)) return 'transparent';
+  if (/White/i.test(source)) return '#ffffff';
+  if (/Black/i.test(source)) return '#000000';
+  const values = [...source.matchAll(/byte\)\((\d+)\)/g)].map(match => Number(match[1]));
+  if (values.length >= 3) {
+    return `#${values.slice(0, 3).map(part => Math.max(0, Math.min(255, part)).toString(16).padStart(2, '0')).join('')}`;
+  }
+  return fallback;
+}
+
+function parseDesofFont(value) {
+  const source = String(value || '');
+  const family = (source.match(/Font\("([^"]+)"/) || [])[1] || 'Arial';
+  const size = parseDesofNumber((source.match(/,\s*([0-9.]+)F/) || [])[1], 10);
+  const bold = /Bold/i.test(source) || /Arial Black/i.test(family);
+  return { family, size, bold };
+}
+
+function normalizeDesofTemplate(template) {
+  if (!template || template.kind !== 'desof-repx') return null;
+  const page = template.page || {};
+  const detail = template.detail || {};
+  const panel = template.panel || {};
+  const labels = Array.isArray(template.labels) ? template.labels : [];
+  if (!page.width || !page.height || !detail.height || !panel.width || !panel.height || !labels.length) return null;
+  return {
+    kind: 'desof-repx',
+    page: {
+      width: clampNumber(Number(page.width) || 0, 1, 10000),
+      height: clampNumber(Number(page.height) || 0, 1, 10000)
+    },
+    margins: {
+      left: clampNumber(Number(template.margins?.left) || 0, 0, 5000),
+      right: clampNumber(Number(template.margins?.right) || 0, 0, 5000),
+      top: clampNumber(Number(template.margins?.top) || 0, 0, 5000),
+      bottom: clampNumber(Number(template.margins?.bottom) || 0, 0, 5000)
+    },
+    detail: {
+      height: clampNumber(Number(detail.height) || 1, 1, 5000),
+      columns: clampNumber(Number(detail.columns) || 1, 1, 12)
+    },
+    panel: {
+      x: clampNumber(Number(panel.x) || 0, -5000, 10000),
+      y: clampNumber(Number(panel.y) || 0, -5000, 10000),
+      width: clampNumber(Number(panel.width) || 0, 1, 10000),
+      height: clampNumber(Number(panel.height) || 0, 1, 10000)
+    },
+    labels: labels
+      .filter(label => label && label.name && label.binding)
+      .slice(0, 120)
+      .map(label => ({
+        name: String(label.name).slice(0, 40),
+        binding: String(label.binding).slice(0, 20),
+        role: ['series', 'cardNumber', 'cell'].includes(label.role) ? label.role : 'cell',
+        parent: label.parent ? String(label.parent).slice(0, 40) : '',
+        x: clampNumber(Number(label.x) || 0, -5000, 10000),
+        y: clampNumber(Number(label.y) || 0, -5000, 10000),
+        width: clampNumber(Number(label.width) || 0, 1, 10000),
+        height: clampNumber(Number(label.height) || 0, 1, 10000),
+        angle: clampNumber(Number(label.angle) || 0, -360, 360),
+        fontSize: clampNumber(Number(label.fontSize) || 10, 4, 80),
+        bold: Boolean(label.bold),
+        foreColor: /^#[0-9a-f]{6}$/i.test(String(label.foreColor || '')) ? label.foreColor : '#000000',
+        backColor: /^#[0-9a-f]{6}$/i.test(String(label.backColor || '')) || label.backColor === 'transparent' ? label.backColor : 'transparent',
+        borders: Boolean(label.borders),
+        align: String(label.align || 'center').slice(0, 20)
+      }))
+  };
+}
+
+function parseDesofRepxTemplate(content, name = '') {
+  const source = String(content || '');
+  if (!source.includes('DevExpress.XtraReports')) throw new Error('El archivo no parece ser una plantilla DeSof/DevExpress .repx.');
+  const pageWidth = parseDesofNumber((source.match(/this\.PageWidth = ([^;]+);/) || [])[1], 0);
+  const pageHeight = parseDesofNumber((source.match(/this\.PageHeight = ([^;]+);/) || [])[1], 0);
+  const margins = (source.match(/this\.Margins = new System\.Drawing\.Printing\.Margins\(([^)]+)\);/) || [])[1]
+    ?.split(',')
+    .map(part => parseDesofNumber(part)) || [0, 0, 0, 0];
+  const detailHeight = parseDesofNumber((source.match(/this\.Detail\.HeightF = ([^;]+);/) || [])[1], 0);
+  const columns = parseDesofNumber((source.match(/this\.Detail\.MultiColumn\.ColumnCount = ([^;]+);/) || [])[1], 1);
+  const panelName = (source.match(/this\.(panel\d+) = new DevExpress\.XtraReports\.UI\.XRPanel/) || [])[1] || 'panel1';
+  const panelPoint = parseDesofPoint(getDesofAssignment(source, panelName, 'LocationFloat'));
+  const panelSize = parseDesofSize(getDesofAssignment(source, panelName, 'SizeF'));
+  const panelControlsBlock = (source.match(new RegExp(`this\\.${panelName}\\.Controls\\.AddRange\\([\\s\\S]*?\\}\\);`)) || [])[0] || '';
+  const panelChildNames = new Set([...panelControlsBlock.matchAll(/this\.(label\d+)/g)].map(match => match[1]));
+  const labelNames = [...source.matchAll(/this\.(label\d+) = new DevExpress\.XtraReports\.UI\.XRLabel/g)].map(match => match[1]);
+  const labels = labelNames.map(labelName => {
+    const location = parseDesofPoint(getDesofAssignment(source, labelName, 'LocationFloat'));
+    const size = parseDesofSize(getDesofAssignment(source, labelName, 'SizeF'));
+    const binding = (source.match(new RegExp(`this\\.${labelName}\\.DataBindings\\.AddRange\\([\\s\\S]*?NUMERADORAS\\.(NUM\\d+)`)) || [])[1] || '';
+    const font = parseDesofFont(getDesofAssignment(source, labelName, 'Font'));
+    const role = binding === 'NUM29' ? 'series' : binding === 'NUM1' ? 'cardNumber' : 'cell';
+    const isPanelChild = panelChildNames.has(labelName);
+    return {
+      name: labelName,
+      binding,
+      role,
+      parent: isPanelChild ? panelName : '',
+      x: location.x,
+      y: location.y,
+      width: size.width,
+      height: size.height,
+      angle: parseDesofNumber(getDesofAssignment(source, labelName, 'Angle'), 0),
+      fontSize: font.size,
+      bold: font.bold,
+      foreColor: parseDesofColor(getDesofAssignment(source, labelName, 'ForeColor'), '#000000'),
+      backColor: parseDesofColor(getDesofAssignment(source, labelName, 'BackColor'), 'transparent'),
+      borders: Boolean(getDesofAssignment(source, labelName, 'Borders')),
+      align: /MiddleCenter/i.test(getDesofAssignment(source, labelName, 'TextAlignment')) ? 'center' : 'left'
+    };
+  }).filter(label => label.binding);
+  const template = normalizeDesofTemplate({
+    kind: 'desof-repx',
+    sourceName: String(name || '').slice(0, 120),
+    page: { width: pageWidth, height: pageHeight },
+    margins: { left: margins[0] || 0, right: margins[1] || 0, top: margins[2] || 0, bottom: margins[3] || 0 },
+    detail: { height: detailHeight, columns },
+    panel: { x: panelPoint.x, y: panelPoint.y, width: panelSize.width, height: panelSize.height },
+    labels
+  });
+  if (!template) throw new Error('No pude leer medidas suficientes de la plantilla .repx.');
+  return template;
+}
+
 function jpegSize(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) return null;
   let offset = 2;
@@ -675,6 +824,137 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
   });
 }
 
+function desofToPt(value) {
+  return (Number(value) || 0) * DESOF_TENTH_MM_TO_PT;
+}
+
+function getDesofTemplateRowsPerPage(template) {
+  const available = Math.max(1, (Number(template.page?.height) || 0) - (Number(template.margins?.top) || 0) - (Number(template.margins?.bottom) || 0));
+  const detailHeight = Math.max(1, Number(template.detail?.height) || 1);
+  return Math.max(1, Math.floor(available / detailHeight));
+}
+
+function drawDesofText(doc, label, text, x, y, width, height) {
+  const value = text === null || text === undefined ? '' : String(text);
+  if (!value) return;
+  const fontSize = Math.max(4, Math.min(80, Number(label.fontSize) || 10));
+  const textY = y + Math.max(0, (height - fontSize) / 2) - Math.max(0, fontSize * 0.08);
+  doc.font(label.bold ? 'Helvetica-Bold' : 'Helvetica')
+    .fontSize(fontSize)
+    .fillColor(label.foreColor || '#000000');
+  if (label.angle) {
+    doc.save();
+    doc.rotate(-Number(label.angle), { origin: [x + width / 2, y + height / 2] });
+    doc.text(value, x, textY, { width, height, align: 'center', lineBreak: false });
+    doc.restore();
+    return;
+  }
+  doc.text(value, x, textY, { width, height, align: label.align === 'left' ? 'left' : 'center', lineBreak: false });
+}
+
+function drawDesofLabel(doc, label, text, originX, originY, options = {}) {
+  const x = originX + desofToPt(label.x);
+  const y = originY + desofToPt(label.y);
+  const width = desofToPt(label.width);
+  const height = desofToPt(label.height);
+  if (label.backColor && label.backColor !== 'transparent') {
+    doc.fillColor(label.backColor).rect(x, y, width, height).fill();
+  }
+  if (label.borders || options.forceBorder) {
+    doc.lineWidth(options.lineWidth || 0.45)
+      .strokeColor(options.borderColor || '#111827')
+      .rect(x, y, width, height)
+      .stroke();
+  }
+  drawDesofText(doc, label, text, x, y, width, height);
+}
+
+function drawDesofCardRecord(doc, template, { card, seriesNumber, seriesLabel, x, y, design, drawSeries }) {
+  const panel = template.panel || {};
+  const panelX = x + desofToPt(panel.x);
+  const panelY = y + desofToPt(panel.y);
+  const cellLabels = template.labels
+    .filter(label => label.role === 'cell')
+    .sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  const values = card.rows.flat();
+  const cardNumberLabel = template.labels.find(label => label.role === 'cardNumber');
+  const seriesLabels = template.labels.filter(label => label.role === 'series');
+  const borderColor = design.cellBorderColor || '#111827';
+
+  if (drawSeries) {
+    seriesLabels.forEach(label => {
+      drawDesofLabel(doc, label, `${seriesLabel || 'Serie N°'} ${seriesNumber}`, x, y, { borderColor });
+    });
+  }
+  if (cardNumberLabel) {
+    const cardNumberOriginX = cardNumberLabel.parent ? panelX : x;
+    const cardNumberOriginY = cardNumberLabel.parent ? panelY : y;
+    drawDesofLabel(doc, cardNumberLabel, `N° ${card.cardNumber}`, cardNumberOriginX, cardNumberOriginY, { borderColor });
+  }
+  cellLabels.forEach((label, index) => {
+    drawDesofLabel(doc, label, values[index] || '', panelX, panelY, { borderColor, lineWidth: 0.35 });
+  });
+}
+
+async function buildDesofTemplatePdf({ event, from, to, design, template }) {
+  const panel = event.bingoPanelSettings || {};
+  const eventSeed = panel.eventSeed || event.bingoSeed || event.id;
+  const eventName = panel.name || event.name || 'Cartones Bingo 90';
+  const seriesLabel = design.seriesLabel || 'Serie N°';
+  const page = {
+    width: desofToPt(template.page.width),
+    height: desofToPt(template.page.height)
+  };
+  const columns = Math.max(1, Math.min(12, Number(template.detail.columns) || 1));
+  const rowsPerPage = Math.max(BINGO_SERIES_SIZE, getDesofTemplateRowsPerPage(template));
+  const detailHeight = desofToPt(template.detail.height);
+  const columnWidth = page.width / columns;
+  const topMargin = desofToPt(template.margins.top);
+  const series = numberRange(from, to);
+  const seriesPerPage = Math.max(1, columns);
+  const orderMode = design.orderMode || 'columnar';
+  const pageCount = Math.max(1, Math.ceil(series.length / seriesPerPage));
+  const backgroundImage = parseDataImage(design.backgroundImageData);
+  const doc = new PDFDocument({
+    autoFirstPage: false,
+    compress: true,
+    info: { Title: eventName, Creator: 'Cargas Online' },
+    bufferPages: false
+  });
+  const bufferPromise = collectPdfBuffer(doc);
+  const backgroundPdfImage = backgroundImage ? doc.openImage(backgroundImage.buffer) : null;
+
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+    doc.addPage({ size: [page.width, page.height], margin: 0 });
+    doc.rect(0, 0, page.width, page.height).fill(design.backgroundColor || '#ffffff');
+    if (backgroundPdfImage) drawCoverImageKit(doc, backgroundPdfImage, page.width, page.height);
+    const pageSeries = orderMode === 'columnar'
+      ? numberRange(0, seriesPerPage - 1).map(columnIndex => series[pageIndex + (columnIndex * pageCount)]).filter(value => value !== undefined)
+      : series.slice(pageIndex * seriesPerPage, pageIndex * seriesPerPage + seriesPerPage);
+    pageSeries.forEach((seriesNumber, columnIndex) => {
+      const cards = createBingoSeriesCards(eventSeed, seriesNumber);
+      const baseX = (columnIndex % columns) * columnWidth;
+      cards.slice(0, Math.min(BINGO_SERIES_SIZE, rowsPerPage)).forEach((card, cardIndex) => {
+        drawDesofCardRecord(doc, template, {
+          card,
+          seriesNumber,
+          seriesLabel,
+          x: baseX,
+          y: topMargin + cardIndex * detailHeight,
+          design,
+          drawSeries: cardIndex === 0
+        });
+      });
+    });
+  }
+
+  doc.end();
+  return {
+    fileName: `${slugifyFileName(eventName)}-series-${from}-${to}.pdf`,
+    buffer: await bufferPromise
+  };
+}
+
 function cardScaleFromDesign(design = {}) {
   return Math.max(0.6, Math.min(1.6, (Number(design.cardScale) || 100) / 100));
 }
@@ -731,6 +1011,10 @@ function collectPdfBuffer(doc) {
 async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   const panel = event.bingoPanelSettings || {};
   const design = { ...(panel.stripDesign || {}), ...(stripDesignOverride || {}) };
+  const desofTemplate = normalizeDesofTemplate(design.desofTemplate);
+  if (desofTemplate) {
+    return buildDesofTemplatePdf({ event, from, to, design, template: desofTemplate });
+  }
   const eventSeed = panel.eventSeed || event.bingoSeed || event.id;
   const eventName = panel.name || event.name || 'Cartones Bingo 90';
   const eventDetail = panel.eventDetail || [event.date, event.town, event.province].filter(Boolean).join(' - ');
@@ -1115,6 +1399,29 @@ async function handleApi(req, res) {
         closure: event.bingoClosure
       }));
     return sendJson(res, 200, { events: confirmedEvents });
+  }
+
+  if (url.pathname === '/api/import-desof-template' && req.method === 'POST') {
+    const body = await readBody(req);
+    const content = String(body.content || '');
+    if (!content.trim()) return sendJson(res, 400, { error: 'Archivo .repx vacio' });
+    if (content.length > 2_500_000) return sendJson(res, 400, { error: 'La plantilla .repx es demasiado grande' });
+    try {
+      const template = parseDesofRepxTemplate(content, body.name || '');
+      const rows = getDesofTemplateRowsPerPage(template);
+      return sendJson(res, 200, {
+        template,
+        summary: {
+          pageWidth: template.page.width,
+          pageHeight: template.page.height,
+          columns: template.detail.columns,
+          rows,
+          labels: template.labels.length
+        }
+      });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message || 'No se pudo leer la plantilla .repx' });
+    }
   }
 
   if (url.pathname === '/api/export-strip-pdf' && (req.method === 'GET' || req.method === 'POST')) {

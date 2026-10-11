@@ -374,6 +374,9 @@ const els = {
   stripBgInput: document.querySelector("#stripBgInput"),
   stripBgImageInput: document.querySelector("#stripBgImageInput"),
   stripBgImageStatus: document.querySelector("#stripBgImageStatus"),
+  stripDesofTemplateInput: document.querySelector("#stripDesofTemplateInput"),
+  stripDesofTemplateStatus: document.querySelector("#stripDesofTemplateStatus"),
+  stripClearDesofTemplateBtn: document.querySelector("#stripClearDesofTemplateBtn"),
   stripSaveDesignBtn: document.querySelector("#stripSaveDesignBtn"),
   stripExportPdfBtn: document.querySelector("#stripExportPdfBtn"),
   stripExportZipBtn: document.querySelector("#stripExportZipBtn"),
@@ -633,6 +636,8 @@ function bindEvents() {
     applyStripDesign();
   });
   els.stripBgImageInput.addEventListener("change", handleStripBackgroundSelection);
+  els.stripDesofTemplateInput?.addEventListener("change", handleStripDesofTemplateSelection);
+  els.stripClearDesofTemplateBtn?.addEventListener("click", clearStripDesofTemplate);
   els.stripSaveDesignBtn.addEventListener("click", saveStripDesignManually);
   els.stripExportPdfBtn.addEventListener("click", exportStripPdf);
   els.stripExportZipBtn.addEventListener("click", exportStripHtmlZip);
@@ -1907,6 +1912,12 @@ function fillStripDesigner() {
   els.stripBgImageStatus.textContent = state.stripDesign.backgroundImageName
     ? `Imagen cargada: ${state.stripDesign.backgroundImageName}`
     : "Sin imagen de fondo.";
+  if (els.stripDesofTemplateStatus) {
+    const template = state.stripDesign.desofTemplate;
+    els.stripDesofTemplateStatus.textContent = template
+      ? `Plantilla cargada: ${state.stripDesign.desofTemplateName || "DeSof"} (${template.labels?.length || 0} campos, ${template.detail?.columns || 1} columnas)`
+      : "Sin plantilla DeSof.";
+  }
 }
 
 function applyStripDesign(options = {}) {
@@ -1992,6 +2003,65 @@ function handleStripBackgroundSelection() {
     persistEventDesign();
   };
   reader.readAsDataURL(file);
+}
+
+async function handleStripDesofTemplateSelection() {
+  const file = els.stripDesofTemplateInput?.files?.[0];
+  if (!file) return;
+  if (!/\.repx$/i.test(file.name) && file.type && !file.type.includes("text")) {
+    window.alert("Selecciona un archivo .repx del disenador DeSof.");
+    els.stripDesofTemplateInput.value = "";
+    return;
+  }
+  if (els.stripDesofTemplateStatus) els.stripDesofTemplateStatus.textContent = `Leyendo plantilla: ${file.name}`;
+  try {
+    const content = await file.text();
+    const response = await fetch("/api/import-desof-template", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      credentials: "same-origin",
+      body: JSON.stringify({ name: file.name, content }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || "No se pudo importar la plantilla.");
+    state.stripDesign.desofTemplate = payload.template;
+    state.stripDesign.desofTemplateName = file.name;
+    applyDesofTemplateDefaults(payload.template);
+    fillStripDesigner();
+    renderStripPreview();
+    persistEventDesign();
+    window.alert(`Plantilla DeSof importada: ${payload.summary?.labels || 0} campos, ${payload.summary?.columns || 1} columnas.`);
+  } catch (error) {
+    if (els.stripDesofTemplateStatus) els.stripDesofTemplateStatus.textContent = "Sin plantilla DeSof.";
+    window.alert(`No se pudo importar la plantilla DeSof: ${error.message || error}`);
+  } finally {
+    if (els.stripDesofTemplateInput) els.stripDesofTemplateInput.value = "";
+  }
+}
+
+function applyDesofTemplateDefaults(template) {
+  if (!template) return;
+  const columns = Math.max(1, Math.min(6, Number(template.detail?.columns) || 1));
+  state.stripDesign.paperSize = "a4";
+  state.stripDesign.orientation = (Number(template.page?.width) || 0) > (Number(template.page?.height) || 0) ? "landscape" : "portrait";
+  state.stripDesign.contentMode = "strip";
+  state.stripDesign.itemsPerPage = columns;
+  state.stripDesign.columns = columns;
+  state.stripDesign.orderMode = "columnar";
+  state.stripDesign.gap = 0;
+  state.stripDesign.rowGap = 0;
+  state.stripDesign.offsetX = 0;
+  state.stripDesign.offsetY = 0;
+  state.stripDesign.seriesLabel = "Serie N°";
+}
+
+function clearStripDesofTemplate() {
+  delete state.stripDesign.desofTemplate;
+  state.stripDesign.desofTemplateName = "";
+  if (els.stripDesofTemplateStatus) els.stripDesofTemplateStatus.textContent = "Sin plantilla DeSof.";
+  renderStripPreview();
+  persistEventDesign();
 }
 
 function handleEventLogoSelection(kind) {
@@ -6112,6 +6182,8 @@ function createDefaultStripDesign() {
     cellBgColor: "#ffffff",
     backgroundImageData: "",
     backgroundImageName: "",
+    desofTemplate: null,
+    desofTemplateName: "",
     printContentScale: 1,
   };
 }
