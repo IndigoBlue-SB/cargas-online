@@ -711,17 +711,19 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
   const cellBg = options.cellBgEnabled ? (options.cellBgColor || '#ffffff') : null;
   const smallGap = Math.max(1, Math.min(5, Number(options.smallGap) || 2));
   const padX = Math.max(2, Math.min(8, Number(options.padX) || 5));
-  const padY = Math.max(1, Math.min(6, Number(options.padY) || 3));
+  const padTop = Math.max(1, Math.min(6, Number(options.padY) || 3));
+  const padBottom = Math.max(1, Math.min(8, Number(options.padBottom) || Number(options.padY) || 3));
   const headerH = Math.max(8, Math.min(15, Number(options.headerHeight) || 12));
+  const headerMarginBottom = Math.max(0, Math.min(4, Number(options.headerMarginBottom) || 0));
   const configuredCell = Math.max(8, Math.min(42, Number(options.cellSize) || 18));
   const availableCellW = (width - padX * 2 - smallGap * 8) / 9;
-  const availableCellH = (height - headerH - padY * 2 - smallGap * 2) / 3;
+  const availableCellH = (height - headerH - headerMarginBottom - padTop - padBottom - smallGap * 2) / 3;
   const cellW = Math.max(8, availableCellW);
   const cellH = Math.max(8, Math.min(configuredCell, availableCellH));
   const gridW = cellW * 9 + smallGap * 8;
   const gridH = cellH * 3 + smallGap * 2;
   const gridX = x + (width - gridW) / 2;
-  const gridY = y + headerH + padY;
+  const gridY = y + padTop + headerH + headerMarginBottom;
   const radius = options.cellShape === 'circle'
     ? Math.min(cellW, cellH) / 2
     : options.cellShape === 'rounded'
@@ -732,7 +734,7 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
   doc.font('Helvetica-Bold')
     .fontSize(Math.max(6, fontSize * 0.45))
     .fillColor(accent)
-    .text(`Carton N° ${card.cardNumber}`, x + 2, y + 2, { width: width - 5, align: 'right', lineBreak: false });
+    .text(`Carton N° ${card.cardNumber}`, x + padX, y + padTop, { width: width - (padX * 2), align: 'right', lineBreak: false });
 
   doc.lineWidth(0.45).strokeColor(cellBorder);
   card.rows.forEach((row, rowIndex) => {
@@ -768,18 +770,20 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
   const cardScale = Math.max(0.6, Math.min(1.6, (Number(design.cardScale) || 100) / 100));
   const cellSize = Math.max(8, Math.min(42, (Number(design.cellSize) || 18) * CSS_PX_TO_PT));
   const cardPadX = 5 * CSS_PX_TO_PT;
-  const cardPadY = 3 * CSS_PX_TO_PT;
+  const cardPadTop = 3 * CSS_PX_TO_PT;
+  const cardPadBottom = 5 * CSS_PX_TO_PT;
   const cardHeaderH = 12 * CSS_PX_TO_PT;
+  const cardHeaderMarginBottom = 1 * CSS_PX_TO_PT;
   const naturalCardW = (cellSize * 9 + smallGap * 8 + cardPadX * 2) * cardScale;
-  const naturalCardH = cardHeaderH + cardPadY * 2 + cellSize * 3 + smallGap * 2;
-  const metaY = y + headerH + ((Number(design.seriesOffsetY) || 0) * CSS_PX_TO_PT);
-  const cardsTop = metaY + seriesFontSize + smallGap;
+  const naturalCardH = cardPadTop + cardHeaderH + cardHeaderMarginBottom + cellSize * 3 + smallGap * 2 + cardPadBottom;
+  const metaBaseY = y + headerH + smallGap;
+  const metaY = metaBaseY + ((Number(design.seriesOffsetY) || 0) * CSS_PX_TO_PT);
+  const cardsTop = metaBaseY + seriesFontSize + smallGap;
   const cardAreaH = height - (cardsTop - y);
   const cardW = Math.min(width, naturalCardW);
   const maxCardH = (cardAreaH - cardGap * 5) / 6;
   const cardH = Math.min(maxCardH, naturalCardH);
-  const cardsHeight = cardH * cards.length + cardGap * Math.max(0, cards.length - 1);
-  const cardsStartY = cardsTop + Math.max(0, (cardAreaH - cardsHeight) / 2);
+  const cardsStartY = cardsTop;
   const seriesX = x + ((Number(design.seriesOffsetX) || 0) * CSS_PX_TO_PT);
 
   doc.font('Helvetica-Bold')
@@ -818,8 +822,10 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
       cellShape: design.cellShape,
       smallGap,
       padX: cardPadX,
-      padY: cardPadY,
-      headerHeight: cardHeaderH
+      padY: cardPadTop,
+      padBottom: cardPadBottom,
+      headerHeight: cardHeaderH,
+      headerMarginBottom: cardHeaderMarginBottom
     });
   });
 }
@@ -975,16 +981,18 @@ function getStripNaturalSize(design = {}) {
   const smallGap = 2 * CSS_PX_TO_PT;
   const cellSize = Math.max(8, Math.min(42, (Number(design.cellSize) || 18) * CSS_PX_TO_PT));
   const cardPadX = 5 * CSS_PX_TO_PT;
-  const cardPadY = 3 * CSS_PX_TO_PT;
+  const cardPadTop = 3 * CSS_PX_TO_PT;
+  const cardPadBottom = 5 * CSS_PX_TO_PT;
   const cardHeaderH = 12 * CSS_PX_TO_PT;
+  const cardHeaderMarginBottom = 1 * CSS_PX_TO_PT;
   const headerH = Math.max(0, (Number(design.headerHeight) || 0) * CSS_PX_TO_PT);
   const seriesFontSize = Math.max(6, Math.min(34, (Number(design.seriesFontSize) || 13) * CSS_PX_TO_PT));
   const cardGap = Math.max(1, Math.min(20, (Number(design.rowGap) || 6) * cardScale * CSS_PX_TO_PT));
   const cardW = (cellSize * 9 + smallGap * 8 + cardPadX * 2) * cardScale;
-  const cardH = cardHeaderH + cardPadY * 2 + cellSize * 3 + smallGap * 2;
+  const cardH = cardPadTop + cardHeaderH + cardHeaderMarginBottom + cellSize * 3 + smallGap * 2 + cardPadBottom;
   return {
     width: cardW,
-    height: headerH + seriesFontSize + smallGap + (cardH * BINGO_SERIES_SIZE) + (cardGap * (BINGO_SERIES_SIZE - 1))
+    height: headerH + smallGap + seriesFontSize + smallGap + (cardH * BINGO_SERIES_SIZE) + (cardGap * (BINGO_SERIES_SIZE - 1))
   };
 }
 
@@ -1032,25 +1040,11 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   const rowGap = Math.max(0, Number(design.rowGap) || 0) * CSS_PX_TO_PT;
   const offsetX = (Number(design.offsetX) || 0) * CSS_PX_TO_PT;
   const offsetY = (Number(design.offsetY) || 0) * CSS_PX_TO_PT;
+  const pageInset = 9 * CSS_PX_TO_PT;
+  const pageContentWidth = Math.max(1, page.width - pageInset * 2);
   const layoutWidth = (columns * stripSize.width) + ((columns - 1) * columnGap);
-  const layoutHeight = (rowsPerPage * stripSize.height) + ((rowsPerPage - 1) * rowGap);
-  const fitPadding = 6;
-  const widthToFit = layoutWidth + Math.abs(offsetX) * 2;
-  const heightToFit = layoutHeight + Math.max(0, offsetY);
-  const contentScale = Math.min(
-    1,
-    (page.width - fitPadding * 2) / Math.max(1, widthToFit),
-    (page.height - fitPadding * 2) / Math.max(1, heightToFit)
-  );
-  const scaledLayoutWidth = layoutWidth * contentScale;
-  const scaledLayoutHeight = layoutHeight * contentScale;
-  const scaledOffsetX = offsetX * contentScale;
-  const scaledOffsetY = offsetY * contentScale;
-  const centeredX = ((page.width - scaledLayoutWidth) / 2) + scaledOffsetX;
-  const maxStartX = Math.max(fitPadding, page.width - scaledLayoutWidth - fitPadding);
-  const startX = clampNumber(centeredX, fitPadding, maxStartX);
-  const verticalRemainder = page.height - scaledOffsetY - scaledLayoutHeight;
-  const startY = Math.max(fitPadding, scaledOffsetY + Math.max(0, verticalRemainder / 2));
+  const startX = pageInset + ((pageContentWidth - layoutWidth) / 2) + offsetX;
+  const startY = pageInset + offsetY;
   const series = numberRange(from, to);
   const pageCount = Math.max(1, Math.ceil(series.length / itemsPerPage));
   const backgroundImage = parseDataImage(design.backgroundImageData);
@@ -1070,14 +1064,11 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
     const pageSeries = orderMode === 'columnar'
       ? numberRange(0, itemsPerPage - 1).map(columnIndex => series[pageIndex + (columnIndex * pageCount)]).filter(value => value !== undefined)
       : series.slice(pageIndex * itemsPerPage, pageIndex * itemsPerPage + itemsPerPage);
-    doc.save();
-    doc.translate(startX, startY);
-    doc.scale(contentScale);
     pageSeries.forEach((seriesNumber, position) => {
       const col = position % columns;
       const row = Math.floor(position / columns);
-      const x = col * (stripSize.width + columnGap);
-      const y = row * (stripSize.height + rowGap);
+      const x = startX + col * (stripSize.width + columnGap);
+      const y = startY + row * (stripSize.height + rowGap);
       drawSeriesStripKit(doc, {
         eventName,
         eventDetail,
@@ -1092,7 +1083,6 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
         hasPageBackground: Boolean(backgroundPdfImage)
       });
     });
-    doc.restore();
   }
 
   doc.end();
