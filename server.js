@@ -1018,10 +1018,6 @@ function collectPdfBuffer(doc) {
 async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   const panel = event.bingoPanelSettings || {};
   const design = { ...(panel.stripDesign || {}), ...(stripDesignOverride || {}) };
-  const desofTemplate = normalizeDesofTemplate(design.desofTemplate);
-  if (desofTemplate) {
-    return buildDesofTemplatePdf({ event, from, to, design, template: desofTemplate });
-  }
   const eventSeed = panel.eventSeed || event.bingoSeed || event.id;
   const eventName = panel.name || event.name || 'Cartones Bingo 90';
   const eventDetail = panel.eventDetail || [event.date, event.town, event.province].filter(Boolean).join(' - ');

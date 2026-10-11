@@ -1915,7 +1915,7 @@ function fillStripDesigner() {
   if (els.stripDesofTemplateStatus) {
     const template = state.stripDesign.desofTemplate;
     els.stripDesofTemplateStatus.textContent = template
-      ? `Plantilla cargada: ${state.stripDesign.desofTemplateName || "DeSof"} (${template.labels?.length || 0} campos, ${template.detail?.columns || 1} columnas)`
+      ? `Referencia DeSof cargada: ${state.stripDesign.desofTemplateName || "DeSof"} (${template.detail?.columns || 1} columnas)`
       : "Sin plantilla DeSof.";
   }
 }
@@ -2031,7 +2031,7 @@ async function handleStripDesofTemplateSelection() {
     fillStripDesigner();
     renderStripPreview();
     persistEventDesign();
-    window.alert(`Plantilla DeSof importada: ${payload.summary?.labels || 0} campos, ${payload.summary?.columns || 1} columnas.`);
+    window.alert(`Referencia DeSof importada: ${payload.summary?.columns || 1} columnas. El PDF conserva el diseño y los cartones de Indigo.`);
   } catch (error) {
     if (els.stripDesofTemplateStatus) els.stripDesofTemplateStatus.textContent = "Sin plantilla DeSof.";
     window.alert(`No se pudo importar la plantilla DeSof: ${error.message || error}`);
