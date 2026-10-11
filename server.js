@@ -834,29 +834,6 @@ function getDesofTemplateRowsPerPage(template) {
   return Math.max(1, Math.floor(available / detailHeight));
 }
 
-function getDesofTemplateContentBounds(template) {
-  const panel = template.panel || {};
-  const labels = Array.isArray(template.labels) ? template.labels : [];
-  const bounds = labels.reduce((acc, label) => {
-    const originX = label.parent ? Number(panel.x) || 0 : 0;
-    const originY = label.parent ? Number(panel.y) || 0 : 0;
-    const x = originX + (Number(label.x) || 0);
-    const y = originY + (Number(label.y) || 0);
-    const width = Math.max(0, Number(label.width) || 0);
-    const height = Math.max(0, Number(label.height) || 0);
-    return {
-      minX: Math.min(acc.minX, x),
-      minY: Math.min(acc.minY, y),
-      maxX: Math.max(acc.maxX, x + width),
-      maxY: Math.max(acc.maxY, y + height)
-    };
-  }, { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
-  if (!Number.isFinite(bounds.minX) || !Number.isFinite(bounds.maxX)) {
-    return { minX: 0, minY: 0, maxX: Number(panel.x || 0) + Number(panel.width || 0), maxY: Number(panel.y || 0) + Number(panel.height || 0) };
-  }
-  return bounds;
-}
-
 function drawDesofText(doc, label, text, x, y, width, height) {
   const value = text === null || text === undefined ? '' : String(text);
   if (!value) return;
@@ -935,10 +912,9 @@ async function buildDesofTemplatePdf({ event, from, to, design, template }) {
   const columnWidth = printableWidth / columns;
   const topMargin = desofToPt(template.margins.top);
   const leftMargin = desofToPt(template.margins.left);
-  const contentBounds = getDesofTemplateContentBounds(template);
-  const contentWidth = desofToPt(contentBounds.maxX - contentBounds.minX);
-  const contentLeft = desofToPt(contentBounds.minX);
-  const centeredContentShiftX = ((columnWidth - contentWidth) / 2) - contentLeft;
+  const panelLeft = desofToPt(template.panel.x);
+  const panelWidth = desofToPt(template.panel.width);
+  const centeredContentShiftX = ((columnWidth - panelWidth) / 2) - panelLeft;
   const offsetX = (Number(design.offsetX) || 0) * CSS_PX_TO_PT;
   const offsetY = (Number(design.offsetY) || 0) * CSS_PX_TO_PT;
   const series = numberRange(from, to);
