@@ -4166,11 +4166,27 @@ function resetGame() {
 
 function finishGameManually() {
   if (!state.eventCreated) return;
-  const detail = state.drawn.length
-    ? "Finalizar esta partida? Se conserva el historial de bolillas y premios detectados."
-    : "Finalizar esta partida sin jugar bolillas?";
+  const hasProgress = state.drawn.length || state.prizeResults.length || state.pendingWinners.length;
+  const detail = hasProgress
+    ? "Interrumpir esta partida y borrar bolillas, premios y marcas detectadas?"
+    : "Interrumpir esta partida y volver todo a cero?";
   if (!window.confirm(detail)) return;
-  state.gameFinished = true;
+  clearTimeout(projectionTimeoutId);
+  clearInterval(projectionCountdownId);
+  projectionTimeoutId = null;
+  projectionCountdownId = null;
+  if (els.projectionDialog?.open) els.projectionDialog.close();
+  if (els.winnerDialog?.open) els.winnerDialog.close();
+  els.projectionVideo?.pause();
+  els.projectionVideo?.removeAttribute("src");
+  els.projectionImage?.removeAttribute("src");
+  state.drawn = [];
+  state.prizeResults = [];
+  state.gameFinished = false;
+  state.extraStartBallIndex = null;
+  state.recapShown = false;
+  state.pozoVacancyShown = false;
+  state.extraVacancyShown = false;
   state.pausedForWinner = false;
   state.pendingWinners = [];
   state.winnerViewIndex = 0;

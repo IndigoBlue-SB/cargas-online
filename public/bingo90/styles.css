@@ -233,6 +233,10 @@ button:disabled {
   pointer-events: none;
 }
 
+.is-disabled .game-command-panel {
+  pointer-events: auto;
+}
+
 .game-finished-lock {
   opacity: 0.48;
   pointer-events: none;
