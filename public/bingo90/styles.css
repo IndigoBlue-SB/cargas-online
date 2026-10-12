@@ -150,6 +150,64 @@ button:disabled {
   padding-top: 16px;
 }
 
+.home-play-check {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  margin-top: 18px;
+  padding-top: 16px;
+}
+
+.play-check-form {
+  display: grid;
+  grid-template-columns: minmax(140px, 180px) minmax(160px, 240px) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.play-check-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.play-check-form input,
+.play-check-form select {
+  min-height: 38px;
+}
+
+.play-check-result {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.play-check-result strong {
+  color: var(--text);
+}
+
+.play-check-result.is-ok {
+  border-color: rgba(47, 191, 113, 0.55);
+  color: #c8f4dd;
+  background: rgba(47, 191, 113, 0.1);
+}
+
+.play-check-result.is-warning {
+  border-color: rgba(255, 203, 69, 0.55);
+  color: #ffe9a8;
+  background: rgba(255, 203, 69, 0.1);
+}
+
+.play-check-result.is-error {
+  border-color: rgba(226, 93, 79, 0.55);
+  color: #ffc2ba;
+  background: rgba(226, 93, 79, 0.1);
+}
+
 .home-stats-block {
   border-top: 1px solid var(--line);
   margin-top: 18px;
@@ -2282,6 +2340,10 @@ dialog::backdrop {
   }
 
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .play-check-form {
     grid-template-columns: 1fr;
   }
 

@@ -58,6 +58,27 @@
             </div>
           </div>
           <div id="homeSavedEventsList" class="saved-events-list"></div>
+          <section class="home-play-check">
+            <div>
+              <h2>Consulta rapida</h2>
+              <p class="small-note">Chequea si una serie o un carton pertenecen al evento seleccionado y si estan en juego.</p>
+            </div>
+            <form id="homePlayCheckForm" class="play-check-form">
+              <label>
+                Buscar
+                <select id="homePlayCheckTypeInput">
+                  <option value="series">Serie</option>
+                  <option value="card">Carton</option>
+                </select>
+              </label>
+              <label>
+                Numero
+                <input id="homePlayCheckNumberInput" type="number" min="1" step="1" placeholder="Ej: 5001">
+              </label>
+              <button class="primary-button" type="submit">Consultar</button>
+            </form>
+            <div id="homePlayCheckResult" class="play-check-result">Selecciona un evento y consulta una serie o carton.</div>
+          </section>
           <div class="home-stats-block">
             <h2>Estadisticas del evento seleccionado</h2>
             <div id="statsList" class="stats-list home-stats-list"></div>

@@ -200,6 +200,10 @@ const els = {
   usersCloseBtn: document.querySelector("#usersCloseBtn"),
   landingBackBtn: document.querySelector("#landingBackBtn"),
   homeSavedEventsList: document.querySelector("#homeSavedEventsList"),
+  homePlayCheckForm: document.querySelector("#homePlayCheckForm"),
+  homePlayCheckTypeInput: document.querySelector("#homePlayCheckTypeInput"),
+  homePlayCheckNumberInput: document.querySelector("#homePlayCheckNumberInput"),
+  homePlayCheckResult: document.querySelector("#homePlayCheckResult"),
   eventTitle: document.querySelector("#eventTitle"),
   gameBingoLogo: document.querySelector("#gameBingoLogo"),
   gameIndigoLogo: document.querySelector("#gameIndigoLogo"),
@@ -415,11 +419,12 @@ function init() {
   rememberCargasLaunch();
   const params = new URLSearchParams(window.location.search);
   const shouldOpenConfigDirectly = isLaunchedFromCargas() && params.get("mode") === "config";
+  const shouldOpenPanelDirectly = isLaunchedFromCargas() && params.get("mode") === "panel";
   if (isLaunchedFromCargas()) {
     els.backHomeBtn.textContent = "Volver a pagina principal";
     els.landingBackBtn.textContent = "Volver a pagina principal";
     els.userLogoutBtn.textContent = "Volver a pagina principal";
-    if (shouldOpenConfigDirectly) {
+    if (shouldOpenConfigDirectly || shouldOpenPanelDirectly) {
       state.view = "home";
       render();
     }
@@ -431,11 +436,12 @@ function init() {
     }
     const eventId = params.get("eventId");
     const mode = params.get("mode");
+    const stayHome = mode === "config" || mode === "panel";
     let openConfig = false;
-    if (eventId && await loadCargasEvent(eventId, { stayHome: mode === "config", allowEmptySales: mode === "config", suppressPrizeReplay: mode === "config" })) {
+    if (eventId && await loadCargasEvent(eventId, { stayHome, allowEmptySales: stayHome, suppressPrizeReplay: stayHome })) {
       openConfig = mode === "config";
     } else if (eventId && loadSavedEvents().some((event) => event.id === eventId)) {
-      loadEvent(eventId, { stayHome: mode === "config", suppressPrizeReplay: mode === "config" });
+      loadEvent(eventId, { stayHome, suppressPrizeReplay: stayHome });
       openConfig = mode === "config";
     }
     render();
@@ -473,6 +479,9 @@ function bindEvents() {
   els.homeExportReportBtn.addEventListener("click", exportEventReport);
   els.homeResetGameBtn.addEventListener("click", resetGame);
   els.usersAdminBtn.addEventListener("click", openUsersAdmin);
+  els.homePlayCheckForm?.addEventListener("submit", handleHomePlayCheck);
+  els.homePlayCheckTypeInput?.addEventListener("change", clearHomePlayCheckResult);
+  els.homePlayCheckNumberInput?.addEventListener("input", clearHomePlayCheckResult);
   els.adminPasswordForm.addEventListener("submit", changeAdminPassword);
   els.userCreateForm.addEventListener("submit", saveUserFromForm);
   els.usersCloseBtn.addEventListener("click", () => els.usersDialog.close());
@@ -798,6 +807,7 @@ function render() {
   renderUserEvents();
   renderSavedEvents();
   renderHomeSavedEvents();
+  renderHomePlayCheckState();
 }
 
 function updateHomeActionAvailability() {
@@ -1436,6 +1446,108 @@ function renderHomeSavedEvents() {
     item.querySelector('[data-action="delete"]').addEventListener("click", () => deleteEvent(event.id));
     els.homeSavedEventsList.appendChild(item);
   });
+}
+
+function renderHomePlayCheckState() {
+  if (!els.homePlayCheckForm || !els.homePlayCheckResult) return;
+  const disabled = !state.eventCreated;
+  els.homePlayCheckTypeInput.disabled = disabled;
+  els.homePlayCheckNumberInput.disabled = disabled;
+  els.homePlayCheckForm.querySelector("button")?.toggleAttribute("disabled", disabled);
+  if (disabled) {
+    setHomePlayCheckResult("Selecciona un evento y consulta una serie o carton.", "");
+  }
+}
+
+function clearHomePlayCheckResult() {
+  if (!state.eventCreated) return;
+  setHomePlayCheckResult("Escribi un numero para consultar si esta dentro del evento y si esta en juego.", "");
+}
+
+function handleHomePlayCheck(event) {
+  event.preventDefault();
+  if (!state.eventCreated) {
+    setHomePlayCheckResult("Selecciona primero un evento guardado.", "is-warning");
+    return;
+  }
+  const type = els.homePlayCheckTypeInput.value;
+  const number = Math.trunc(Number(els.homePlayCheckNumberInput.value));
+  if (!Number.isInteger(number) || number < 1) {
+    setHomePlayCheckResult("Escribi un numero valido mayor a cero.", "is-warning");
+    return;
+  }
+  const result = type === "card" ? getHomeCardCheck(number) : getHomeSeriesCheck(number);
+  setHomePlayCheckResult(result.message, result.className);
+}
+
+function getHomeSeriesCheck(seriesNumber) {
+  const inRange = seriesNumber >= state.rangeStart && seriesNumber <= state.rangeEnd;
+  const unitLabel = getSalesUnitLabel();
+  if (!inRange) {
+    return {
+      className: "is-error",
+      message: `<strong>${unitLabel.singular} ${seriesNumber}</strong> no pertenece a este evento. Rango configurado: ${state.rangeStart}-${state.rangeEnd}.`,
+    };
+  }
+  const status = getHomeUnitPlayStatus(seriesNumber);
+  const cardRange = state.cardMode === "series"
+    ? ` Cartones: ${getFirstCardNumberForSeries(seriesNumber)}-${getFirstCardNumberForSeries(seriesNumber) + SERIES_SIZE - 1}.`
+    : "";
+  return {
+    className: status.inPlay ? "is-ok" : (status.loaded ? "is-warning" : "is-error"),
+    message: `<strong>${unitLabel.singular} ${seriesNumber}</strong> pertenece a ${escapeHtml(state.eventName || "este evento")}.${cardRange} ${status.text}`,
+  };
+}
+
+function getHomeCardCheck(cardNumber) {
+  if (state.cardMode === "individual") {
+    const inRange = cardNumber >= state.rangeStart && cardNumber <= state.rangeEnd;
+    if (!inRange) {
+      return {
+        className: "is-error",
+        message: `<strong>Carton ${cardNumber}</strong> no pertenece a este evento. Rango configurado: ${state.rangeStart}-${state.rangeEnd}.`,
+      };
+    }
+    const status = getHomeUnitPlayStatus(cardNumber);
+    return {
+      className: status.inPlay ? "is-ok" : (status.loaded ? "is-warning" : "is-error"),
+      message: `<strong>Carton ${cardNumber}</strong> pertenece a ${escapeHtml(state.eventName || "este evento")}. ${status.text}`,
+    };
+  }
+
+  const seriesNumber = Math.ceil(cardNumber / SERIES_SIZE);
+  const cardPosition = ((cardNumber - 1) % SERIES_SIZE) + 1;
+  const inRange = seriesNumber >= state.rangeStart && seriesNumber <= state.rangeEnd;
+  if (!inRange) {
+    return {
+      className: "is-error",
+      message: `<strong>Carton ${cardNumber}</strong> no pertenece a este evento. Ese carton corresponde a la serie ${seriesNumber}; rango configurado: ${state.rangeStart}-${state.rangeEnd}.`,
+    };
+  }
+  const status = getHomeUnitPlayStatus(seriesNumber);
+  return {
+    className: status.inPlay ? "is-ok" : (status.loaded ? "is-warning" : "is-error"),
+    message: `<strong>Carton ${cardNumber}</strong> pertenece a la <strong>Serie ${seriesNumber}</strong>, posicion ${cardPosition} de 6. ${status.text}`,
+  };
+}
+
+function getHomeUnitPlayStatus(unit) {
+  enforceCargasOfficialSales();
+  const activeSet = new Set(state.salesLoaded ? state.soldUnits : []);
+  const loadedSet = new Set(getSalesDraftUnits());
+  if (activeSet.has(unit)) {
+    return { inPlay: true, loaded: true, text: "Esta en juego." };
+  }
+  if (loadedSet.has(unit)) {
+    return { inPlay: false, loaded: true, text: "Esta cargada en ventas, pero todavia no esta activada para jugar." };
+  }
+  return { inPlay: false, loaded: false, text: "Existe en el evento, pero no figura vendida ni esta en juego." };
+}
+
+function setHomePlayCheckResult(message, className) {
+  if (!els.homePlayCheckResult) return;
+  els.homePlayCheckResult.className = `play-check-result${className ? ` ${className}` : ""}`;
+  els.homePlayCheckResult.innerHTML = message;
 }
 
 function selectHomeEvent(eventId) {

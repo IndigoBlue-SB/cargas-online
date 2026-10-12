@@ -3309,8 +3309,8 @@
       $('openAdvancedBingo').disabled = !hasEvent;
       $('openBingoSales').disabled = !hasEvent;
       $('openAdvancedBingo').textContent = hasEvent
-        ? `Preparar bingo: ${eventData.name}`
-        : 'Preparar bingo';
+        ? `Abrir panel bingo: ${eventData.name}`
+        : 'Abrir panel bingo';
       $('openBingoSales').textContent = hasEvent
         ? `Cargar ventas: ${eventData.name}`
         : 'Cargar ventas';
@@ -3469,7 +3469,7 @@
       const advancedEvent = buildBingo90Event(eventData);
       const saved = loadBingo90Events().filter(item => item && item.id !== advancedEvent.id);
       saveBingo90BridgeEvents([advancedEvent, ...saved].slice(0, 30));
-      window.location.href = `/bingo90/index.html?eventId=${encodeURIComponent(advancedEvent.id)}&mode=config&from=cargas`;
+      window.location.href = `/bingo90/index.html?eventId=${encodeURIComponent(advancedEvent.id)}&mode=panel&from=cargas`;
     }
 
     function openBingoSalesEvent() {
