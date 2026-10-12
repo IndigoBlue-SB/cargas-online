@@ -1297,9 +1297,10 @@ function serveStatic(req, res) {
       res.end('Not found');
       return;
     }
+    const noStoreStatic = filePath.endsWith('index.html') || filePath.startsWith(path.join(PUBLIC_DIR, 'bingo90'));
     res.writeHead(200, {
       'Content-Type': contentType(filePath),
-      'Cache-Control': filePath.endsWith('index.html') ? 'no-store' : 'public, max-age=3600'
+      'Cache-Control': noStoreStatic ? 'no-store' : 'public, max-age=3600'
     });
     res.end(data);
   });

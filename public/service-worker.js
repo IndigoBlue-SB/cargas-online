@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cargas-app-v98';
+const CACHE_NAME = 'cargas-app-v99';
 const APP_FILES = [
   './',
   './manifest.webmanifest',
@@ -23,6 +23,11 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   if (event.request.url.includes('/api/')) {
     event.respondWith(fetch(event.request));
+    return;
+  }
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith('/bingo90/')) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
     return;
   }
   event.respondWith(

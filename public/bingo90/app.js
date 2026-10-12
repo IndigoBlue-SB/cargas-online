@@ -4166,11 +4166,6 @@ function resetGame() {
 
 function finishGameManually() {
   if (!state.eventCreated) return;
-  const hasProgress = state.drawn.length || state.prizeResults.length || state.pendingWinners.length;
-  const detail = hasProgress
-    ? "Interrumpir esta partida y borrar bolillas, premios y marcas detectadas?"
-    : "Interrumpir esta partida y volver todo a cero?";
-  if (!window.confirm(detail)) return;
   clearTimeout(projectionTimeoutId);
   clearInterval(projectionCountdownId);
   projectionTimeoutId = null;
