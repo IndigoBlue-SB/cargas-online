@@ -1532,10 +1532,26 @@ function getHomeCardCheck(cardNumber) {
   };
 }
 
-function getHomeUnitPlayStatus(unit) {
+function getHomeLoadedUnits() {
+  const draftUnits = normalizeSoldUnits(getSalesDraftUnits());
+  if (draftUnits.length) return draftUnits;
+  if (Array.isArray(state.cargasOfficialSoldUnits) && state.cargasOfficialSoldUnits.length) {
+    return normalizeSoldUnits(state.cargasOfficialSoldUnits);
+  }
+  return range(state.rangeStart, state.rangeEnd);
+}
+
+function getHomeActiveUnits() {
   enforceCargasOfficialSales();
-  const activeSet = new Set(state.salesLoaded ? state.soldUnits : []);
-  const loadedSet = new Set(getSalesDraftUnits());
+  const activeUnits = state.salesLoaded && state.soldUnits.length
+    ? normalizeSoldUnits(state.soldUnits)
+    : getHomeLoadedUnits();
+  return activeUnits;
+}
+
+function getHomeUnitPlayStatus(unit) {
+  const activeSet = new Set(getHomeActiveUnits());
+  const loadedSet = new Set(getHomeLoadedUnits());
   if (activeSet.has(unit)) {
     return { inPlay: true, loaded: true, text: "Esta en juego." };
   }
@@ -1551,14 +1567,15 @@ function setHomePlayCheckResult(message, className) {
   els.homePlayCheckResult.innerHTML = message;
 }
 
-function selectHomeEvent(eventId) {
+async function selectHomeEvent(eventId) {
   if (state.eventCreated && state.eventId === eventId) {
     resetActiveEventToHome();
     state.view = "home";
     render();
     return;
   }
-  loadEvent(eventId, { stayHome: true });
+  const loadedFromCargas = await loadCargasEvent(eventId, { stayHome: true, allowEmptySales: true, suppressPrizeReplay: true });
+  if (!loadedFromCargas) loadEvent(eventId, { stayHome: true, suppressPrizeReplay: true });
 }
 
 function renderUserEvents() {
