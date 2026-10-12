@@ -3336,6 +3336,17 @@ function buildBingoEventFromCargas(event) {
   const drawn = Array.isArray(panel.drawn)
     ? panel.drawn
     : (Array.isArray(event.bingoGame?.drawn) ? event.bingoGame.drawn : []);
+  const visualSettings = {
+    ...(panel.visualSettings || {}),
+  };
+  if (!visualSettings.bingoLogoData && event.eventLogoLeft) {
+    visualSettings.bingoLogoData = event.eventLogoLeft;
+    visualSettings.bingoLogoName = visualSettings.bingoLogoName || "Logo del evento";
+  }
+  if (!visualSettings.indigoLogoData && event.eventLogoRight) {
+    visualSettings.indigoLogoData = event.eventLogoRight;
+    visualSettings.indigoLogoName = visualSettings.indigoLogoName || "Logo del evento";
+  }
   return {
     ...panel,
     id: event.id,
@@ -3358,7 +3369,7 @@ function buildBingoEventFromCargas(event) {
     drawn,
     savedAt: panel.savedAt || new Date().toISOString(),
     cardDesign: panel.cardDesign || {},
-    visualSettings: panel.visualSettings || {},
+    visualSettings,
     stripDesign: panel.stripDesign || {},
     projectionSettings: panel.projectionSettings || {},
   };

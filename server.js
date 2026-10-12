@@ -1241,6 +1241,35 @@ function visibleEventsFor(session, events) {
   });
 }
 
+function hasText(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function hasObjectEntries(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0;
+}
+
+function mergeBingoPanelAssets(previousPanel, nextPanel) {
+  const previousVisual = previousPanel?.visualSettings || {};
+  const nextVisual = nextPanel?.visualSettings || {};
+  const visualSettings = { ...nextVisual };
+
+  ['bingoLogoData', 'indigoLogoData', 'bingoLogoName', 'indigoLogoName', 'ballImageSetName'].forEach(key => {
+    if (!hasText(visualSettings[key]) && hasText(previousVisual[key])) {
+      visualSettings[key] = previousVisual[key];
+    }
+  });
+
+  if (!hasObjectEntries(visualSettings.ballImageKeys) && hasObjectEntries(previousVisual.ballImageKeys)) {
+    visualSettings.ballImageKeys = previousVisual.ballImageKeys;
+  }
+
+  return {
+    ...nextPanel,
+    visualSettings
+  };
+}
+
 function isBingoLoadConfirmed(event) {
   return event?.bingoClosure?.status === 'confirmed';
 }
@@ -1637,10 +1666,11 @@ async function handleApi(req, res) {
     const canAccess = session.role === 'admin' || visibleEventsFor(session, [event]).length > 0;
     if (!canAccess) return sendJson(res, 403, { error: 'Sin permiso para este evento' });
     const panel = body.panel && typeof body.panel === 'object' ? body.panel : {};
+    const safePanel = mergeBingoPanelAssets(event.bingoPanelSettings || {}, panel);
     db.events[eventIndex] = {
       ...event,
       bingoPanelSettings: {
-        ...panel,
+        ...safePanel,
         savedAt: new Date().toISOString(),
         savedBy: session.name || (session.role === 'admin' ? 'Administrador' : 'Usuario')
       }
