@@ -211,6 +211,7 @@ const els = {
   newEventBtn: document.querySelector("#newEventBtn"),
   saveEventStateBtn: document.querySelector("#saveEventStateBtn"),
   exportReportBtn: document.querySelector("#exportReportBtn"),
+  finishGameBtn: document.querySelector("#finishGameBtn"),
   resetGameBtn: document.querySelector("#resetGameBtn"),
   drawBallBtn: document.querySelector("#drawBallBtn"),
   undoBallBtn: document.querySelector("#undoBallBtn"),
@@ -421,7 +422,7 @@ function init() {
   const shouldOpenConfigDirectly = isLaunchedFromCargas() && params.get("mode") === "config";
   const shouldOpenPanelDirectly = isLaunchedFromCargas() && params.get("mode") === "panel";
   if (isLaunchedFromCargas()) {
-    els.backHomeBtn.textContent = "Volver a pagina principal";
+    els.backHomeBtn.textContent = "Panel principal";
     els.landingBackBtn.textContent = "Volver a pagina principal";
     els.userLogoutBtn.textContent = "Volver a pagina principal";
     if (shouldOpenConfigDirectly || shouldOpenPanelDirectly) {
@@ -478,6 +479,7 @@ function bindEvents() {
   els.homeSaveEventBtn.addEventListener("click", () => saveCurrentEvent({ manual: true }));
   els.homeExportReportBtn.addEventListener("click", exportEventReport);
   els.homeResetGameBtn.addEventListener("click", resetGame);
+  els.finishGameBtn.addEventListener("click", finishGameManually);
   els.usersAdminBtn.addEventListener("click", openUsersAdmin);
   els.homePlayCheckForm?.addEventListener("submit", handleHomePlayCheck);
   els.homePlayCheckTypeInput?.addEventListener("change", clearHomePlayCheckResult);
@@ -525,15 +527,12 @@ function bindEvents() {
   els.loadDesignCopyInput.addEventListener("change", updateLoadCreationChoices);
   els.loadDesignNewInput.addEventListener("change", updateLoadCreationChoices);
   els.backHomeBtn.addEventListener("click", () => {
-    if (isLaunchedFromCargas()) {
-      returnToCargasHome();
-      return;
-    }
     if (state.currentUser) {
       state.view = "user-events";
       render();
       return;
     }
+    if (state.eventCreated) saveCurrentEvent({ silent: true });
     showHome();
   });
   els.clearCardsBtn.addEventListener("click", () => {
@@ -788,6 +787,8 @@ function render() {
   els.newEventBtn.disabled = state.gameFinished || state.isProjecting;
   els.saveEventStateBtn.disabled = userMode || !state.eventCreated;
   els.exportReportBtn.disabled = userMode || !state.eventCreated || state.gameFinished;
+  els.finishGameBtn.classList.toggle("hidden", state.gameFinished);
+  els.finishGameBtn.disabled = userMode || !state.eventCreated || state.isProjecting;
   els.resetGameBtn.classList.toggle("hidden", !state.gameFinished);
   els.resetGameBtn.disabled = userMode || !state.eventCreated || state.isProjecting;
   updateHomeActionAvailability();
@@ -4160,6 +4161,23 @@ function resetGame() {
   state.pozoVacancyShown = false;
   state.extraVacancyShown = false;
   saveCurrentEvent({ silent: true });
+  render();
+}
+
+function finishGameManually() {
+  if (!state.eventCreated) return;
+  const detail = state.drawn.length
+    ? "Finalizar esta partida? Se conserva el historial de bolillas y premios detectados."
+    : "Finalizar esta partida sin jugar bolillas?";
+  if (!window.confirm(detail)) return;
+  state.gameFinished = true;
+  state.pausedForWinner = false;
+  state.pendingWinners = [];
+  state.winnerViewIndex = 0;
+  state.reviewingWinner = false;
+  state.isProjecting = false;
+  saveCurrentEvent({ silent: true });
+  state.view = "home";
   render();
 }
 
