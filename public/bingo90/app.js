@@ -2310,13 +2310,16 @@ async function handleBallImagesFolderSelection() {
     els.eventBallImagesInput.value = "";
     return;
   }
+  if (new Set(images.map((item) => item.number)).size !== images.length) {
+    window.alert("La carpeta contiene varias imagenes para el mismo numero. Selecciona una sola carpeta de color, por ejemplo bolas rojas.");
+    els.eventBallImagesInput.value = "";
+    return;
+  }
   const nextMap = { ...(state.visualSettings.ballImageKeys || {}) };
   let savedCount = 0;
   for (const item of images) {
-    const key = `${state.eventId}-ball-${item.number}-${createId()}`;
     try {
-      await storeMediaFile(key, item.file);
-      nextMap[item.number] = key;
+      nextMap[item.number] = await readBallImageData(item.file);
       savedCount += 1;
     } catch {
       // Continua con las demas imagenes si una falla.
@@ -2328,7 +2331,19 @@ async function handleBallImagesFolderSelection() {
   els.eventBallImagesInput.value = "";
   if (state.eventCreated) saveCurrentEvent({ silent: true });
   renderLastBallImage(state.drawn.at(-1));
-  window.alert(`Se cargaron ${savedCount} imagenes de bolillas. Usa nombres como 1.png, bolilla-9.jpg o numero_90.png.`);
+  const saved = !state.eventCreated || await ensureCargasPanelSaved();
+  window.alert(saved
+    ? "Se cargaron " + savedCount + " de " + images.length + " imagenes de bolillas."
+    : "Las imagenes se cargaron en esta pantalla, pero Cargas no confirmo el guardado. Revisa tu sesion y guarda el diseno antes de cerrar.");
+}
+
+function readBallImageData(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 function isSupportedBallImageFile(file) {
@@ -3995,7 +4010,7 @@ function deleteEvent(eventId) {
   if (!confirmed) return;
   rememberDeletedEvent(eventId);
   const nextEvents = loadSavedEvents().filter((item) => item.id !== eventId);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextEvents));
+  saveEventsToLocalStorage(nextEvents);
   scheduleServerStateSave();
   if (state.eventId === eventId) {
     resetActiveEventToHome();
@@ -5526,10 +5541,12 @@ function loadEventData(event, options = {}) {
   generateConfiguredCards({ preserveGame: true });
 }
 
+let savedEventsMemory = null;
+
 function loadSavedEvents() {
   try {
     const deletedIds = new Set(loadDeletedEventIds());
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")
+    return (savedEventsMemory || JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"))
       .filter((event) => event && event.id && !deletedIds.has(event.id));
   } catch {
     return [];
@@ -5537,12 +5554,13 @@ function loadSavedEvents() {
 }
 
 function saveEventsToLocalStorage(events) {
+  // El respaldo del servidor necesita los originales aun si se supera la cuota local.
+  savedEventsMemory = clonePlain(events);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events.map(stripLargeEventAssets)));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
     return true;
   } catch {
     try {
-      localStorage.removeItem(STORAGE_KEY);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(events.slice(0, 1).map(stripLargeEventAssets)));
     } catch {
       // Si tambien falla la copia liviana, seguimos con el estado en memoria y el guardado en servidor.
@@ -6550,6 +6568,10 @@ async function storeMediaFile(key, file) {
 }
 
 async function loadMediaFile(key) {
+  if (/^data:image\/(png|jpeg);base64,/i.test(key)) {
+    const response = await fetch(key);
+    return response.blob();
+  }
   const database = await openMediaDatabase();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(MEDIA_STORE_NAME, "readonly");
