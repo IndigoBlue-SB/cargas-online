@@ -877,9 +877,10 @@
               <div class="actions">
                 <button type="button" id="raffleExportCsv">Exportar Excel (CSV)</button>
                 <button type="button" id="raffleExportTxt">Exportar TXT</button>
+                <button type="button" id="raffleExportDat">Exportar DAT</button>
                 <button type="button" id="raffleExportPdf">Imprimir / PDF</button>
               </div>
-              <label>Importar series extra (TXT / CSV)<input id="raffleImportFile" type="file" accept=".txt,.csv,text/plain,text/csv"></label>
+              <label>Importar series extra (TXT / CSV / DAT)<input id="raffleImportFile" type="file" accept=".txt,.csv,.dat,text/plain,text/csv"></label>
             </section>
             <section class="panel">
               <div class="table-head">
@@ -5690,7 +5691,7 @@
       saveEvents();
       renderRaffle();
     });
-    ['csv', 'txt', 'pdf'].forEach(format => {
+    ['csv', 'txt', 'dat', 'pdf'].forEach(format => {
       $(`raffleExport${format[0].toUpperCase()}${format.slice(1)}`).addEventListener('click', () => exportRafflePool(format));
     });
     $('raffleImportFile').addEventListener('change', importRaffleFile);
