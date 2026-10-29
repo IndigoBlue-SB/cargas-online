@@ -270,6 +270,9 @@
     .raffle-live-number { box-sizing: border-box; min-width: 0; height: var(--raffle-box-height, 140px); display: grid; place-items: center; background: var(--raffle-box-color, #f5f7fa); color: var(--raffle-number-color, #102c45); border: 3px solid transparent; border-radius: 8px; font-size: var(--raffle-font-size, 56px); font-family: var(--raffle-font-family, Arial); font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
     .raffle-live-slot.is-stopped .raffle-live-number { border-color: #42d69b; }
     .raffle-live-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+    .raffle-logos { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 24px; width: 100%; }
+    .raffle-logos img { object-fit: contain; max-width: 100%; height: auto; }
+    .raffle-board .raffle-logo { max-width: 100%; max-height: none; filter: none; }
     .raffle-config-grid { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 8px; align-items: end; }
     .raffle-extra-row { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(90px, 1fr) minmax(140px, 1.4fr) auto; gap: 6px; align-items: end; }
     .raffle-results { display: grid; gap: 8px; max-height: 280px; overflow-y: auto; }
@@ -817,7 +820,10 @@
           </aside>
           <section class="raffle-stage">
             <div id="raffleBoard" class="raffle-board">
-              <img id="raffleLogoPreview" class="raffle-logo hidden" alt="Logo sorteo">
+              <div class="raffle-logos">
+                <img id="raffleLogoPreview" class="raffle-logo hidden" alt="Logo del bingo">
+                <img id="raffleIndigoPreview" class="raffle-logo hidden" alt="Logo Indigo Blue">
+              </div>
               <div class="raffle-title" id="raffleBoardTitle">Selecciona un evento</div>
               <div class="raffle-subtitle" id="raffleBoardSubtitle">El sorteador usa las series confirmadas para bingo.</div>
               <div id="raffleNumberGrid" class="raffle-number-grid"></div>
@@ -836,7 +842,12 @@
                   </select>
                 </label>
                 <label>Imagen de fondo<input id="raffleBgInput" type="file" accept="image/*"></label>
-                <label>Logo<input id="raffleLogoInput" type="file" accept="image/*"></label>
+                <label>Logo del bingo<input id="raffleLogoInput" type="file" accept="image/*"></label>
+                <label>Logo Indigo Blue<input id="raffleIndigoInput" type="file" accept="image/*"></label>
+                <label>Logo bingo: configuracion<input id="rafflePreviewLogoSize" type="number" min="40" max="600" value="120"></label>
+                <label>Logo Indigo: configuracion<input id="rafflePreviewIndigoSize" type="number" min="40" max="600" value="120"></label>
+                <label>Logo bingo: sorteo<input id="raffleLiveLogoSize" type="number" min="40" max="600" value="180"></label>
+                <label>Logo Indigo: sorteo<input id="raffleLiveIndigoSize" type="number" min="40" max="600" value="180"></label>
                 <label>Ancho de cuadros<input id="raffleBoxWidth" type="number" min="120" max="900" step="10" value="260"></label>
                 <label>Alto de cuadros<input id="raffleBoxHeight" type="number" min="80" max="600" step="10" value="140"></label>
                 <label>Tamano de numeros<input id="raffleFontSize" type="number" min="24" max="240" step="2" value="56"></label>
@@ -863,6 +874,12 @@
                 <button type="button" id="raffleAddExtra">Agregar</button>
               </div>
               <div id="raffleExtraList" class="raffle-results"></div>
+              <div class="actions">
+                <button type="button" id="raffleExportCsv">Exportar Excel (CSV)</button>
+                <button type="button" id="raffleExportTxt">Exportar TXT</button>
+                <button type="button" id="raffleExportPdf">Imprimir / PDF</button>
+              </div>
+              <label>Importar series extra (TXT / CSV)<input id="raffleImportFile" type="file" accept=".txt,.csv,text/plain,text/csv"></label>
             </section>
             <section class="panel">
               <div class="table-head">
@@ -1358,6 +1375,10 @@
   <div id="printArea" class="hidden"></div>
   <dialog id="raffleLive" class="raffle-live" aria-label="Sorteo en vivo">
     <div class="raffle-live-content">
+      <div class="raffle-logos">
+        <img id="raffleLiveLogo" class="hidden" alt="Logo del bingo">
+        <img id="raffleLiveIndigo" class="hidden" alt="Logo Indigo Blue">
+      </div>
       <div id="raffleLiveGrid" class="raffle-live-grid"></div>
       <div class="raffle-live-actions">
         <button type="button" id="raffleStopNext">Detener siguiente</button>
@@ -2552,6 +2573,11 @@
         results: [],
         backgroundImage: '',
         logoImage: '',
+        indigoImage: '',
+        previewLogoSize: 120,
+        previewIndigoSize: 120,
+        liveLogoSize: 180,
+        liveIndigoSize: 180,
         boxWidth: 260,
         boxHeight: 140,
         fontSize: 56,
@@ -2639,6 +2665,9 @@
       const available = hasEvent ? raffleAvailablePool(eventData) : [];
       $('raffleBoard').style.setProperty('--raffle-bg', raffle?.backgroundImage ? `url("${raffle.backgroundImage}")` : 'none');
       setImage($('raffleLogoPreview'), raffle?.logoImage || '');
+      setImage($('raffleIndigoPreview'), raffle?.indigoImage || '');
+      $('raffleLogoPreview').style.width = `${raffle?.previewLogoSize || 120}px`;
+      $('raffleIndigoPreview').style.width = `${raffle?.previewIndigoSize || 120}px`;
       $('raffleBoardTitle').textContent = hasEvent ? eventData.name : 'Selecciona un evento';
       $('raffleBoardSubtitle').textContent = hasEvent
         ? `${num(official.length)} series oficiales, ${num(extras.length)} extra, ${num(available.length)} disponibles`
@@ -2678,7 +2707,7 @@
         if ($(id)) $(id).disabled = !hasEvent;
       });
     }
-    const raffleAppearanceInputs = { boxWidth: 'raffleBoxWidth', boxHeight: 'raffleBoxHeight', fontSize: 'raffleFontSize', fontFamily: 'raffleFontFamily', boxColor: 'raffleBoxColor', numberColor: 'raffleNumberColor' };
+    const raffleAppearanceInputs = { boxWidth: 'raffleBoxWidth', boxHeight: 'raffleBoxHeight', fontSize: 'raffleFontSize', fontFamily: 'raffleFontFamily', boxColor: 'raffleBoxColor', numberColor: 'raffleNumberColor', previewLogoSize: 'rafflePreviewLogoSize', previewIndigoSize: 'rafflePreviewIndigoSize', liveLogoSize: 'raffleLiveLogoSize', liveIndigoSize: 'raffleLiveIndigoSize' };
     function syncRaffleSettings(eventData = activeRaffleEvent()) {
       if (!eventData) return null;
       const raffle = ensureRaffle(eventData);
@@ -2690,10 +2719,17 @@
       raffle.fontFamily = $('raffleFontFamily').value;
       raffle.boxColor = $('raffleBoxColor').value;
       raffle.numberColor = $('raffleNumberColor').value;
+      for (const key of ['previewLogoSize', 'previewIndigoSize', 'liveLogoSize', 'liveIndigoSize']) {
+        raffle[key] = Math.min(600, Math.max(40, Number($(raffleAppearanceInputs[key]).value) || 120));
+      }
       return raffle;
     }
     function applyLiveRaffleAppearance(raffle) {
       const stage = $('raffleLive');
+      setImage($('raffleLiveLogo'), raffle.logoImage || '');
+      setImage($('raffleLiveIndigo'), raffle.indigoImage || '');
+      $('raffleLiveLogo').style.width = `${raffle.liveLogoSize}px`;
+      $('raffleLiveIndigo').style.width = `${raffle.liveIndigoSize}px`;
       stage.style.setProperty('--raffle-bg', raffle.backgroundImage ? `url("${raffle.backgroundImage}")` : 'none');
       for (const [key, property] of Object.entries({ boxWidth: 'box-width', boxHeight: 'box-height', fontSize: 'font-size' })) {
         stage.style.setProperty(`--raffle-${property}`, `${raffle[key]}px`);
@@ -2719,6 +2755,70 @@
       raffle.results = raffle.results.filter(result => result.id !== id);
       saveEvents();
       renderRaffle();
+    }
+    function exportRafflePool(format) {
+      const eventData = activeRaffleEvent();
+      if (!eventData || !canUsePage('raffle')) return;
+      const pool = rafflePool(eventData);
+      if (!pool.length) return alert('No hay series para exportar.');
+      if (format === 'pdf') {
+        const drawn = raffleDrawnSeries(eventData);
+        const area = $('printArea');
+        area.innerHTML = `<style>@page{size:A4 portrait} #printArea table{width:100%;border-collapse:collapse} #printArea td,#printArea th{border:1px solid #aaa;padding:4px} #printArea tr{break-inside:avoid}</style><h1>${escapeAttr(eventData.name)}</h1><h2>Series del sorteador</h2><p>${pool.length} series</p>${exportTableHtml(['Serie','Origen','Estado'], pool.map(item => [item.series, item.source, drawn.has(item.series) ? 'Sorteada' : 'Disponible']))}`;
+        area.classList.remove('hidden');
+        try { window.print(); } finally { area.classList.add('hidden'); }
+        return;
+      }
+      const lines = pool.map(item => String(item.series));
+      const content = format === 'csv' ? '\uFEFFSerie\r\n' + lines.join('\r\n') : lines.join('\r\n');
+      const blob = new Blob([content], { type: format === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `series-sorteador-${String(eventData.name || 'evento').replace(/[^a-zA-Z0-9_-]/g, '-')}.${format}`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    function parseRaffleImport(text) {
+      const tokens = String(text).replace(/^\uFEFF/, '').split(/[\r\n,;\t]+/).map(value => value.trim().replace(/^"(.*)"$/, '$1')).filter(Boolean);
+      if (/^series?$/i.test(tokens[0] || '')) tokens.shift();
+      const units = new Set();
+      for (const token of tokens) {
+        const match = token.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
+        if (!match) throw new Error(`Dato invalido: ${token.slice(0, 60)}. Usa numeros enteros o rangos como 100-120.`);
+        const from = Number(match[1]), to = Number(match[2] || match[1]);
+        if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 1 || to < from || to > 1000000 || to - from >= 50000) throw new Error('Rango invalido. Maximo: 50.000 series y numeros hasta 1.000.000.');
+        for (let series = from; series <= to; series++) {
+          units.add(series);
+          if (units.size > 50000) throw new Error('El archivo supera las 50.000 series.');
+        }
+      }
+      if (!units.size) throw new Error('El archivo no contiene series.');
+      return [...units].sort((a,b) => a-b);
+    }
+    async function importRaffleFile() {
+      const input = $('raffleImportFile');
+      const file = input.files[0];
+      const eventData = activeRaffleEvent();
+      if (!file || !eventData || !canUsePage('raffle')) return;
+      try {
+        if (file.size > 5000000) throw new Error('El archivo supera los 5 MB.');
+        const units = parseRaffleImport(await file.text());
+        const existing = new Set(rafflePool(eventData).map(item => item.series));
+        const added = units.filter(series => !existing.has(series));
+        if (!added.length) return alert('Todas las series del archivo ya pertenecen a este sorteo.');
+        if (!confirm(`Agregar ${num(added.length)} series extra a ${eventData.name}?`)) return;
+        const ranges = [];
+        added.forEach(series => {
+          const previous = ranges.at(-1);
+          if (previous && series === previous.to + 1) previous.to = series;
+          else ranges.push({ id: crypto.randomUUID(), from: series, to: series, label: file.name });
+        });
+        ensureRaffle(eventData).extraRanges.push(...ranges);
+        saveEvents();
+        renderRaffle();
+      } catch (error) { alert(error.message || 'No se pudo importar el archivo.'); }
+      finally { input.value = ''; }
     }
     function saveRaffleSettings() {
       const eventData = activeRaffleEvent();
@@ -5581,6 +5681,19 @@
       saveEvents();
       renderRaffle();
     });
+    $('raffleIndigoInput').addEventListener('change', async () => {
+      const eventData = activeRaffleEvent();
+      if (!eventData) return;
+      const value = await readImageFile($('raffleIndigoInput'), 700);
+      if (!value) return;
+      ensureRaffle(eventData).indigoImage = value;
+      saveEvents();
+      renderRaffle();
+    });
+    ['csv', 'txt', 'pdf'].forEach(format => {
+      $(`raffleExport${format[0].toUpperCase()}${format.slice(1)}`).addEventListener('click', () => exportRafflePool(format));
+    });
+    $('raffleImportFile').addEventListener('change', importRaffleFile);
     $('enterApp').addEventListener('click', () => {
       splashDone = true;
       applySession();
