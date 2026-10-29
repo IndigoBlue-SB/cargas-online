@@ -262,13 +262,13 @@
     .raffle-number-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; width: min(760px, 100%); }
     .raffle-number { min-height: 96px; display: grid; place-items: center; border-radius: 8px; background: rgba(255,255,255,.92); color: #062a4a; font-size: clamp(30px, 5vw, 58px); font-weight: 900; box-shadow: 0 14px 34px rgba(0,0,0,.22); }
     .raffle-config { display: grid; gap: 8px; }
-    .raffle-live { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; padding: 24px; box-sizing: border-box; background: #10151b; color: white; overflow: auto; }
+    .raffle-live { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; padding: 24px; box-sizing: border-box; background: #10151b; background-image: var(--raffle-bg, none); background-size: cover; background-position: center; color: white; overflow: auto; }
     .raffle-live::backdrop { background: #10151b; }
     .raffle-live-content { min-height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 24px; }
-    .raffle-live-grid { width: min(1200px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 18px; }
+    .raffle-live-grid { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(var(--raffle-box-width, 260px), 100%), var(--raffle-box-width, 260px))); justify-content: center; gap: 18px; }
     .raffle-live-slot { display: grid; gap: 10px; }
-    .raffle-live-number { height: 140px; display: grid; place-items: center; background: #f5f7fa; color: #102c45; border: 3px solid transparent; border-radius: 8px; font-size: 56px; font-weight: 900; font-variant-numeric: tabular-nums; }
-    .raffle-live-slot.is-stopped .raffle-live-number { border-color: #42d69b; color: #126843; }
+    .raffle-live-number { box-sizing: border-box; min-width: 0; height: var(--raffle-box-height, 140px); display: grid; place-items: center; background: var(--raffle-box-color, #f5f7fa); color: var(--raffle-number-color, #102c45); border: 3px solid transparent; border-radius: 8px; font-size: var(--raffle-font-size, 56px); font-family: var(--raffle-font-family, Arial); font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
+    .raffle-live-slot.is-stopped .raffle-live-number { border-color: #42d69b; }
     .raffle-live-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
     .raffle-config-grid { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 8px; align-items: end; }
     .raffle-extra-row { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(90px, 1fr) minmax(140px, 1.4fr) auto; gap: 6px; align-items: end; }
@@ -837,6 +837,12 @@
                 </label>
                 <label>Imagen de fondo<input id="raffleBgInput" type="file" accept="image/*"></label>
                 <label>Logo<input id="raffleLogoInput" type="file" accept="image/*"></label>
+                <label>Ancho de cuadros<input id="raffleBoxWidth" type="number" min="120" max="900" step="10" value="260"></label>
+                <label>Alto de cuadros<input id="raffleBoxHeight" type="number" min="80" max="600" step="10" value="140"></label>
+                <label>Tamano de numeros<input id="raffleFontSize" type="number" min="24" max="240" step="2" value="56"></label>
+                <label>Fuente de numeros<select id="raffleFontFamily"><option value="Arial">Arial</option><option value="Verdana">Verdana</option><option value="Georgia">Georgia</option><option value="monospace">Monoespaciada</option></select></label>
+                <label>Color de cuadros<input id="raffleBoxColor" type="color" value="#f5f7fa"></label>
+                <label>Color de numeros<input id="raffleNumberColor" type="color" value="#102c45"></label>
               </div>
               <div class="actions">
                 <button type="button" id="raffleDrawOne">Sortear de a uno</button>
@@ -2546,6 +2552,12 @@
         results: [],
         backgroundImage: '',
         logoImage: '',
+        boxWidth: 260,
+        boxHeight: 140,
+        fontSize: 56,
+        fontFamily: 'Arial',
+        boxColor: '#f5f7fa',
+        numberColor: '#102c45',
         ...(eventData.raffle || {})
       };
       eventData.raffle.drawCount = Math.min(Math.max(Number(eventData.raffle.drawCount) || 1, 1), 20);
@@ -2625,21 +2637,23 @@
       const extras = hasEvent ? raffleExtraUnits(eventData) : [];
       const pool = hasEvent ? rafflePool(eventData) : [];
       const available = hasEvent ? raffleAvailablePool(eventData) : [];
-      const lastResult = raffle?.results?.[0] || null;
       $('raffleBoard').style.setProperty('--raffle-bg', raffle?.backgroundImage ? `url("${raffle.backgroundImage}")` : 'none');
       setImage($('raffleLogoPreview'), raffle?.logoImage || '');
       $('raffleBoardTitle').textContent = hasEvent ? eventData.name : 'Selecciona un evento';
       $('raffleBoardSubtitle').textContent = hasEvent
         ? `${num(official.length)} series oficiales, ${num(extras.length)} extra, ${num(available.length)} disponibles`
         : 'El sorteador usa las series confirmadas para bingo.';
-      $('raffleNumberGrid').innerHTML = lastResult?.picks?.length
-        ? lastResult.picks.map(pick => `<div class="raffle-number">${num(pick.series)}</div>`).join('')
-        : '<div class="raffle-number">--</div>';
+      $('raffleNumberGrid').replaceChildren();
+      $('raffleNumberGrid').classList.add('hidden');
       $('rafflePoolSummary').textContent = hasEvent
         ? `${num(pool.length)} series en sorteo - ${num(available.length)} disponibles`
         : '0 series disponibles';
       $('raffleDrawCount').value = raffle?.drawCount || 1;
       $('raffleDrawMode').value = raffle?.drawMode || 'single';
+      for (const [key, id] of Object.entries(raffleAppearanceInputs)) {
+        $(id).value = raffle?.[key] ?? ensureRaffle({})[key];
+        $(id).disabled = !hasEvent;
+      }
       $('raffleExtraList').innerHTML = raffle?.extraRanges?.length ? raffle.extraRanges.map(item => `
         <div class="raffle-result">
           <strong>${num(item.from)}-${num(item.to)}</strong>
@@ -2656,6 +2670,7 @@
           <div>
             <div class="raffle-pill-list">${(result.picks || []).map(pick => `<span class="raffle-pill">${num(pick.series)} · ${escapeAttr(pick.source || '')}</span>`).join('')}</div>
             <small class="muted">${formatDateTime(result.drawnAt)}</small>
+            <div class="actions"><button type="button" class="danger" data-delete-raffle-result="${escapeAttr(result.id)}">Eliminar resultado</button></div>
           </div>
         </div>
       `).join('') : '<div class="empty">Todavia no hay sorteos realizados.</div>';
@@ -2663,12 +2678,47 @@
         if ($(id)) $(id).disabled = !hasEvent;
       });
     }
+    const raffleAppearanceInputs = { boxWidth: 'raffleBoxWidth', boxHeight: 'raffleBoxHeight', fontSize: 'raffleFontSize', fontFamily: 'raffleFontFamily', boxColor: 'raffleBoxColor', numberColor: 'raffleNumberColor' };
     function syncRaffleSettings(eventData = activeRaffleEvent()) {
       if (!eventData) return null;
       const raffle = ensureRaffle(eventData);
       raffle.drawCount = Math.min(Math.max(Number($('raffleDrawCount').value) || 1, 1), 20);
       raffle.drawMode = $('raffleDrawMode').value === 'simultaneous' ? 'simultaneous' : 'single';
+      for (const [key, min, max, fallback] of [['boxWidth', 120, 900, 260], ['boxHeight', 80, 600, 140], ['fontSize', 24, 240, 56]]) {
+        raffle[key] = Math.min(max, Math.max(min, Number($(raffleAppearanceInputs[key]).value) || fallback));
+      }
+      raffle.fontFamily = $('raffleFontFamily').value;
+      raffle.boxColor = $('raffleBoxColor').value;
+      raffle.numberColor = $('raffleNumberColor').value;
       return raffle;
+    }
+    function applyLiveRaffleAppearance(raffle) {
+      const stage = $('raffleLive');
+      stage.style.setProperty('--raffle-bg', raffle.backgroundImage ? `url("${raffle.backgroundImage}")` : 'none');
+      for (const [key, property] of Object.entries({ boxWidth: 'box-width', boxHeight: 'box-height', fontSize: 'font-size' })) {
+        stage.style.setProperty(`--raffle-${property}`, `${raffle[key]}px`);
+      }
+      stage.style.setProperty('--raffle-font-family', raffle.fontFamily);
+      stage.style.setProperty('--raffle-box-color', raffle.boxColor);
+      stage.style.setProperty('--raffle-number-color', raffle.numberColor);
+    }
+    function fitLiveRaffleNumber(element) {
+      const settings = ensureRaffle(liveRaffle.eventData);
+      let size = Math.min(settings.fontSize, settings.boxHeight * 0.7);
+      element.style.fontSize = `${size}px`;
+      if (element.scrollWidth > element.clientWidth) {
+        size = Math.max(1, size * (element.clientWidth - 12) / element.scrollWidth);
+        element.style.fontSize = `${size}px`;
+      }
+    }
+    function deleteRaffleResult(id) {
+      const eventData = activeRaffleEvent();
+      if (!eventData || !canUsePage('raffle')) return;
+      if (!confirm('Eliminar este resultado? Sus series volveran a estar disponibles para sortear.')) return;
+      const raffle = ensureRaffle(eventData);
+      raffle.results = raffle.results.filter(result => result.id !== id);
+      saveEvents();
+      renderRaffle();
     }
     function saveRaffleSettings() {
       const eventData = activeRaffleEvent();
@@ -2686,7 +2736,9 @@
       liveRaffle.slots.forEach((slot, index) => {
         if (slot.stopped) return;
         slot.pick = available.splice(randomIndex(available.length), 1)[0];
-        $('raffleLiveGrid').children[index].querySelector('.raffle-live-number').textContent = num(slot.pick.series);
+        const element = $('raffleLiveGrid').children[index].querySelector('.raffle-live-number');
+        element.textContent = num(slot.pick.series);
+        fitLiveRaffleNumber(element);
       });
     }
     function stopLiveRaffleSlot(index) {
@@ -2733,6 +2785,7 @@
       $('raffleLiveGrid').innerHTML = liveRaffle.slots.map((slot, index) => `<div class="raffle-live-slot"><div class="raffle-live-number">--</div><button type="button" data-stop-raffle-slot="${index}">Detener ${index + 1}</button></div>`).join('');
       $('raffleStopNext').disabled = false;
       $('raffleStopAll').disabled = false;
+      applyLiveRaffleAppearance(raffle);
       $('raffleLive').showModal();
       animateLiveRaffle();
       liveRaffleTimer = setInterval(animateLiveRaffle, 90);
@@ -5502,6 +5555,14 @@
     $('raffleAddExtra').addEventListener('click', addRaffleExtraRange);
     $('raffleDrawCount').addEventListener('change', saveRaffleSettings);
     $('raffleDrawMode').addEventListener('change', saveRaffleSettings);
+    Object.values(raffleAppearanceInputs).forEach(id => $(id).addEventListener('change', saveRaffleSettings));
+    $('raffleResultsList').addEventListener('click', event => {
+      const button = event.target.closest('[data-delete-raffle-result]');
+      if (button) deleteRaffleResult(button.dataset.deleteRaffleResult);
+    });
+    window.addEventListener('resize', () => {
+      if (liveRaffle) $('raffleLiveGrid').querySelectorAll('.raffle-live-number').forEach(fitLiveRaffleNumber);
+    });
     $('raffleBgInput').addEventListener('change', async () => {
       const eventData = activeRaffleEvent();
       if (!eventData) return;
