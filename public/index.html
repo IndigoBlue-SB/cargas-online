@@ -2697,7 +2697,7 @@
         <div class="raffle-result">
           <strong>${num((raffle.results || []).length - index)}</strong>
           <div>
-            <div class="raffle-pill-list">${(result.picks || []).map(pick => `<span class="raffle-pill">${num(pick.series)} · ${escapeAttr(pick.source || '')}</span>`).join('')}</div>
+            <div class="raffle-pill-list">${(result.picks || []).map((pick, stopIndex) => `<span class="raffle-pill">${num(pick.series)} · ${stopIndex + 1}&deg;Stop</span>`).join('')}</div>
             <small class="muted">${formatDateTime(result.drawnAt)}</small>
             <div class="actions"><button type="button" class="danger" data-delete-raffle-result="${escapeAttr(result.id)}">Eliminar resultado</button></div>
           </div>
