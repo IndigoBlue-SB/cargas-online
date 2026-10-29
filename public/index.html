@@ -262,6 +262,14 @@
     .raffle-number-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; width: min(760px, 100%); }
     .raffle-number { min-height: 96px; display: grid; place-items: center; border-radius: 8px; background: rgba(255,255,255,.92); color: #062a4a; font-size: clamp(30px, 5vw, 58px); font-weight: 900; box-shadow: 0 14px 34px rgba(0,0,0,.22); }
     .raffle-config { display: grid; gap: 8px; }
+    .raffle-live { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; padding: 24px; box-sizing: border-box; background: #10151b; color: white; overflow: auto; }
+    .raffle-live::backdrop { background: #10151b; }
+    .raffle-live-content { min-height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 24px; }
+    .raffle-live-grid { width: min(1200px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 18px; }
+    .raffle-live-slot { display: grid; gap: 10px; }
+    .raffle-live-number { height: 140px; display: grid; place-items: center; background: #f5f7fa; color: #102c45; border: 3px solid transparent; border-radius: 8px; font-size: 56px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .raffle-live-slot.is-stopped .raffle-live-number { border-color: #42d69b; color: #126843; }
+    .raffle-live-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
     .raffle-config-grid { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 8px; align-items: end; }
     .raffle-extra-row { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(90px, 1fr) minmax(140px, 1.4fr) auto; gap: 6px; align-items: end; }
     .raffle-results { display: grid; gap: 8px; max-height: 280px; overflow-y: auto; }
@@ -1342,6 +1350,16 @@
     </main>
   </div>
   <div id="printArea" class="hidden"></div>
+  <dialog id="raffleLive" class="raffle-live" aria-label="Sorteo en vivo">
+    <div class="raffle-live-content">
+      <div id="raffleLiveGrid" class="raffle-live-grid"></div>
+      <div class="raffle-live-actions">
+        <button type="button" id="raffleStopNext">Detener siguiente</button>
+        <button type="button" id="raffleStopAll">Detener todos</button>
+        <button type="button" id="raffleLiveBack" class="secondary">Volver a configuracion</button>
+      </div>
+    </div>
+  </dialog>
   <datalist id="sellerOptions"></datalist>
   <datalist id="adminOptions"></datalist>
   <datalist id="townOptions"></datalist>
@@ -2659,22 +2677,65 @@
       saveEvents();
       renderRaffle();
     }
+    let liveRaffle = null;
+    let liveRaffleTimer = null;
+    function animateLiveRaffle() {
+      if (!liveRaffle) return;
+      const used = new Set(liveRaffle.slots.filter(slot => slot.stopped).map(slot => slot.pick.series));
+      const available = liveRaffle.pool.filter(pick => !used.has(pick.series));
+      liveRaffle.slots.forEach((slot, index) => {
+        if (slot.stopped) return;
+        slot.pick = available.splice(randomIndex(available.length), 1)[0];
+        $('raffleLiveGrid').children[index].querySelector('.raffle-live-number').textContent = num(slot.pick.series);
+      });
+    }
+    function stopLiveRaffleSlot(index) {
+      const slot = liveRaffle?.slots[index];
+      if (!slot || slot.stopped) return;
+      slot.stopped = true;
+      const element = $('raffleLiveGrid').children[index];
+      element.classList.add('is-stopped');
+      element.querySelector('button').disabled = true;
+      element.querySelector('button').textContent = 'Detenido';
+      if (!liveRaffle.result) {
+        liveRaffle.result = { id: crypto.randomUUID(), drawnAt: new Date().toISOString(), mode: liveRaffle.mode, picks: [] };
+        ensureRaffle(liveRaffle.eventData).results.unshift(liveRaffle.result);
+      }
+      liveRaffle.result.picks = liveRaffle.slots.filter(item => item.stopped).map(item => ({ ...item.pick }));
+      saveEvents();
+      const finished = liveRaffle.slots.every(item => item.stopped);
+      $('raffleStopNext').disabled = finished;
+      $('raffleStopAll').disabled = finished;
+      if (finished) {
+        clearInterval(liveRaffleTimer);
+        liveRaffleTimer = null;
+      }
+    }
+    function closeLiveRaffle() {
+      if (!liveRaffle) return;
+      const pending = liveRaffle.slots.some(slot => !slot.stopped);
+      if (pending && !confirm('Volver y cancelar los recuadros que siguen corriendo? Los resultados detenidos quedan guardados.')) return;
+      clearInterval(liveRaffleTimer);
+      liveRaffleTimer = null;
+      liveRaffle = null;
+      $('raffleLive').close();
+      renderRaffle();
+    }
     function drawRaffle(mode = null) {
+      if (liveRaffle) return;
       const eventData = activeRaffleEvent();
       if (!eventData) return alert('Primero elegi un evento.');
       const raffle = syncRaffleSettings(eventData);
       const selectedMode = mode || raffle.drawMode;
-      const drawCount = selectedMode === 'simultaneous' ? raffle.drawCount : 1;
-      const picks = pickRaffleItems(eventData, drawCount);
-      if (!picks.length) return alert('No quedan series disponibles para sortear.');
-      raffle.results.unshift({
-        id: crypto.randomUUID(),
-        drawnAt: new Date().toISOString(),
-        mode: selectedMode,
-        picks
-      });
-      saveEvents();
-      renderRaffle();
+      const pool = raffleAvailablePool(eventData);
+      if (pool.length < raffle.drawCount) return alert(`Quedan ${pool.length} series disponibles. Reduce la cantidad de recuadros para iniciar.`);
+      liveRaffle = { eventData, pool, mode: selectedMode, result: null, slots: Array.from({ length: raffle.drawCount }, () => ({ stopped: false, pick: null })) };
+      $('raffleLiveGrid').innerHTML = liveRaffle.slots.map((slot, index) => `<div class="raffle-live-slot"><div class="raffle-live-number">--</div><button type="button" data-stop-raffle-slot="${index}">Detener ${index + 1}</button></div>`).join('');
+      $('raffleStopNext').disabled = false;
+      $('raffleStopAll').disabled = false;
+      $('raffleLive').showModal();
+      animateLiveRaffle();
+      liveRaffleTimer = setInterval(animateLiveRaffle, 90);
     }
     function addRaffleExtraRange() {
       const eventData = activeRaffleEvent();
@@ -5423,6 +5484,18 @@
 
     navButtons.forEach(button => button.addEventListener('click', () => go(button.dataset.page)));
     $('raffleDrawOne').addEventListener('click', () => drawRaffle('single'));
+    $('raffleLiveGrid').addEventListener('click', event => {
+      const button = event.target.closest('[data-stop-raffle-slot]');
+      if (button) stopLiveRaffleSlot(Number(button.dataset.stopRaffleSlot));
+    });
+    $('raffleStopNext').addEventListener('click', () => {
+      if (liveRaffle) stopLiveRaffleSlot(liveRaffle.slots.findIndex(slot => !slot.stopped));
+    });
+    $('raffleStopAll').addEventListener('click', () => {
+      liveRaffle?.slots.forEach((slot, index) => stopLiveRaffleSlot(index));
+    });
+    $('raffleLiveBack').addEventListener('click', closeLiveRaffle);
+    $('raffleLive').addEventListener('cancel', event => { event.preventDefault(); closeLiveRaffle(); });
     $('raffleDrawSimultaneous').addEventListener('click', () => drawRaffle('simultaneous'));
     $('raffleSaveConfig').addEventListener('click', saveRaffleSettings);
     $('raffleResetResults').addEventListener('click', resetRaffleResults);
