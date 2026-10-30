@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
@@ -5145,7 +5145,7 @@
       $('confirmBingoLoad').disabled = confirmed || !unitsFromSales(event.sales || []).length;
       $('goToConfirmedBingo').classList.toggle('hidden', !confirmed);
       $('reopenBingoLoad').classList.toggle('hidden', !confirmed || !isAdmin());
-      $('clearReopenedLoads').classList.toggle('hidden', confirmed || !isAdmin() || !Array.isArray(closure.snapshotSales));
+      $('clearReopenedLoads').classList.toggle('hidden', confirmed || !isAdmin());
       $('clearReopenedLoads').disabled = confirmed || !isAdmin() || !(event.sales || []).length;
       const recoverableSales = lastRecoverableSales(event);
       const canRestorePreviousLoad = !confirmed && isAdmin() && !(event.sales || []).length && recoverableSales.length;
@@ -5463,11 +5463,13 @@
       if (!eventData || !isAdmin()) return;
       const closure = ensureBingoControl(eventData);
       if (isBingoLoadConfirmed(eventData)) return alert('Primero reabri la carga para poder eliminar las filas.');
-      if (!Array.isArray(closure.snapshotSales)) return alert('Todavia no hay una carga confirmada anterior para conservar en Balance, Contable y Estadisticas.');
       const loads = groupLoads(eventData.sales || []);
       const units = totalsFor(eventData.sales || [], eventData).units;
       if (!loads.length) return alert('No hay cargas activas para eliminar.');
-      const message = `Eliminar ${num(loads.length)} filas de carga activa (${num(units)} bingos/series)?\n\nNo se borra Balance, Contable ni Estadisticas: quedan tomando las cargas confirmadas hasta que confirmes una nueva.`;
+      const preservedNotice = Array.isArray(closure.snapshotSales)
+        ? "Balance, Contable y Estadisticas siguen tomando la carga confirmada anterior hasta que confirmes una nueva."
+        : "Como todavia no hay una carga confirmada anterior, Balance, Contable y Estadisticas se actualizaran sin estas ventas.";
+      const message = `Eliminar ${num(loads.length)} filas de carga activa (${num(units)} bingos/series)?\n\n${preservedNotice}\nSe conserva una copia de las ventas eliminadas para recuperarlas si hace falta.`;
       if (!confirm(message)) return;
       if (Array.isArray(closure.snapshotSales) && closure.snapshotSales.length) {
         const preservedClosure = { ...closure, playId: closure.playId || crypto.randomUUID() };
