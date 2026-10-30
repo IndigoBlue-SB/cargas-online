@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const EventSync = require('./public/event-sync.js');
 const PDFDocument = require('pdfkit');
 
 const PORT = Number(process.env.PORT || 3000);
@@ -1627,6 +1628,34 @@ async function handleApi(req, res) {
       restoredFrom: `${selected.sourceDb}:${selected.source}`,
       summary: selected.summary
     });
+  }
+
+
+  if (url.pathname === '/api/events' && req.method === 'PATCH') {
+    const body = await readBody(req);
+    db = readDb();
+    if (!Array.isArray(body.changes)) return sendJson(res, 400, { error: 'Cambios invalidos' });
+    const allowed = new Set(visibleEventsFor(session, db.events || []).map(e => e.id));
+    for (const change of body.changes) {
+      if (session.role !== 'admin' && (change.create ? !hasFunctionPermission(session, db.settings, 'create') : !allowed.has(change.id))) return sendJson(res, 403, { error: 'Sin permiso para este evento' });
+      if (session.role !== 'admin' && change.remove && !hasFunctionPermission(session, db.settings, 'delete')) return sendJson(res, 403, { error: 'Sin permiso para eliminar eventos' });
+      const previous = (db.events || []).find(e => e.id === change.id);
+      if (session.role !== 'admin' && previous && isBingoLoadConfirmed(previous) && (change.fields?.sales || change.fields?.bingoClosure || change.fields?.bingoSeed)) return sendJson(res, 403, { error: 'La carga esta confirmada para bingo. El administrador debe reabrirla antes de modificarla.' });
+      if (change.create && session.role !== 'admin') {
+        change.create.allowedUsers = [...new Set([...(change.create.allowedUsers || []), session.name])];
+      }
+    }
+    let applied;
+    try { applied = EventSync.apply(db.events || [], body.changes); }
+    catch (error) { return sendJson(res, 409, { error: error.message }); }
+    const previous = new Map((db.events || []).map(e => [e.id, e]));
+    db.events = applied.events.map(event => {
+      const old = previous.get(event.id);
+      return old && shouldBackupSales(old.sales || [], event.sales || [])
+        ? appendSalesBackup(event, old.sales, { by: session.name || 'Administrador', reason: 'before-patch' }) : event;
+    });
+    if (body.changes.length) writeDb(db);
+    return sendJson(res, 200, { ok: true, acks: applied.acks });
   }
 
   if (url.pathname === '/api/events' && req.method === 'PUT') {
