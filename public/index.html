@@ -1434,6 +1434,9 @@
     let appNoticeTimer = null;
     let lastSaveWarningAt = 0;
     let eventsSaveQueue = Promise.resolve();
+    let baseEventsVersion = null;
+    let eventsSaveBlocked = false;
+    let pendingLocalWrite = Promise.resolve();
     let pendingEventsRevision = 0;
     let voiceRecognition = null;
     let voiceListening = false;
@@ -1465,44 +1468,81 @@
       const now = Date.now();
       if (now - lastSaveWarningAt < 15000) return;
       lastSaveWarningAt = now;
-      showAppNotice(`${error.message} La carga quedo guardada en esta compu y se va a sincronizar cuando vuelva la conexion.`);
+      if (error.status === 409 || error.status === 403) { showSaveConflict(error.message); return; }
+      showAppNotice(error.message + (error.localSaved ? ' Hay una copia local pendiente de sincronizar.' : ' No se pudo confirmar una copia local. Manten esta pantalla abierta y volve a intentar.'), 0);
     }
 
-    function readPendingEventsState() {
-      try {
-        const parsed = JSON.parse(localStorage.getItem(pendingEventsStorageKey) || 'null');
-        if (!parsed || !Array.isArray(parsed.events)) return null;
-        pendingEventsRevision = Math.max(pendingEventsRevision, Number(parsed.revision) || 0);
-        return parsed;
-      } catch (error) {
-        console.warn('No se pudo leer el respaldo local de eventos.', error);
-        return null;
-      }
+    function pendingDatabase(action, value) {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open('cargas-pending', 1);
+        request.onupgradeneeded = () => request.result.createObjectStore('snapshots');
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction('snapshots', action === 'get' ? 'readonly' : 'readwrite');
+          const store = tx.objectStore('snapshots');
+          const operation = action === 'get' ? store.get(pendingEventsStorageKey)
+            : action === 'put' ? store.put(value, pendingEventsStorageKey) : store.delete(pendingEventsStorageKey);
+          tx.oncomplete = () => { db.close(); resolve(operation.result); };
+          tx.onerror = tx.onabort = () => { db.close(); reject(tx.error || new Error('No se pudo guardar la copia local.')); };
+        };
+      });
     }
-
-    function writePendingEventsState(sourceEvents = events, revision = pendingEventsRevision + 1) {
-      try {
-        pendingEventsRevision = Math.max(pendingEventsRevision, revision);
-        localStorage.setItem(pendingEventsStorageKey, JSON.stringify({
-          revision,
-          savedAt: new Date().toISOString(),
-          events: clonePlain(sourceEvents || [])
-        }));
-        return revision;
-      } catch (error) {
-        console.warn('No se pudo guardar el respaldo local de eventos.', error);
-        return revision;
-      }
+    async function readPendingEventsState() {
+      let local = null, stored = null;
+      try { local = JSON.parse(localStorage.getItem(pendingEventsStorageKey) || 'null'); } catch {}
+      try { stored = await pendingDatabase('get'); } catch {}
+      const parsed = [local, stored].filter(item => Array.isArray(item?.events))
+        .sort((a, b) => new Date(b.savedAt || 0) - new Date(a.savedAt || 0))[0];
+      if (!parsed) return null;
+      pendingEventsRevision = Math.max(pendingEventsRevision, Number(parsed.revision) || 0);
+      return parsed;
     }
-
-    function clearPendingEventsState(revision = null) {
+    async function writePendingEventsState(sourceEvents, revision) {
+      const snapshot = { revision, baseEventsVersion, savedAt: new Date().toISOString(), events: clonePlain(sourceEvents) };
       try {
-        const current = readPendingEventsState();
-        if (revision !== null && current && Number(current.revision) !== Number(revision)) return;
-        localStorage.removeItem(pendingEventsStorageKey);
-      } catch (error) {
-        console.warn('No se pudo limpiar el respaldo local de eventos.', error);
-      }
+        localStorage.setItem(pendingEventsStorageKey, JSON.stringify(snapshot));
+        return true;
+      } catch {}
+      try { await pendingDatabase('put', snapshot); return true; }
+      catch { return false; }
+    }
+    async function clearPendingEventsState(revision = null) {
+      // No borrar un respaldo mas nuevo que la solicitud confirmada.
+      try {
+        const current = JSON.parse(localStorage.getItem(pendingEventsStorageKey) || 'null');
+        if (revision === null || Number(current?.revision) === Number(revision)) localStorage.removeItem(pendingEventsStorageKey);
+      } catch {}
+      try {
+        const current = await pendingDatabase('get');
+        if (revision === null || Number(current?.revision) === Number(revision)) await pendingDatabase('delete');
+      } catch {}
+    }
+    function showSaveConflict(message = "Hay otra version de los eventos en el servidor.") {
+      showAppNotice(message + ' No se guardo en Railway. Tus cambios quedan pendientes; descarga una copia antes de recargar.', 0);
+      if ($('downloadPendingCopy')) return;
+      const button = document.createElement('button');
+      button.id = 'downloadPendingCopy';
+      button.textContent = 'Descargar cambios pendientes';
+      button.onclick = async () => {
+        const pending = await readPendingEventsState();
+        const blob = new Blob([JSON.stringify(pending || { events }, null, 2)], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'cargas-pendientes-' + Date.now() + '.json';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      };
+      $('appNotice').appendChild(button);
+      const reload = document.createElement('button');
+      reload.textContent = 'Volver a datos del servidor';
+      reload.onclick = async () => {
+        if (!confirm('Descarga primero tus cambios pendientes. Volver al servidor descarta la copia local pendiente. Continuar?')) return;
+        await pendingLocalWrite;
+        await clearPendingEventsState();
+        location.reload();
+      };
+      $('appNotice').appendChild(reload);
     }
 
     function mergePendingEvents(serverEvents = [], pendingState = null) {
@@ -1529,7 +1569,11 @@
           ...fetchOptions
         });
         const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error || 'Error de servidor');
+        if (!response.ok) {
+          const error = new Error(data.error || 'Error de servidor');
+          error.status = response.status;
+          throw error;
+        }
         return data;
       } catch (error) {
         if (error.name === 'AbortError') throw new Error('La app tardo demasiado en confirmar la respuesta.');
@@ -1540,12 +1584,33 @@
       }
     }
     function saveEvents({ background = true } = {}) {
-      const localRevision = writePendingEventsState(events);
-      const request = () => api('/api/events', { method: 'PUT', body: JSON.stringify({ events }) })
-        .then(result => {
-          clearPendingEventsState(localRevision);
+      const snapshot = clonePlain(events);
+      const localRevision = ++pendingEventsRevision;
+      const backup = pendingLocalWrite.catch(() => {}).then(() => writePendingEventsState(snapshot, localRevision));
+      pendingLocalWrite = backup;
+      showAppNotice('Guardando cambios... No cierres hasta ver la confirmacion.', 0);
+      const request = async () => {
+        const localSaved = await backup;
+        try {
+          if (eventsSaveBlocked) {
+            const error = new Error('Hay un conflicto pendiente con los datos del servidor.');
+            error.status = 409;
+            throw error;
+          }
+          const result = await api('/api/events', { method: 'PUT', body: JSON.stringify({ events: snapshot, baseEventsVersion }) });
+          baseEventsVersion = result.eventsVersion;
+          await clearPendingEventsState(localRevision);
+          if (localRevision === pendingEventsRevision) showAppNotice('Cambios confirmados y guardados en Railway.', 6000);
           return result;
-        });
+        } catch (error) {
+          error.localSaved = localSaved;
+          if (error.status === 409 || error.status === 403) {
+            eventsSaveBlocked = true;
+            showSaveConflict(error.message);
+          }
+          throw error;
+        }
+      };
       const queued = eventsSaveQueue.catch(() => {}).then(request);
       eventsSaveQueue = queued;
       if (background) queued.catch(handleBackgroundSaveError);
@@ -1569,12 +1634,13 @@
       renderUsers();
     }
     async function loadState() {
-      const pendingState = readPendingEventsState();
+      const pendingState = await readPendingEventsState();
       let data = null;
       try {
         data = await api('/api/state');
       } catch (error) {
         if (!pendingState) throw error;
+        baseEventsVersion = pendingState.baseEventsVersion || null;
         events = mergePendingEvents([], pendingState);
         events.forEach(eventData => {
           eventData.referenceLists = eventReferenceListsFromEvent(eventData, eventData.referenceLists);
@@ -1586,6 +1652,8 @@
         showAppNotice('Sin conexion estable: se muestran los datos guardados en esta compu. Se van a subir cuando vuelva la conexion.', 0);
         return;
       }
+      baseEventsVersion = data.eventsVersion;
+      eventsSaveBlocked = Boolean(pendingState && pendingState.baseEventsVersion !== baseEventsVersion);
       events = mergePendingEvents(data.events || [], pendingState);
       appUsers = data.users || appUsers;
       settings = { ...defaultSettings, ...(data.settings || {}) };
@@ -1596,7 +1664,9 @@
       settings.functionPermissions = normalizeFunctionPermissions(settings.functionPermissions);
       applySettings();
       renderAll();
-      if (pendingState) {
+      if (eventsSaveBlocked) {
+        showSaveConflict();
+      } else if (pendingState) {
         showAppNotice('Hay cargas guardadas localmente pendientes de sincronizar. La app las esta subiendo a Railway.', 9000);
         saveEvents();
       }
@@ -2044,7 +2114,7 @@
         await saveEvents({ background: false });
       } catch (error) {
         handleBackgroundSaveError(error);
-        alert(`${error.message} Quedo guardado en esta compu y se va a subir cuando vuelva la conexion.`);
+        alert(error.message + (error.localSaved ? ' Hay una copia local pendiente.' : ' No cierres esta pantalla sin guardar.'));
       }
       if (shouldRender) renderReferenceLists();
       renderSaleReferenceSelects(eventData);
@@ -6649,8 +6719,8 @@
       }
     }
     bootstrap();
-    window.addEventListener('online', () => {
-      const pendingState = readPendingEventsState();
+    window.addEventListener('online', async () => {
+      const pendingState = await readPendingEventsState();
       if (!pendingState) return;
       showAppNotice('Conexion recuperada: sincronizando cargas guardadas en esta compu...', 9000);
       saveEvents();

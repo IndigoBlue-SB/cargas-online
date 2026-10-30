@@ -1285,6 +1285,10 @@ function publicVirtualSheet(db, token) {
   return null;
 }
 
+function eventsVersion(db) {
+  return crypto.createHash('sha256').update(JSON.stringify(db.events || [])).digest('hex');
+}
+
 function protectConfirmedEvent(existing, incoming, session) {
   if (session.role === 'admin' || !isBingoLoadConfirmed(existing)) return incoming;
   return {
@@ -1337,7 +1341,7 @@ function serveStatic(req, res) {
 
 async function handleApi(req, res) {
   const url = new URL(req.url, 'http://localhost');
-  const db = readDb();
+  let db = readDb();
 
   const virtualMatch = url.pathname.match(/^\/api\/virtual\/([^/]+)$/);
   if (virtualMatch && req.method === 'GET') {
@@ -1376,9 +1380,10 @@ async function handleApi(req, res) {
   }
 
   if (virtualMatch && req.method === 'PUT') {
+    const body = await readBody(req);
+    db = readDb();
     const found = publicVirtualSheet(db, virtualMatch[1]);
     if (!found) return sendJson(res, 404, { error: 'Planilla virtual no encontrada' });
-    const body = await readBody(req);
     const { sheet } = found;
     if ((sheet.status || 'open') !== 'open') return sendJson(res, 409, { error: 'Esta planilla ya esta cerrada.' });
     const desde = Number(sheet.desde) || 0;
@@ -1404,6 +1409,7 @@ async function handleApi(req, res) {
 
   if (url.pathname === '/api/login' && req.method === 'POST') {
     const body = await readBody(req);
+    db = readDb();
     const role = body.role;
     const name = String(body.name || '').trim();
     const password = String(body.password || '').trim();
@@ -1428,6 +1434,7 @@ async function handleApi(req, res) {
 
   if (url.pathname === '/api/recover-admin' && req.method === 'POST') {
     const body = await readBody(req);
+    db = readDb();
     const recoveryPassword = String(body.recoveryPassword || '').trim();
     const newAdminPassword = String(body.newAdminPassword || '').trim();
     const savedRecoveryPassword = String(db.settings?.recoveryPassword || '').trim();
@@ -1464,6 +1471,7 @@ async function handleApi(req, res) {
 
   if (url.pathname === '/api/state' && req.method === 'GET') {
     return sendJson(res, 200, {
+      eventsVersion: eventsVersion(db),
       events: visibleEventsFor(session, db.events || []),
       users: hasFunctionPermission(session, db.settings, 'settings') ? (db.users || []) : [],
       settings: db.settings || defaultDb.settings,
@@ -1489,6 +1497,7 @@ async function handleApi(req, res) {
 
   if (url.pathname === '/api/import-desof-template' && req.method === 'POST') {
     const body = await readBody(req);
+    db = readDb();
     const content = String(body.content || '');
     if (!content.trim()) return sendJson(res, 400, { error: 'Archivo .repx vacio' });
     if (content.length > 10_000_000) return sendJson(res, 400, { error: 'La plantilla .repx es demasiado grande. Usa un archivo menor a 10 MB.' });
@@ -1572,6 +1581,7 @@ async function handleApi(req, res) {
   if (url.pathname === '/api/admin/restore-sales-backup' && req.method === 'POST') {
     if (session.role !== 'admin') return sendJson(res, 403, { error: 'Solo administrador' });
     const body = await readBody(req);
+    db = readDb();
     const query = { id: body.eventId || '', name: body.name || '' };
     const currentIndex = (db.events || []).findIndex(event => eventMatches(event, query));
     if (currentIndex < 0) return sendJson(res, 404, { error: 'Evento actual no encontrado' });
@@ -1621,6 +1631,19 @@ async function handleApi(req, res) {
 
   if (url.pathname === '/api/events' && req.method === 'PUT') {
     const body = await readBody(req);
+    db = readDb();
+    if (!body.baseEventsVersion || body.baseEventsVersion !== eventsVersion(db)) {
+      return sendJson(res, 409, { error: 'Los eventos cambiaron en el servidor o esta pantalla es anterior a la actualizacion. No se reemplazo ninguna venta. Conserva tu copia local y recarga los datos antes de continuar.' });
+    }
+    if (session.role !== 'admin') {
+      const visible = new Map(visibleEventsFor(session, db.events || []).map(event => [event.id, event]));
+      const blocked = (body.events || []).find(event => {
+        const previous = visible.get(event.id);
+        return previous && isBingoLoadConfirmed(previous) &&
+          JSON.stringify(previous.sales || []) !== JSON.stringify(event.sales || []);
+      });
+      if (blocked) return sendJson(res, 403, { error: 'La carga de ' + blocked.name + ' esta confirmada para bingo. El administrador principal debe reabrirla antes de cambiar sus ventas. No se guardaron los cambios.' });
+    }
     if (session.role === 'admin') {
       const incomingEvents = Array.isArray(body.events) ? body.events : [];
       const previousById = new Map((db.events || []).map(event => [String(event.id), event]));
@@ -1654,11 +1677,12 @@ async function handleApi(req, res) {
       }
     }
     writeDb(db);
-    return sendJson(res, 200, { ok: true });
+    return sendJson(res, 200, { ok: true, eventsVersion: eventsVersion(db), savedAt: new Date().toISOString() });
   }
 
   if (url.pathname === '/api/bingo-panel' && req.method === 'PUT') {
     const body = await readBody(req);
+    db = readDb();
     const eventId = String(body.eventId || '');
     const eventIndex = (db.events || []).findIndex(event => String(event.id) === eventId);
     if (eventIndex < 0) return sendJson(res, 404, { error: 'Evento no encontrado' });
@@ -1682,6 +1706,7 @@ async function handleApi(req, res) {
   if (url.pathname === '/api/users' && req.method === 'PUT') {
     if (!hasFunctionPermission(session, db.settings, 'settings')) return sendJson(res, 403, { error: 'Sin permiso para configuraciones' });
     const body = await readBody(req);
+    db = readDb();
     db.users = Array.isArray(body.users) ? body.users : db.users;
     writeDb(db);
     return sendJson(res, 200, { ok: true });
@@ -1690,6 +1715,7 @@ async function handleApi(req, res) {
   if (url.pathname === '/api/settings' && req.method === 'PUT') {
     if (!hasFunctionPermission(session, db.settings, 'settings')) return sendJson(res, 403, { error: 'Sin permiso para configuraciones' });
     const body = await readBody(req);
+    db = readDb();
     db.settings = { ...defaultDb.settings, ...(body.settings || {}) };
     writeDb(db);
     return sendJson(res, 200, { ok: true });

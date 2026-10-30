@@ -1,0 +1,20 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const src=fs.readFileSync('public/index.html','utf8');
+const local=new Map(),db=new Map(),requests=[];let quota=false,networkFailure=false;
+const context=vm.createContext({console,Date,JSON,Blob,URL,setTimeout,localStorage:{getItem:k=>local.get(k),removeItem:k=>local.delete(k),setItem:(k,v)=>{if(quota)throw Error('quota');local.set(k,v)}},pendingDatabase:async(action,value)=>{if(action==='put')db.set('pending',structuredClone(value));if(action==='delete')db.delete('pending');return structuredClone(db.get('pending'))},clonePlain:v=>structuredClone(v),showAppNotice:()=>{},handleBackgroundSaveError:()=>{},api:async(path,options)=>{const body=JSON.parse(options.body);requests.push(body);if(networkFailure)throw Error('offline');return {eventsVersion:'v'+requests.length}}});
+vm.runInContext("let events=[{id:'one',sales:[1]}], baseEventsVersion='v0', eventsSaveBlocked=false, pendingEventsRevision=0, pendingLocalWrite=Promise.resolve(), eventsSaveQueue=Promise.resolve(); const pendingEventsStorageKey='pending';",context);
+vm.runInContext(src.slice(src.indexOf('    async function readPendingEventsState'),src.indexOf('    function mergePendingEvents')),context);
+vm.runInContext(src.slice(src.indexOf('    function saveEvents({'),src.indexOf('    function saveSettingsData')),context);
+vm.runInContext('showSaveConflict = () => {}',context);
+(async()=>{
+ const first=vm.runInContext('saveEvents()',context);vm.runInContext('events[0].sales=[2]',context);const second=vm.runInContext('saveEvents()',context);await Promise.all([first,second]);
+ assert.deepEqual(requests[0].events[0].sales,[1]);assert.deepEqual(requests[1].events[0].sales,[2]);assert.equal(requests[1].baseEventsVersion,'v1');assert.equal(await vm.runInContext('readPendingEventsState()',context),null);
+ quota=true;networkFailure=true;
+ await assert.rejects(vm.runInContext('saveEvents({background:false})',context));
+ const pending=await vm.runInContext('readPendingEventsState()',context);assert.equal(pending.events[0].sales[0],2,'IndexedDB fallback preserves sales when localStorage is full');
+ await vm.runInContext('clearPendingEventsState(1)',context);assert.ok(await vm.runInContext('readPendingEventsState()',context),'old confirmation must not erase newer backup');
+ await vm.runInContext('clearPendingEventsState()',context);assert.equal(await vm.runInContext('readPendingEventsState()',context),null);
+ vm.runInContext('eventsSaveBlocked=true',context);const count=requests.length;
+ await assert.rejects(vm.runInContext('saveEvents({background:false})',context));assert.equal(requests.length,count,'conflicting local changes must not be uploaded');
+ console.log('PASS: frozen snapshots, ordered versions, quota fallback, network failure, backup retention and conflict blocking');
+})().catch(e=>{console.error(e);process.exitCode=1});
