@@ -337,6 +337,7 @@
     .stats-bar-value { color: var(--ink); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
     .stats-bar-label { color: var(--muted); font-size: 11px; line-height: 1.15; min-height: 24px; }
     .stats-bar-change { font-size: 11px; min-height: 14px; }
+    #page-balance-detail .balance-help { color: var(--balance-help-color, #17345a); background: var(--balance-help-bg, #edf4ff); padding: 10px 12px; border-radius: 6px; font-size: 14px; line-height: 1.5; margin: 8px 0; }
     .balance-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; width: 100%; }
     .balance-accounts, .balance-admins, .balance-main, .balance-side { min-width: 0; }
     .balance-side, .balance-admins { border-left: 1px solid var(--line); padding-left: 8px; display: grid; gap: 5px; }
@@ -346,7 +347,7 @@
     #page-balance-detail .panel { padding: 8px; gap: 6px; }
     #page-balance-detail label { gap: 2px; color: var(--balance-label-color, var(--muted)); font-size: var(--balance-label-size, 11px); }
     #page-balance-detail .stat span { color: var(--balance-label-color, var(--muted)); font-size: var(--balance-label-size, 11px); }
-    #page-balance-detail .stat strong { font-size: var(--balance-amount-size, var(--total-font-size)); }
+    #page-balance-detail .stat strong { color: var(--balance-summary-amount-color, #202426); font-size: var(--balance-amount-size, var(--total-font-size)); }
     #page-balance-detail input { min-height: 28px; padding: 5px 6px; font-size: 13px; }
     #page-balance-detail button { min-height: 30px; padding: 5px 8px; font-size: 13px; }
     #page-balance-detail .form-grid { gap: 5px; }
@@ -1024,7 +1025,7 @@
             <label>% Gise<input id="balanceGisePercent" inputmode="decimal" autocomplete="off" value="0"></label>
             <label>% Laureano<input id="balanceLaureanoPercent" inputmode="decimal" autocomplete="off" value="0"></label>
           </div>
-<p class="muted">Compartido: se descuenta de la rendicion antes del reparto. Institucion o Indigo: se descuenta solo de su parte. Las comisiones de administradores son por serie; Gise y Laureano reparten el neto final de Indigo.</p>
+<p class="balance-help">Compartido: se descuenta de la rendicion antes del reparto. Institucion o Indigo: se descuenta solo de su parte. Las comisiones de administradores son por serie; Gise y Laureano reparten el neto final de Indigo.</p>
           <div class="balance-grid">
             <div class="balance-accounts">
               <h3>Cuentas</h3>
@@ -1063,6 +1064,9 @@
           </div>
           <div class="grid-2">
             <label>Color texto<input id="balanceConfigTextColor" type="color"></label>
+            <label>Color importes de tarjetas superiores<input id="balanceConfigSummaryAmountColor" type="color"></label>
+            <label>Color texto explicativo<input id="balanceConfigHelpColor" type="color"></label>
+            <label>Fondo texto explicativo<input id="balanceConfigHelpBgColor" type="color"></label>
             <label>Color titulos<input id="balanceConfigHeadingColor" type="color"></label>
           </div>
           <div class="grid-2">
@@ -3196,6 +3200,9 @@
     function defaultBalanceStyle() {
       return {
         textColor: '#202426',
+        summaryAmountColor: '',
+        helpColor: '#17345a',
+        helpBgColor: '#edf4ff',
         headingColor: '#202426',
         labelColor: '#667078',
         labelSize: 11,
@@ -4180,10 +4187,20 @@
       [...$('balancePrizesList').querySelectorAll('[data-prize-amount]')].forEach(bindAmountFormatting);
     }
 
+    function balanceSummaryColor(style) {
+      if (style.summaryAmountColor) return style.summaryAmountColor;
+      const hex = /^#[0-9a-f]{6}$/i.test(style.panelColor || '') ? style.panelColor : '#ffffff';
+      const rgb = [1,3,5].map(offset => parseInt(hex.slice(offset, offset + 2), 16) / 255)
+        .map(value => value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4));
+      return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2] > 0.179 ? '#202426' : '#ffffff';
+    }
     function applyBalanceStyle(style) {
       const target = $('page-balance-detail');
       if (!target) return;
       target.style.setProperty('--balance-text-color', style.textColor || defaultBalanceStyle().textColor);
+      target.style.setProperty('--balance-summary-amount-color', balanceSummaryColor(style));
+      target.style.setProperty('--balance-help-color', style.helpColor || defaultBalanceStyle().helpColor);
+      target.style.setProperty('--balance-help-bg', style.helpBgColor || defaultBalanceStyle().helpBgColor);
       target.style.setProperty('--balance-heading-color', style.headingColor || defaultBalanceStyle().headingColor);
       target.style.setProperty('--balance-label-color', style.labelColor || defaultBalanceStyle().labelColor);
       target.style.setProperty('--balance-label-size', `${Number(style.labelSize) || defaultBalanceStyle().labelSize}px`);
@@ -4200,6 +4217,9 @@
     function fillBalanceConfig(style) {
       const merged = { ...defaultBalanceStyle(), ...(style || {}) };
       $('balanceConfigTextColor').value = merged.textColor;
+      $('balanceConfigSummaryAmountColor').value = balanceSummaryColor(merged);
+      $('balanceConfigHelpColor').value = merged.helpColor;
+      $('balanceConfigHelpBgColor').value = merged.helpBgColor;
       $('balanceConfigHeadingColor').value = merged.headingColor;
       $('balanceConfigLabelColor').value = merged.labelColor;
       $('balanceConfigLabelSize').value = merged.labelSize;
@@ -6545,6 +6565,9 @@
       const balance = eventBalance(eventData);
       balance.style = {
         textColor: $('balanceConfigTextColor').value,
+        summaryAmountColor: $('balanceConfigSummaryAmountColor').value,
+        helpColor: $('balanceConfigHelpColor').value,
+        helpBgColor: $('balanceConfigHelpBgColor').value,
         headingColor: $('balanceConfigHeadingColor').value,
         labelColor: $('balanceConfigLabelColor').value,
         labelSize: Number($('balanceConfigLabelSize').value) || defaultBalanceStyle().labelSize,
