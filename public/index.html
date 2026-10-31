@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
@@ -265,7 +265,8 @@
     .raffle-live { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; padding: 24px; box-sizing: border-box; background: #10151b; background-image: var(--raffle-bg, none); background-size: cover; background-position: center; color: white; overflow: auto; }
     .raffle-live::backdrop { background: #10151b; }
     .raffle-live-content { min-height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 24px; }
-    .raffle-live-grid { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(var(--raffle-box-width, 260px), 100%), var(--raffle-box-width, 260px))); justify-content: center; gap: 18px; }
+    .raffle-live-grid { width: 100%; display: flex; flex-direction: column; gap: 18px; }
+    .raffle-live-row { display: grid; justify-content: center; gap: 18px; width: 100%; }
     .raffle-live-slot { display: grid; gap: 10px; }
     .raffle-live-number { box-sizing: border-box; min-width: 0; height: var(--raffle-box-height, 140px); display: grid; place-items: center; background: var(--raffle-box-color, #f5f7fa); color: var(--raffle-number-color, #102c45); border: 3px solid transparent; border-radius: 8px; font-size: var(--raffle-font-size, 56px); font-family: var(--raffle-font-family, Arial); font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
     .raffle-live-slot.is-stopped .raffle-live-number { border-color: #42d69b; }
@@ -830,7 +831,7 @@
               <p class="muted">No usa ventas, series ni cartones de ningun bingo. Nombres: uno por linea. Numeros: individuales o rangos como 1-100. Los repetidos se agregan una sola vez.</p>
               <label>Agregar participantes<textarea id="freeRaffleEntries" rows="5" placeholder="Escribi la lista aqui"></textarea></label>
               <div class="actions"><button type="button" id="freeRaffleAdd">Agregar a la lista</button><label>Importar TXT, CSV o DAT<input id="freeRaffleImport" type="file" accept=".txt,.csv,.dat,text/plain,text/csv"></label></div>
-              <div class="actions"><button type="button" id="freeRaffleExportCsv">Exportar CSV</button><button type="button" id="freeRaffleExportTxt">Exportar TXT</button></div><p id="freeRaffleCount" class="muted"></p><div id="freeRaffleParticipants" class="raffle-results"></div>
+              <div class="actions"><button type="button" id="freeRaffleExportCsv">Exportar CSV</button><button type="button" id="freeRaffleExportTxt">Exportar TXT</button></div><p id="freeRaffleCount" class="muted"></p><details><summary>Quitar un numero, rango o nombre</summary><label>Participantes a quitar<textarea id="freeRaffleRemoveText" rows="2" placeholder="Ej: 10 o 20-30"></textarea></label><button type="button" class="danger" id="freeRaffleRemove">Quitar de la lista</button></details>
               <div class="actions"><button type="button" class="danger" id="freeRaffleClear">Vaciar lista</button><button type="button" class="danger" id="freeRaffleArchive">Archivar sorteo libre</button></div>
             </section>
             <div id="raffleBoard" class="raffle-board">
@@ -2773,8 +2774,8 @@
     }
     function renderFreeRaffleParticipants(eventData) {
       const items = eventData.participants || [];
-      $('freeRaffleCount').textContent = items.length + ' participantes · ' + raffleAvailablePool(eventData).length + ' disponibles. Se muestran los primeros 200.';
-      $('freeRaffleParticipants').innerHTML = items.slice(0,200).map(item => '<div class="raffle-result"><span>' + escapeAttr(item.label) + '</span><button type="button" class="danger" data-remove-free-participant="' + escapeAttr(item.id) + '">Quitar</button></div>').join('');
+      $('freeRaffleCount').textContent = items.length + ' participantes · ' + raffleAvailablePool(eventData).length + ' disponibles.';
+      $('freeRaffleRemoveText').placeholder = eventData.participantType === 'names' ? 'Nombre exacto, uno por linea' : 'Ej: 10 o 20-30';
     }
     function addFreeParticipants(text, options = {}) {
       const eventData = activeRaffleEvent();
@@ -2808,10 +2809,18 @@
       try { if (file.size > 5000000) throw Error('El archivo supera los 5 MB.'); addFreeParticipants(await file.text(), { csv: /\.csv$/i.test(file.name) }); }
       catch (error) { alert(error.message); } finally { $('freeRaffleImport').value = ''; }
     });
-    $('freeRaffleParticipants').addEventListener('click', event => {
-      const button = event.target.closest('[data-remove-free-participant]'); if (!button) return;
+    $('freeRaffleRemove').addEventListener('click', () => {
       const item = activeRaffleEvent(); if (!item?.isFreeRaffle) return;
-      item.participants = item.participants.filter(entry => entry.id !== button.dataset.removeFreeParticipant); saveFreeRaffles(); renderRaffle();
+      try {
+        const selected = new Set(FreeRaffle.parse($('freeRaffleRemoveText').value, item.participantType).map(entry => entry.id));
+        const count = item.participants.filter(entry => selected.has(entry.id)).length;
+        if (!count) return alert('No se encontraron esos participantes en la lista.');
+        if (!confirm('Quitar ' + count + ' participantes de este sorteo libre?')) return;
+        item.raffle.listBackups = [...(item.raffle.listBackups || []), { participants: item.participants, results: item.raffle.results, savedAt: new Date().toISOString() }].slice(-5);
+        item.participants = item.participants.filter(entry => !selected.has(entry.id));
+        $('freeRaffleRemoveText').value = '';
+        saveFreeRaffles(); renderRaffle();
+      } catch (error) { alert(error.message); }
     });
     $('freeRaffleClear').addEventListener('click', () => {
       const item = activeRaffleEvent(); if (!item?.isFreeRaffle || !confirm('Vaciar la lista y reiniciar los resultados de este sorteo libre?')) return;
@@ -3010,6 +3019,30 @@
       stage.style.setProperty('--raffle-box-color', raffle.boxColor);
       stage.style.setProperty('--raffle-number-color', raffle.numberColor);
     }
+    function raffleRowSizes(count, maxColumns) {
+      const rows = Math.ceil(count / Math.max(1, maxColumns));
+      if (!rows) return [];
+      const size = Math.floor(count / rows), extra = count % rows;
+      return Array.from({ length: rows }, (_, index) => size + (index < extra ? 1 : 0));
+    }
+    function layoutLiveRaffle() {
+      if (!liveRaffle) return;
+      const grid = $('raffleLiveGrid'), settings = ensureRaffle(liveRaffle.eventData);
+      const slots = [...grid.querySelectorAll('.raffle-live-slot')];
+      const width = grid.clientWidth || Math.max(1, window.innerWidth - 48);
+      const maxColumns = Math.max(1, Math.floor((width + 18) / (settings.boxWidth + 18)));
+      const rows = raffleRowSizes(slots.length, maxColumns);
+      const fragment = document.createDocumentFragment();
+      let index = 0;
+      for (const count of rows) {
+        const row = document.createElement('div');
+        row.className = 'raffle-live-row';
+        row.style.gridTemplateColumns = 'repeat(' + count + ', minmax(0, ' + settings.boxWidth + 'px))';
+        for (let column = 0; column < count; column++) row.appendChild(slots[index++]);
+        fragment.appendChild(row);
+      }
+      grid.replaceChildren(fragment);
+    }
     function fitLiveRaffleNumber(element) {
       const settings = ensureRaffle(liveRaffle.eventData);
       let size = Math.min(settings.fontSize, settings.boxHeight * 0.7);
@@ -3108,7 +3141,7 @@
       liveRaffle.slots.forEach((slot, index) => {
         if (slot.stopped) return;
         slot.pick = available.splice(randomIndex(available.length), 1)[0];
-        const element = $('raffleLiveGrid').children[index].querySelector('.raffle-live-number');
+        const element = $('raffleLiveGrid').querySelectorAll('.raffle-live-slot')[index].querySelector('.raffle-live-number');
         element.textContent = raffleLabel(slot.pick);
         fitLiveRaffleNumber(element);
       });
@@ -3117,7 +3150,7 @@
       const slot = liveRaffle?.slots[index];
       if (!slot || slot.stopped) return;
       slot.stopped = true;
-      const element = $('raffleLiveGrid').children[index];
+      const element = $('raffleLiveGrid').querySelectorAll('.raffle-live-slot')[index];
       element.classList.add('is-stopped');
       element.querySelector('button').disabled = true;
       element.querySelector('button').textContent = 'Detenido';
@@ -3159,6 +3192,7 @@
       $('raffleStopAll').disabled = false;
       applyLiveRaffleAppearance(raffle);
       $('raffleLive').showModal();
+      layoutLiveRaffle();
       animateLiveRaffle();
       liveRaffleTimer = setInterval(animateLiveRaffle, 90);
     }
@@ -5948,6 +5982,7 @@
       if (button) deleteRaffleResult(button.dataset.deleteRaffleResult);
     });
     window.addEventListener('resize', () => {
+      layoutLiveRaffle();
       if (liveRaffle) $('raffleLiveGrid').querySelectorAll('.raffle-live-number').forEach(fitLiveRaffleNumber);
     });
     $('raffleBgInput').addEventListener('change', async () => {
