@@ -32,6 +32,7 @@ const BINGO_COLUMN_RANGES = [
 
 const defaultDb = {
   events: [],
+  freeRaffles: [],
   users: [],
   settings: {
     font: 'Arial, Helvetica, sans-serif',
@@ -1472,6 +1473,7 @@ async function handleApi(req, res) {
 
   if (url.pathname === '/api/state' && req.method === 'GET') {
     return sendJson(res, 200, {
+      freeRaffles: hasFunctionPermission(session, db.settings, 'raffle') ? (db.freeRaffles || []) : [],
       eventsVersion: eventsVersion(db),
       events: visibleEventsFor(session, db.events || []),
       users: hasFunctionPermission(session, db.settings, 'settings') ? (db.users || []) : [],
@@ -1630,6 +1632,21 @@ async function handleApi(req, res) {
     });
   }
 
+
+
+  if (url.pathname === '/api/free-raffles' && req.method === 'PATCH') {
+    if (!hasFunctionPermission(session, db.settings, 'raffle')) return sendJson(res, 403, { error: 'Sin permiso para Sorteador' });
+    const body = await readBody(req);
+    db = readDb();
+    if (!Array.isArray(body.changes)) return sendJson(res, 400, { error: 'Cambios invalidos' });
+    try {
+      const applied = EventSync.apply(db.freeRaffles || [], body.changes);
+      if (applied.events.some(event => !event.isFreeRaffle || !['numbers','names'].includes(event.participantType) || !Array.isArray(event.participants) || event.participants.length > 50000 || !String(event.name || '').trim() || String(event.name).length > 120 || event.participants.some(item => !item || typeof item.id !== 'string' || typeof item.label !== 'string' || item.label.length > 200) || new Set(event.participants.map(item => item.id)).size !== event.participants.length)) return sendJson(res, 400, { error: 'Sorteo libre invalido' });
+      db.freeRaffles = applied.events;
+      if (body.changes.length) writeDb(db);
+      return sendJson(res, 200, { ok: true, acks: applied.acks });
+    } catch (error) { return sendJson(res, 409, { error: error.message }); }
+  }
 
   if (url.pathname === '/api/events' && req.method === 'PATCH') {
     const body = await readBody(req);
