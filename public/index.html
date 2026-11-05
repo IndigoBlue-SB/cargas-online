@@ -1279,6 +1279,7 @@
             <p id="bingoClosureInfo">La cantidad oficial para Balance, Contable y Bingo se fija al confirmar la carga.</p>
           </div>
           <div class="actions">
+            <button type="button" class="light" id="reviewDuplicateSales">Revisar series repetidas</button>
             <button type="button" id="confirmBingoLoad">Confirmar carga para bingo</button>
             <button type="button" class="secondary hidden" id="restorePreviousLoad">Recuperar carga anterior</button>
             <button type="button" class="secondary hidden" id="restoreBackupLoad">Recuperar desde respaldo</button>
@@ -1393,6 +1394,15 @@
       </section>
     </main>
   </div>
+  <dialog id="duplicateSalesDialog" aria-labelledby="duplicateSalesTitle" style="width:min(960px,94vw);max-height:86vh;overflow:auto;border:0;border-radius:12px;padding:22px">
+    <div class="table-head"><h2 id="duplicateSalesTitle">Series repetidas en la carga</h2><button type="button" id="closeDuplicateSales">Cerrar</button></div>
+    <p id="duplicateSalesSummary"></p><p>Selecciona una serie para ver a que planilla y vendedor corresponde cada carga. No se elimina ni se corrige nada automaticamente.</p>
+    <label>Buscar serie repetida<input id="duplicateSeriesSearch" type="number" min="1" step="1" placeholder="Numero de serie"></label><button type="button" id="duplicateSeriesFind">Ver serie</button>
+    <div id="duplicateSeriesList" class="actions" style="display:flex;flex-wrap:wrap;gap:6px;margin:14px 0"></div>
+    <div class="actions"><button type="button" id="duplicateSeriesPrev">Anteriores</button><span id="duplicateSeriesPage"></span><button type="button" id="duplicateSeriesNext">Siguientes</button></div>
+    <h3 id="duplicateSeriesSelected"></h3><div class="scroll"><table><thead><tr><th>Vendedor</th><th>Planilla</th><th>Rango de la carga</th><th>Localidad</th><th>Fecha</th><th>Corregir</th></tr></thead><tbody id="duplicateSeriesOwners"></tbody></table></div>
+  </dialog>
+
   <div id="printArea" class="hidden"></div>
   <dialog id="raffleLive" class="raffle-live" aria-label="Sorteo en vivo">
     <div class="raffle-live-content">
@@ -1416,6 +1426,7 @@
   <script src="/event-sync.js"></script>
   <script src="/balance-engine.js"></script>
   <script src="/free-raffle.js"></script>
+  <script src="/duplicate-sales.js"></script>
   <script>
     const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], bingo: [], raffle: [], virtual: [], sheets: [], balance: [], accounting: [], settings: [] };
     const functionLabels = { home: 'Inicio', create: 'Crear evento', stats: 'Estadisticas', delete: 'Papelera', events: 'Eventos', bingo: 'Bingo', raffle: 'Sorteador', virtual: 'Ventas virtuales', sheets: 'Planillas', balance: 'Balance', accounting: 'Contable', settings: 'Configuraciones' };
@@ -1621,6 +1632,9 @@
         if (!response.ok) {
           const error = new Error(data.error || 'Error de servidor');
           error.status = response.status;
+          error.code = data.code;
+          error.duplicates = data.duplicates;
+          error.eventId = data.eventId;
           throw error;
         }
         return data;
@@ -1674,7 +1688,9 @@
           return result;
         } catch (error) {
           error.localSaved = await backup;
-          if (error.status === 409 || error.status === 403) {
+          if (error.code === 'DUPLICATE_SALES') {
+            eventsSaveBlocked = false;
+          } else if (error.status === 409 || error.status === 403) {
             eventsSaveBlocked = true;
             showSaveConflict(error.message);
           } else if (localRevision === pendingEventsRevision) {
@@ -5341,6 +5357,9 @@
       $('bingoClosureInfo').textContent = confirmed
         ? `${num(officialUnits.length)} series/cartones oficiales. Confirmo ${closure.confirmedBy || 'Sin usuario'} el ${formatDateTime(closure.confirmedAt)}. Semilla oficial: ${event.bingoSeed}.`
         : `${num(unitsFromSales(event.sales || []).length)} series/cartones cargados. Al confirmar, esta cantidad se usa para Balance, Contable y Bingo. Semilla oficial: ${event.bingoSeed}.`;
+      const duplicateCount = DuplicateSales.analyze(event.sales || []).count;
+      $('reviewDuplicateSales').textContent = duplicateCount ? 'Revisar ' + num(duplicateCount) + ' series repetidas' : 'Revisar series repetidas';
+      $('reviewDuplicateSales').disabled = !(event.sales || []).length;
       $('confirmBingoLoad').classList.toggle('hidden', confirmed);
       $('confirmBingoLoad').disabled = confirmed || !unitsFromSales(event.sales || []).length;
       $('goToConfirmedBingo').classList.toggle('hidden', !confirmed);
@@ -5607,16 +5626,72 @@
       }
     }
 
-    function confirmBingoLoad() {
+    let duplicateReview = null;
+    function openDuplicateSales(report = null, eventId = null) {
+      const event = eventId ? events.find(item => item.id === eventId) : activeEvent(); if (!event) return;
+      report = report || DuplicateSales.analyze(event.sales || []);
+      if (!report.count) return alert('No hay series repetidas en esta carga.');
+      duplicateReview = { eventId: event.id, report, offset: 0 };
+      $('duplicateSalesSummary').textContent = event.name + ': ' + num(report.count) + ' series repetidas y ' + num(report.extraOccurrences) + ' apariciones de mas. Corregi las cargas antes de confirmar para bingo.';
+      $('duplicateSeriesSearch').value = '';
+      renderDuplicateSeriesPage();
+      selectDuplicateSeries(DuplicateSales.page(report, 0, 1)[0]);
+      if (!$('duplicateSalesDialog').open) $('duplicateSalesDialog').showModal();
+    }
+    function renderDuplicateSeriesPage() {
+      if (!duplicateReview) return;
+      const { report, offset } = duplicateReview;
+      const numbers = DuplicateSales.page(report, offset, 100);
+      $('duplicateSeriesList').innerHTML = numbers.map(number => '<button type="button" data-duplicate-series="' + number + '">Serie ' + num(number) + '</button>').join('');
+      $('duplicateSeriesPrev').disabled = offset === 0;
+      $('duplicateSeriesNext').disabled = offset + numbers.length >= report.count;
+      $('duplicateSeriesPage').textContent = num(offset + 1) + '–' + num(offset + numbers.length) + ' de ' + num(report.count);
+    }
+    function selectDuplicateSeries(number) {
+      if (!duplicateReview || !Number.isSafeInteger(number)) return;
+      const event = events.find(event => event.id === duplicateReview.eventId);
+      if (!event) return;
+      const owners = DuplicateSales.owners(duplicateReview.report, number);
+      $('duplicateSeriesSelected').textContent = owners.length ? 'Serie ' + num(number) + ' · ' + owners.length + ' apariciones' : 'Esta serie no esta repetida.';
+      $('duplicateSeriesOwners').innerHTML = owners.map(owner => {
+        const virtual = (event.virtualSheets || []).find(sheet => sheet.id === owner.virtualSheetId);
+        const perSheet = Number(virtual?.seriesPerSheet) || eventSeriesPerSheet(event);
+        const plan = planNumberForSeries(number, perSheet);
+        const exists = (event.sales || []).some(sale => String(sale.id) === owner.saleId);
+        const canEdit = exists && !isBingoLoadConfirmed(event);
+        const origin = virtual ? ' · Virtual ' + (virtual.sheetFrom || plan) + (virtual.sheetTo && virtual.sheetTo !== virtual.sheetFrom ? '–' + virtual.sheetTo : '') : '';
+        return '<tr><td><strong>' + escapeAttr(owner.seller) + '</strong></td><td>Planilla ' + num(plan) + ' (' + planRangeLabel(plan, perSheet) + ')' + escapeAttr(origin) + '</td><td>' + num(owner.from) + '–' + num(owner.to) + '</td><td>' + escapeAttr([owner.town, owner.province].filter(Boolean).join(', ')) + '</td><td>' + escapeAttr(owner.date || 'Sin fecha') + '</td><td><button type="button" data-edit-duplicate-load="' + escapeAttr(owner.loadId) + '" ' + (canEdit ? '' : 'disabled') + '>Editar carga</button></td></tr>';
+      }).join('');
+    }
+    $('closeDuplicateSales').addEventListener('click', () => $('duplicateSalesDialog').close());
+    $('reviewDuplicateSales').addEventListener('click', () => openDuplicateSales());
+    $('duplicateSeriesList').addEventListener('click', event => {
+      const button = event.target.closest('[data-duplicate-series]'); if (button) selectDuplicateSeries(Number(button.dataset.duplicateSeries));
+    });
+    $('duplicateSeriesFind').addEventListener('click', () => selectDuplicateSeries(Number($('duplicateSeriesSearch').value)));
+    $('duplicateSeriesSearch').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); selectDuplicateSeries(Number(event.target.value)); } });
+    $('duplicateSeriesPrev').addEventListener('click', () => { duplicateReview.offset = Math.max(0, duplicateReview.offset - 100); renderDuplicateSeriesPage(); });
+    $('duplicateSeriesNext').addEventListener('click', () => { duplicateReview.offset += 100; renderDuplicateSeriesPage(); });
+    $('duplicateSeriesOwners').addEventListener('click', event => {
+      const button = event.target.closest('[data-edit-duplicate-load]'); if (!button) return;
+      activeEventId = duplicateReview.eventId;
+      $('duplicateSalesDialog').close();
+      editLoad(button.dataset.editDuplicateLoad);
+    });
+
+    async function confirmBingoLoad() {
       const eventData = activeEvent();
       if (!eventData) return;
+      const duplicateReport = DuplicateSales.analyze(eventData.sales || []);
+      if (duplicateReport.count) { openDuplicateSales(duplicateReport); return; }
       ensureBingoControl(eventData);
       const soldUnits = unitsFromSales(eventData.sales || []);
       const soldUnitsTotal = totalsFor(eventData.sales || [], eventData).units;
       if (!soldUnits.length) return alert('No hay series/cartones cargados para confirmar.');
       const message = `Confirmar ${num(soldUnitsTotal)} series/cartones vendidas para Balance, Contable y Bingo? Luego la carga queda bloqueada.`;
       if (!confirm(message)) return;
-      const previousClosure = eventData.bingoClosure || {};
+      const previousClosure = clonePlain(eventData.bingoClosure || {});
+      const previousHistory = clonePlain(eventData.bingoClosureHistory || []);
       const startsNewPlay = Boolean(previousClosure.activeLoadClearedAt);
       const playId = startsNewPlay ? crypto.randomUUID() : (previousClosure.playId || crypto.randomUUID());
       eventData.bingoClosure = {
@@ -5632,7 +5707,20 @@
       };
       upsertBingoClosureHistory(eventData, eventData.bingoClosure);
       activeBingoEventId = eventData.id;
-      saveEvents();
+      try {
+        const saved = await saveEvents({ background: false });
+        if (saved?.conflict) return;
+      } catch (error) {
+        if (error.code === 'DUPLICATE_SALES') {
+          eventData.bingoClosure = previousClosure;
+          eventData.bingoClosureHistory = previousHistory;
+          renderActiveEvent();
+          openDuplicateSales(error.duplicates, error.eventId);
+          // Persist the still-open load, never the rejected confirmation.
+          saveEvents();
+        } else handleBackgroundSaveError(error);
+        return;
+      }
       resetSaleForm();
       renderActiveEvent();
       renderBalanceEvents();

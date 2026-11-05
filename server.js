@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const EventSync = require('./public/event-sync.js');
+const DuplicateSales = require('./public/duplicate-sales.js');
 const PDFDocument = require('pdfkit');
 
 const PORT = Number(process.env.PORT || 3000);
@@ -1665,6 +1666,13 @@ async function handleApi(req, res) {
     let applied;
     try { applied = EventSync.apply(db.events || [], body.changes); }
     catch (error) { return sendJson(res, 409, { error: error.message }); }
+    for (const change of body.changes) {
+      if (!(change.create || change.fields?.sales || change.fields?.bingoClosure)) continue;
+      const proposed = applied.events.find(event => event.id === change.id);
+      if (!proposed || !isBingoLoadConfirmed(proposed)) continue;
+      const duplicates = DuplicateSales.analyze(proposed.sales || []);
+      if (duplicates.count) return sendJson(res, 422, { code: 'DUPLICATE_SALES', eventId: proposed.id, error: 'Hay series repetidas. Corregilas antes de confirmar la carga para bingo.', duplicates });
+    }
     const previous = new Map((db.events || []).map(e => [e.id, e]));
     db.events = applied.events.map(event => {
       const old = previous.get(event.id);
@@ -1689,6 +1697,12 @@ async function handleApi(req, res) {
           JSON.stringify(previous.sales || []) !== JSON.stringify(event.sales || []);
       });
       if (blocked) return sendJson(res, 403, { error: 'La carga de ' + blocked.name + ' esta confirmada para bingo. El administrador principal debe reabrirla antes de cambiar sus ventas. No se guardaron los cambios.' });
+    }
+    for (const proposed of (Array.isArray(body.events) ? body.events : [])) {
+      const old = (db.events || []).find(event => event.id === proposed.id);
+      if (!isBingoLoadConfirmed(proposed) || (old && JSON.stringify(old.sales) === JSON.stringify(proposed.sales) && JSON.stringify(old.bingoClosure) === JSON.stringify(proposed.bingoClosure))) continue;
+      const duplicates = DuplicateSales.analyze(proposed.sales || []);
+      if (duplicates.count) return sendJson(res, 422, { code: 'DUPLICATE_SALES', eventId: proposed.id, error: 'Hay series repetidas. Corregilas antes de confirmar la carga para bingo.', duplicates });
     }
     if (session.role === 'admin') {
       const incomingEvents = Array.isArray(body.events) ? body.events : [];
