@@ -829,6 +829,7 @@
             <section id="freeRaffleEditor" class="panel hidden">
               <h3>Lista independiente de participantes</h3>
               <p class="muted">No usa ventas, series ni cartones de ningun bingo. Nombres: uno por linea. Numeros: individuales o rangos como 1-100. Los repetidos se agregan una sola vez.</p>
+<div id="freeRaffleRangeControls" class="grid-3"><label>Desde<input id="freeRaffleRangeFrom" type="number" min="0" step="1" placeholder="Ej: 1"></label><label>Hasta<input id="freeRaffleRangeTo" type="number" min="0" step="1" placeholder="Ej: 100"></label><button type="button" id="freeRaffleAddRange">Agregar rango</button></div>
               <label>Agregar participantes<textarea id="freeRaffleEntries" rows="5" placeholder="Escribi la lista aqui"></textarea></label>
               <div class="actions"><button type="button" id="freeRaffleAdd">Agregar a la lista</button><label>Importar TXT, CSV o DAT<input id="freeRaffleImport" type="file" accept=".txt,.csv,.dat,text/plain,text/csv"></label></div>
               <div class="actions"><button type="button" id="freeRaffleExportCsv">Exportar CSV</button><button type="button" id="freeRaffleExportTxt">Exportar TXT</button></div><p id="freeRaffleCount" class="muted"></p><details><summary>Quitar un numero, rango o nombre</summary><label>Participantes a quitar<textarea id="freeRaffleRemoveText" rows="2" placeholder="Ej: 10 o 20-30"></textarea></label><button type="button" class="danger" id="freeRaffleRemove">Quitar de la lista</button></details>
@@ -2819,6 +2820,8 @@
       if (button) deleteFreeRaffle(button.dataset.deleteFreeRaffle);
     });
     function renderFreeRaffleParticipants(eventData) {
+      $('freeRaffleRangeControls').classList.toggle('hidden', eventData.participantType !== 'numbers');
+      $('freeRaffleEntries').placeholder = eventData.participantType === 'names' ? 'Un nombre por linea' : 'Tambien podes escribir numeros o rangos: 1-100, 150, 200-250';
       const items = eventData.participants || [];
       $('freeRaffleCount').textContent = items.length + ' participantes · ' + raffleAvailablePool(eventData).length + ' disponibles.';
       $('freeRaffleRemoveText').placeholder = eventData.participantType === 'names' ? 'Nombre exacto, uno por linea' : 'Ej: 10 o 20-30';
@@ -2847,6 +2850,22 @@
     });
     $('freeRaffleExportCsv').addEventListener('click', () => exportRafflePool('csv'));
     $('freeRaffleExportTxt').addEventListener('click', () => exportRafflePool('txt'));
+    function addFreeRaffleRange() {
+      const event = activeRaffleEvent();
+      if (!event?.isFreeRaffle || event.participantType !== 'numbers') return;
+      const from = $('freeRaffleRangeFrom').value.trim(), to = $('freeRaffleRangeTo').value.trim();
+      if (!from) return alert('Escribi el numero inicial en Desde.');
+      try {
+        addFreeParticipants(from + '-' + (to || from));
+        $('freeRaffleRangeFrom').value = '';
+        $('freeRaffleRangeTo').value = '';
+        $('freeRaffleRangeFrom').focus();
+      } catch (error) { alert(error.message); }
+    }
+    $('freeRaffleAddRange').addEventListener('click', addFreeRaffleRange);
+    ['freeRaffleRangeFrom','freeRaffleRangeTo'].forEach(id => $(id).addEventListener('keydown', event => {
+      if (event.key === 'Enter') { event.preventDefault(); addFreeRaffleRange(); }
+    }));
     $('freeRaffleAdd').addEventListener('click', () => {
       try { addFreeParticipants($('freeRaffleEntries').value); $('freeRaffleEntries').value = ''; } catch (error) { alert(error.message); }
     });
