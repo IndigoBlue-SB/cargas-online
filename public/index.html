@@ -2800,8 +2800,24 @@
       return saving;
     }
     function renderFreeRaffleList(list) {
-      $('freeRaffleList').innerHTML = list.map(item => '<button type="button" class="raffle-event-button ' + (item.id === activeRaffleEventId ? 'active' : '') + '" data-open-raffle="' + escapeAttr(item.id) + '"><strong>' + escapeAttr(item.name) + '</strong><span>Sorteo libre · ' + (item.participantType === 'names' ? 'Nombres' : 'Numeros') + ' · ' + (item.participants || []).length + ' participantes</span></button>').join('') || '<p class="muted">Todavia no hay sorteos libres.</p>';
+      $('freeRaffleList').innerHTML = list.map(item => '<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center"><button type="button" class="raffle-event-button ' + (item.id === activeRaffleEventId ? 'active' : '') + '" data-open-raffle="' + escapeAttr(item.id) + '"><strong>' + escapeAttr(item.name) + '</strong><span>Sorteo libre · ' + (item.participantType === 'names' ? 'Nombres' : 'Numeros') + ' · ' + (item.participants || []).length + ' participantes</span></button><button type="button" class="danger" data-delete-free-raffle="' + escapeAttr(item.id) + '" aria-label="Eliminar ' + escapeAttr(item.name) + '">Eliminar</button></div>').join('') || '<p class="muted">Todavia no hay sorteos libres.</p>';
     }
+    function deleteFreeRaffle(id) {
+      if (!canUsePage('raffle')) return;
+      const item = freeRaffles.find(event => event.id === id);
+      if (!item || item.archived) return;
+      if (liveRaffle?.eventData?.id === id) return alert('Finaliza el sorteo en curso antes de eliminarlo.');
+      if (!confirm('Eliminar el sorteo libre "' + item.name + '" de la lista?')) return;
+      item.archived = true;
+      item.deletedAt = new Date().toISOString();
+      if (activeRaffleEventId === id) activeRaffleEventId = null;
+      saveFreeRaffles();
+      renderRaffle();
+    }
+    $('freeRaffleList').addEventListener('click', event => {
+      const button = event.target.closest('[data-delete-free-raffle]');
+      if (button) deleteFreeRaffle(button.dataset.deleteFreeRaffle);
+    });
     function renderFreeRaffleParticipants(eventData) {
       const items = eventData.participants || [];
       $('freeRaffleCount').textContent = items.length + ' participantes · ' + raffleAvailablePool(eventData).length + ' disponibles.';
