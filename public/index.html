@@ -1295,6 +1295,9 @@
               <label>Localidad<select id="localidad" required><option value="">Elegir localidad</option></select></label>
               <label>Provincia<select id="provincia" required><option value="">Elegir provincia</option></select></label>
             </div>
+            <label>Buscar vendedor por nombre (todas las localidades)<input id="sellerNameSearch" type="search" placeholder="Escribi parte del nombre" autocomplete="off"></label>
+            <label><span><input id="showLoadedSellers" type="checkbox" style="width:auto;min-height:auto"> Mostrar vendedores ya cargados</span></label>
+            <p id="sellerPendingSummary" class="muted" aria-live="polite"></p>
             <div class="grid-2">
               <label>Vendedor<select id="vendedor" required><option value="">Elegir vendedor</option></select></label>
               <label>Sin Cargos<input id="sinCargos" type="number" min="0" step="1" value="0"></label>
@@ -1866,52 +1869,63 @@
     function provincesForTown(eventData, town) {
       const cleanTown = normalize(town);
       if (!eventData || !cleanTown) return [];
-      const sellers = referenceLists(eventData).sellers || [];
-      const sellerProvinces = sellers
-        .filter(seller => normalize(seller.town) === cleanTown)
-        .map(seller => seller.province);
-      const saleProvinces = (eventData.sales || [])
-        .filter(sale => normalize(sale.town) === cleanTown)
-        .map(sale => sale.province);
-      const eventProvince = normalize(eventData.town) === cleanTown ? eventData.province : '';
-      return uniqueTextList([...sellerProvinces, ...saleProvinces, eventProvince]);
+      const registered = uniqueTextList((referenceLists(eventData).sellers || [])
+        .filter(seller => normalize(seller.town) === cleanTown).map(seller => seller.province));
+      if (registered.length) return registered;
+      const previous = uniqueTextList((eventData.sales || []).filter(sale => normalize(sale.town) === cleanTown).map(sale => sale.province));
+      if (previous.length) return previous;
+      return uniqueTextList(normalize(eventData.town) === cleanTown ? [eventData.province] : []);
+    }
+    function sellerLoadingState(eventData) {
+      const loaded = new Set((eventData.sales || []).map(sale => normalize(sale.seller)).filter(Boolean));
+      const editing = new Set((eventData.sales || []).filter(sale => editingLoadId && (sale.batchId || sale.id) === editingLoadId).map(sale => normalize(sale.seller)));
+      return { loaded, editing };
     }
     function renderSaleReferenceSelects(eventData = activeEvent()) {
       if (!eventData) return;
-      const lists = referenceLists(eventData);
-      const sellers = lists.sellers || [];
-      const currentTown = fields.localidad.value;
-      const currentProvince = fields.provincia.value;
-      const currentSeller = fields.vendedor.value;
-      const towns = [...(lists.towns || []), ...sellers.map(seller => seller.town), eventData.town || ''];
-      const provinceSellers = sellers.filter(seller => !currentTown || seller.town === currentTown);
-      const provinces = currentTown
-        ? provincesForTown(eventData, currentTown)
-        : [...(lists.provinces || []), ...provinceSellers.map(seller => seller.province), eventData.province || ''];
-      const sellersForTown = sellerOptionsForEvent(eventData, { town: currentTown, province: currentProvince });
-      const nextSeller = sellersForTown.some(seller => seller.name === currentSeller) ? currentSeller : '';
-      setSelectOptions(fields.localidad, towns, 'Elegir localidad', currentTown);
-      setSelectOptions(fields.provincia, provinces, 'Elegir provincia', currentProvince);
-      setSelectOptions(fields.vendedor, sellersForTown.map(seller => seller.name), 'Elegir vendedor', nextSeller);
+      const lists = referenceLists(eventData), sellers = lists.sellers || [];
+      const currentTown = fields.localidad.value, currentSeller = fields.vendedor.value;
+      const provinces = currentTown ? provincesForTown(eventData, currentTown) : lists.provinces;
+      let province = fields.provincia.value;
+      if (currentTown && provinces.length === 1) province = provinces[0];
+      else if (currentTown && !provinces.some(value => normalize(value) === normalize(province))) province = '';
+      setSelectOptions(fields.localidad, [...lists.towns, ...sellers.map(seller => seller.town), eventData.town || ''], 'Elegir localidad', currentTown);
+      setSelectOptions(fields.provincia, provinces, 'Elegir provincia', province);
+      const { loaded, editing } = sellerLoadingState(eventData);
+      const query = normalize($('sellerNameSearch').value);
+      const showLoaded = $('showLoadedSellers').checked;
+      const candidates = sellers.filter(seller => {
+        const key = normalize(seller.name);
+        if (!showLoaded && loaded.has(key) && !editing.has(key)) return false;
+        if (query) return key.includes(query);
+        return (!currentTown || normalize(seller.town) === normalize(currentTown)) && (!province || normalize(seller.province) === normalize(province));
+      });
+      // Editing an existing load must keep its seller available even with an active filter.
+      for (const seller of sellers) if (editing.has(normalize(seller.name)) && !candidates.some(item => normalize(item.name) === normalize(seller.name))) candidates.push(seller);
+      const selected = candidates.find(seller => normalize(seller.name) === normalize(currentSeller))?.name || '';
+      setSelectOptions(fields.vendedor, candidates.map(seller => seller.name), 'Elegir vendedor', selected);
+      const pending = sellers.filter(seller => !loaded.has(normalize(seller.name))).length;
+      $('sellerPendingSummary').textContent = pending + ' vendedores pendientes de ' + sellers.length + ' registrados en este evento. Los registros se conservan para la proxima carga.';
     }
     function applySellerReference() {
-      const eventData = activeEvent();
-      if (!eventData) return;
-      const seller = sellerReferenceByName(eventData, fields.vendedor.value);
-      if (!seller) return;
-      if (seller.admin) fields.saleAdmin.value = seller.admin;
-      if (seller.town) fields.localidad.value = seller.town;
-      if (seller.province) fields.provincia.value = seller.province;
+      const eventData = activeEvent(); if (!eventData) return;
+      const seller = sellerReferenceByName(eventData, fields.vendedor.value); if (!seller) return;
+      const lists = referenceLists(eventData);
+      fields.saleAdmin.value = seller.admin || eventData.admin || '';
+      setSelectOptions(fields.localidad, [...lists.towns, seller.town], 'Elegir localidad', seller.town || '');
+      const provinces = seller.town ? provincesForTown(eventData, seller.town) : lists.provinces;
+      setSelectOptions(fields.provincia, [...provinces, seller.province], 'Elegir provincia', seller.province || (provinces.length === 1 ? provinces[0] : ''));
       renderSaleReferenceSelects(eventData);
     }
-    function applyTownReference() {
-      const eventData = activeEvent();
-      if (!eventData) return;
-      const matchingSellers = sellerOptionsForEvent(eventData, { town: fields.localidad.value });
-      renderSellerOptions(eventData, { town: fields.localidad.value });
-      const provinces = provincesForTown(eventData, fields.localidad.value);
-      if (provinces.length === 1) fields.provincia.value = provinces[0];
-      if (!matchingSellers.some(seller => seller.name === fields.vendedor.value)) fields.vendedor.value = '';
+    function applyTownReference(event) {
+      const eventData = activeEvent(); if (!eventData) return;
+      if (event?.target === fields.localidad) $('sellerNameSearch').value = '';
+      const town = fields.localidad.value, provinces = provincesForTown(eventData, town);
+      const current = provinces.find(value => normalize(value) === normalize(fields.provincia.value)) || '';
+      setSelectOptions(fields.provincia, town ? provinces : referenceLists(eventData).provinces, 'Elegir provincia', provinces.length === 1 ? provinces[0] : current);
+      const matching = sellerOptionsForEvent(eventData, { town });
+      if (!matching.some(seller => normalize(seller.name) === normalize(fields.vendedor.value))) fields.vendedor.value = '';
+      renderSellerOptions(eventData, { town });
       renderSaleReferenceSelects(eventData);
     }
     function voiceKey(value) {
@@ -6617,6 +6631,9 @@
     fields.desde.addEventListener('blur', () => {
       if (!fields.hasta.value && fields.desde.value) fillHastaFromDesde(true);
     });
+    $('sellerNameSearch').addEventListener('input', () => renderSaleReferenceSelects());
+    $('showLoadedSellers').addEventListener('change', () => renderSaleReferenceSelects());
+    fields.provincia.addEventListener('change', () => renderSaleReferenceSelects());
     fields.vendedor.addEventListener('input', applySellerReference);
     fields.vendedor.addEventListener('change', applySellerReference);
     fields.vendedor.addEventListener('blur', applySellerReference);
