@@ -4,6 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const EventSync = require('./public/event-sync.js');
 const DuplicateSales = require('./public/duplicate-sales.js');
+const SellerRewards = require('./public/seller-rewards.js');
 const PDFDocument = require('pdfkit');
 
 const PORT = Number(process.env.PORT || 3000);
@@ -1634,6 +1635,36 @@ async function handleApi(req, res) {
   }
 
 
+
+
+  if (url.pathname === '/api/seller-rewards/generate' && req.method === 'POST') {
+    const body = await readBody(req); db = readDb();
+    const event = (db.events || []).find(item => item.id === body.eventId);
+    if (!event || !visibleEventsFor(session, [event]).length) return sendJson(res, 404, { error: 'Evento no encontrado' });
+    if (!hasFunctionPermission(session, db.settings, 'raffle') && session.role !== 'admin') return sendJson(res, 403, { error: 'Sin permiso para Sorteador' });
+    const config = SellerRewards.settings(body.settings);
+    if (config.mode === 'quantity' && (!Number.isSafeInteger(config.unitsPerTicket) || config.unitsPerTicket < 1)) return sendJson(res, 400, { error: 'Escribi una cantidad entera mayor a cero.' });
+    const sheetSize = Math.max(1, Number(event.seriesPerSheet || event.virtualSeriesPerSheet) || 10);
+    const sourceKey = SellerRewards.signature(event.sales || [], config, sheetSize);
+    if (sourceKey !== body.sourceKey) return sendJson(res, 409, { error: 'Las ventas cambiaron. Actualiza antes de asignar numeros.' });
+    const duplicates = DuplicateSales.analyze(event.sales || []);
+    if (duplicates.count) return sendJson(res, 422, { code: 'DUPLICATE_SALES', eventId: event.id, duplicates, error: 'Corregi las series repetidas antes de asignar participaciones.' });
+    const rows = SellerRewards.eligibility(event.sales || [], config, sheetSize);
+    if (!rows.some(row => row.ticketCount)) return sendJson(res, 400, { error: 'Ningun vendedor alcanza la condicion elegida.' });
+    let assignment = event.sellerRewardAssignment;
+    if (!assignment || assignment.sourceKey !== sourceKey) {
+      if ((event.raffle?.sellerResults || []).length && !body.resetResults) return sendJson(res, 409, { error: 'La nueva asignacion reinicia los resultados del sorteo de vendedores. Confirma para continuar.' });
+      assignment = { sourceKey, tickets: SellerRewards.generate(rows, max => crypto.randomInt(max)), generatedAt: new Date().toISOString(), generatedBy: session.name };
+      event.raffle = { ...(event.raffle || {}), sellerResults: [] };
+    }
+    event.sellerRewardSettings = config; event.sellerRewardAssignment = assignment;
+    writeDb(db);
+    return sendJson(res, 200, { ok: true, settings: config, assignment, sellerResults: event.raffle?.sellerResults || [] });
+  }
+  if (url.pathname === '/api/free-raffles' && req.method === 'GET') {
+    if (!hasFunctionPermission(session, db.settings, 'raffle')) return sendJson(res, 403, { error: 'Sin permiso para Sorteador' });
+    return sendJson(res, 200, { events: db.freeRaffles || [] });
+  }
 
   if (url.pathname === '/api/free-raffles' && req.method === 'PATCH') {
     if (!hasFunctionPermission(session, db.settings, 'raffle')) return sendJson(res, 403, { error: 'Sin permiso para Sorteador' });

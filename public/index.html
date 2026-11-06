@@ -267,6 +267,8 @@
     .raffle-live-content { min-height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 24px; }
     .raffle-live-grid { width: 100%; display: flex; flex-direction: column; gap: 18px; }
     .raffle-live-row { display: grid; justify-content: center; gap: 18px; width: 100%; }
+    .raffle-live-owner { color: #ffffff; text-align: center; font-weight: 700; }
+    .raffle-live-owner:empty { display:none; }
     .raffle-live-slot { display: grid; gap: 10px; }
     .raffle-live-number { box-sizing: border-box; min-width: 0; height: var(--raffle-box-height, 140px); display: grid; place-items: center; background: var(--raffle-box-color, #f5f7fa); color: var(--raffle-number-color, #102c45); border: 3px solid transparent; border-radius: 8px; font-size: var(--raffle-font-size, 56px); font-family: var(--raffle-font-family, Arial); font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
     .raffle-live-slot.is-stopped .raffle-live-number { border-color: #42d69b; }
@@ -821,11 +823,12 @@
             <label>Nombre del sorteo<input id="freeRaffleName" maxlength="120" placeholder="Ej: Sorteo del club"></label>
             <label>Participantes<select id="freeRaffleType"><option value="numbers">Numeros</option><option value="names">Nombres</option></select></label>
             <button type="button" id="createFreeRaffle">Crear sorteo libre</button>
+            <button type="button" class="secondary" id="syncFreeRaffles">Guardar y sincronizar sorteos libres</button><p id="freeRaffleSyncStatus" class="muted" role="status"></p>
             <div id="freeRaffleList" class="raffle-event-list"></div>
             <h3>Sorteos de bingos</h3>
             <div id="raffleEventsList" class="raffle-event-list"></div>
           </aside>
-          <section class="raffle-stage">
+          <section class="raffle-stage"><section id="sellerRewardsRaffle" class="panel hidden"></section>
             <section id="freeRaffleEditor" class="panel hidden">
               <h3>Lista independiente de participantes</h3>
               <p class="muted">No usa ventas, series ni cartones de ningun bingo. Nombres: uno por linea. Numeros: individuales o rangos como 1-100. Los repetidos se agregan una sola vez.</p>
@@ -850,6 +853,7 @@
                 <span id="rafflePoolSummary" class="muted">0 series disponibles</span>
               </div>
               <div class="raffle-config-grid">
+                <label id="raffleAudienceLabel">Sortear<select id="raffleAudience"><option value="series">Series del bingo</option><option value="sellers">Numeros de vendedores</option></select></label>
                 <label>Cantidad de sorteos<input id="raffleDrawCount" type="number" min="1" max="20" step="1" value="1"></label>
                 <label>Modo
                   <select id="raffleDrawMode">
@@ -1290,6 +1294,7 @@
           </div>
         </div>
 
+        <section id="sellerRewardsLoad" class="panel"></section>
         <div class="event-layout">
           <form id="saleForm" class="panel form-grid">
             <div class="grid-2">
@@ -1431,6 +1436,7 @@
   <script src="/balance-engine.js"></script>
   <script src="/free-raffle.js"></script>
   <script src="/duplicate-sales.js"></script>
+  <script src="/seller-rewards.js"></script>
   <script>
     const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], bingo: [], raffle: [], virtual: [], sheets: [], balance: [], accounting: [], settings: [] };
     const functionLabels = { home: 'Inicio', create: 'Crear evento', stats: 'Estadisticas', delete: 'Papelera', events: 'Eventos', bingo: 'Bingo', raffle: 'Sorteador', virtual: 'Ventas virtuales', sheets: 'Planillas', balance: 'Balance', accounting: 'Contable', settings: 'Configuraciones' };
@@ -1451,7 +1457,7 @@
     let activeBingoEventId = null;
     let activeRaffleEventId = null;
     let freeRaffles = [], freeRaffleBaseline = [], freeRaffleRevision = 0, freeRaffleNeedsSync = false, freeRaffleSyncConflict = false;
-    let freeRaffleSaveQueue = Promise.resolve(), freeRaffleBackupQueue = Promise.resolve();
+    let freeRaffleSaveQueue = Promise.resolve(), freeRaffleBackupQueue = Promise.resolve(), freeRaffleRetryTimer = null;
     const freeRafflePendingKey = "cargas.freeRaffles.pending.v1";
     let activeStatsEventId = null;
     let statsRangeStart = '';
@@ -2776,6 +2782,7 @@
       return target?.isFreeRaffle ? saveFreeRaffles() : saveEvents();
     }
     function saveFreeRaffles() {
+      window.clearTimeout(freeRaffleRetryTimer);
       const revision = ++freeRaffleRevision;
       const pending = { events: clonePlain(freeRaffles), base: clonePlain(freeRaffleBaseline) };
       const backup = freeRaffleBackupQueue.catch(() => {}).then(() => pendingDatabase('put', pending, freeRafflePendingKey)).then(() => true, () => false);
@@ -2785,19 +2792,41 @@
         if (revision !== freeRaffleRevision) return;
         if (freeRaffleSyncConflict) throw Error('Hay otra version del sorteo libre. La copia local se conserva; no se reemplazo el servidor.');
         const snapshot = clonePlain(freeRaffles), changes = EventSync.diff(freeRaffleBaseline, snapshot);
+        $('freeRaffleSyncStatus').textContent = 'Guardando y verificando en Railway...';
         showAppNotice('Guardando sorteo libre...', 0);
-        if (changes.length) await api('/api/free-raffles', { method: 'PATCH', body: JSON.stringify({ changes }) });
+        let verified = null;
+        const matches = remote => EventSync.diff(remote.events || [], EventSync.apply(remote.events || [], changes).events).length === 0;
+        if (changes.length) {
+          try { await api('/api/free-raffles', { method: 'PATCH', body: JSON.stringify({ changes }) }); }
+          catch (error) {
+            if ([401,403,409].includes(error.status)) throw error;
+            try { verified = await api('/api/free-raffles'); if (!matches(verified)) throw error; }
+            catch { throw error; }
+          }
+          // A confirmed write is a valid base even if the subsequent verification loses connectivity.
+          freeRaffleBaseline = snapshot;
+        }
+        verified = verified || await api('/api/free-raffles');
+        const replay = EventSync.apply(verified.events || [], changes);
+        if (EventSync.diff(verified.events || [], replay.events).length) throw Error('Railway no devolvio los cambios esperados. La copia local se conserva.');
         freeRaffleBaseline = snapshot;
         await backup;
         if (revision === freeRaffleRevision) {
           await pendingDatabase('delete', undefined, freeRafflePendingKey).catch(() => {});
           freeRaffleNeedsSync = false;
+          $('freeRaffleSyncStatus').textContent = 'Sorteos libres guardados y verificados en Railway.';
           showAppNotice('Sorteo libre guardado en Railway.', 6000);
         }
       };
       const saving = freeRaffleSaveQueue.catch(() => {}).then(request);
       freeRaffleSaveQueue = saving;
-      saving.catch(error => showAppNotice('No se confirmo el guardado del sorteo libre: ' + error.message, 0));
+      saving.catch(async error => {
+        const localSaved = await backup;
+        const text = 'No se confirmo el guardado: ' + error.message + (localSaved ? ' Hay una copia local pendiente.' : ' Manten esta pantalla abierta.');
+        $('freeRaffleSyncStatus').textContent = text;
+        showAppNotice(text, 0);
+        if (![401,403,409].includes(error.status) && !freeRaffleSyncConflict && revision === freeRaffleRevision) freeRaffleRetryTimer = window.setTimeout(() => saveFreeRaffles(), 5000);
+      });
       return saving;
     }
     function renderFreeRaffleList(list) {
@@ -2840,6 +2869,15 @@
       renderRaffle();
       return entries.size - before;
     }
+    $('syncFreeRaffles').addEventListener('click', async () => {
+      try { await saveFreeRaffles(); } catch(error) {
+        if (error.status === 401) {
+          await freeRaffleBackupQueue;
+          currentUser = null; applySession();
+          showAppNotice('La sesion vencio. Inicia sesion nuevamente; la copia pendiente del sorteo libre queda conservada.', 0);
+        }
+      }
+    });
     $('createFreeRaffle').addEventListener('click', () => {
       if (!canUsePage('raffle')) return;
       const name = $('freeRaffleName').value.trim();
@@ -2897,10 +2935,87 @@
       item.archived = true; saveFreeRaffles(); activeRaffleEventId = null; renderRaffle();
     });
 
+    const sellerRewardDrafts = new Map();
+    function sellerRewardConfig(event) { return sellerRewardDrafts.get(event.id) || SellerRewards.settings(event.sellerRewardSettings); }
+    function sellerRewardsCurrent(event) {
+      const draft = event && sellerRewardDrafts.get(event.id);
+      if (draft && JSON.stringify(draft) !== JSON.stringify(SellerRewards.settings(event.sellerRewardSettings))) return false;
+      return event?.sellerRewardAssignment?.sourceKey === SellerRewards.signature(event.sales || [], SellerRewards.settings(event.sellerRewardSettings), eventSeriesPerSheet(event));
+    }
+    function renderSellerRewards(event, containerId) {
+      const container = $(containerId); if (!container) return;
+      container.classList.toggle('hidden', !event || !!event.isFreeRaffle); if (!event || event.isFreeRaffle) return;
+      const opened = container.querySelector('details')?.open || false;
+      const config = sellerRewardConfig(event), rows = SellerRewards.eligibility(event.sales || [], config, eventSeriesPerSheet(event));
+      const total = rows.reduce((sum,row) => sum + row.ticketCount,0);
+      const current = sellerRewardsCurrent(event) && JSON.stringify(config) === JSON.stringify(SellerRewards.settings(event.sellerRewardSettings));
+      const tickets = current ? event.sellerRewardAssignment.tickets : [];
+      container.dataset.rewardEvent = event.id;
+      const html = '<details ' + (opened ? 'open' : '') + '><summary data-reward-summary><strong>Sorteo de vendedores · ' + total + ' participaciones</strong></summary><p>Planillas completas: todas las series de una misma planilla deben pertenecer al mismo vendedor. En cantidad vendida, escribi cuantas ventas dan derecho a un numero.</p><div class="grid-2"><label>Regla<select data-reward-mode><option value="sheets" ' + (config.mode === 'sheets' ? 'selected' : '') + '>Una participacion por planilla completa</option><option value="quantity" ' + (config.mode === 'quantity' ? 'selected' : '') + '>Una participacion por cantidad vendida</option></select></label><label ' + (config.mode === 'sheets' ? 'class="hidden"' : '') + '>Series/bingos por numero<input data-reward-quantity type="number" min="1" step="1" value="' + (config.unitsPerTicket || '') + '"></label></div><p>Planillas de ' + eventSeriesPerSheet(event) + ' series. El primer numero se asigna en orden alfabetico; los adicionales se reparten variados y quedan guardados.</p><div class="actions"><button type="button" data-seller-reward-action="generate" ' + (!total ? 'disabled' : '') + '>Asignar y guardar numeros</button><button type="button" data-seller-reward-action="draw" ' + (!current ? 'disabled' : '') + '>Ir al sorteo de vendedores</button><button type="button" data-seller-reward-action="export" ' + (!current ? 'disabled' : '') + '>Exportar listado CSV</button></div><p class="muted" data-reward-status>' + (current ? 'Asignacion guardada: ' + tickets.length + ' numeros.' : 'La asignacion debe generarse o actualizarse antes de sortear.') + '</p><div class="scroll"><table><thead><tr><th>Vendedor</th><th>Series vendidas</th><th>Planillas completas</th><th>Participaciones</th><th>Primer numero</th><th>Adicionales</th></tr></thead><tbody data-reward-rows>' + rows.map(row => {
+        const own = tickets.filter(ticket => ticket.key === row.key);
+        return '<tr><td>' + escapeAttr(row.seller) + '</td><td>' + row.units + '</td><td>' + row.fullSheets + '</td><td>' + row.ticketCount + '</td><td>' + (own.find(ticket => ticket.first)?.number || '—') + '</td><td>' + own.filter(ticket => !ticket.first).map(ticket => ticket.number).join(', ') + '</td></tr>';
+      }).join('') + '</tbody></table></div></details>';
+      if (container.querySelector('[data-reward-quantity]') === document.activeElement) {
+        const next = document.createElement('div'); next.innerHTML = html;
+        for (const selector of ['[data-reward-summary]','[data-reward-rows]','[data-reward-status]']) {
+          const before = container.querySelector(selector), after = next.querySelector(selector);
+          if (before && after) before.innerHTML = after.innerHTML;
+        }
+        for (const button of container.querySelectorAll('[data-seller-reward-action]')) button.disabled = next.querySelector('[data-seller-reward-action="' + button.dataset.sellerRewardAction + '"]').disabled;
+      } else container.innerHTML = html;
+    }
+    async function generateSellerRewards(event) {
+      const config = sellerRewardConfig(event), sourceKey = SellerRewards.signature(event.sales || [], config, eventSeriesPerSheet(event));
+      const resetResults = (event.raffle?.sellerResults || []).length > 0 && event.sellerRewardAssignment?.sourceKey !== sourceKey;
+      if (resetResults && !confirm('Cambiar las participaciones reinicia los resultados del sorteo de vendedores. Continuar?')) return;
+      const saved = await saveEvents({ background: false }); if (saved?.conflict) return;
+      const result = await api('/api/seller-rewards/generate', { method: 'POST', body: JSON.stringify({ eventId: event.id, settings: config, sourceKey, resetResults }) });
+      event.sellerRewardSettings = result.settings; event.sellerRewardAssignment = result.assignment;
+      ensureRaffle(event).sellerResults = result.sellerResults;
+      const base = eventsBaseline.find(item => item.id === event.id);
+      if (base) { base.sellerRewardSettings = clonePlain(result.settings); base.sellerRewardAssignment = clonePlain(result.assignment); base.raffle = { ...(base.raffle || {}), sellerResults: clonePlain(result.sellerResults) }; }
+      sellerRewardDrafts.delete(event.id);
+      renderSellerRewards(event, 'sellerRewardsLoad'); renderSellerRewards(event, 'sellerRewardsRaffle');
+      showAppNotice('Numeros de vendedores asignados y guardados en Railway.', 7000);
+    }
+    function exportSellerRewards(event) {
+      const assignment = event.sellerRewardAssignment; if (!sellerRewardsCurrent(event)) return alert('Actualiza la asignacion antes de exportar.');
+      const rows = SellerRewards.eligibility(event.sales || [], event.sellerRewardSettings, eventSeriesPerSheet(event));
+      const cell = value => '"' + String(/^[=+@-]/.test(String(value)) ? "'" + value : value).replace(/"/g,'""') + '"';
+      const lines = [['Vendedor','Ventas','Planillas completas','Participaciones','Numeros'],...rows.map(row=>[row.seller,row.units,row.fullSheets,row.ticketCount,assignment.tickets.filter(ticket=>ticket.key===row.key).map(ticket=>ticket.number).join(', ')])];
+      const url = URL.createObjectURL(new Blob(['\uFEFF' + lines.map(row=>row.map(cell).join(';')).join('\r\n')], {type:'text/csv;charset=utf-8'}));
+      const link = document.createElement('a');link.href=url;link.download='participaciones-vendedores.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }
+    ['sellerRewardsLoad','sellerRewardsRaffle'].forEach(id => {
+      const updateRewardDraft = event => {
+        if (!event.target.matches('[data-reward-mode], [data-reward-quantity]')) return;
+        const container = $(id), target = events.find(item => item.id === container.dataset.rewardEvent); if (!target) return;
+        sellerRewardDrafts.set(target.id, {mode:container.querySelector('[data-reward-mode]').value,unitsPerTicket:Number(container.querySelector('[data-reward-quantity]').value)||0});
+        renderSellerRewards(target,id);
+      };
+      $(id).addEventListener('input', event => { if (event.target.matches('[data-reward-quantity]')) updateRewardDraft(event); });
+      $(id).addEventListener('change', event => { if (event.target.matches('[data-reward-mode]')) updateRewardDraft(event); });
+      $(id).addEventListener('click', async event => {
+        const button = event.target.closest('[data-seller-reward-action]'); if (!button) return;
+        const target = events.find(item => item.id === $(id).dataset.rewardEvent); if (!target) return;
+        button.disabled = true;
+        try {
+          if (button.dataset.sellerRewardAction === 'generate') await generateSellerRewards(target);
+          if (button.dataset.sellerRewardAction === 'draw') {activeRaffleEventId=target.id;ensureRaffle(target).audience='sellers';saveEvents();go('raffle');renderRaffle();}
+          if (button.dataset.sellerRewardAction === 'export') exportSellerRewards(target);
+        } catch(error) {
+          if (error.code==='DUPLICATE_SALES') {activeEventId=target.id;go('event');openDuplicateSales(error.duplicates,target.id);}
+          else alert(error.message);
+        } finally {button.disabled=false;}
+      });
+    });
+
     function activeRaffleEvent() { return [...freeRaffles, ...events].find(event => event.id === activeRaffleEventId && !isDeletedEvent(event) && !event.archived); }
     function ensureRaffle(eventData) {
       if (!eventData) return null;
       eventData.raffle = {
+        audience: 'series',
+        sellerResults: [],
         drawCount: 1,
         drawMode: 'single',
         extraRanges: [],
@@ -2926,9 +3041,11 @@
       eventData.raffle.results = Array.isArray(eventData.raffle.results) ? eventData.raffle.results : [];
       return eventData.raffle;
     }
+    function isSellerRaffle(event) { return !event?.isFreeRaffle && event?.raffle?.audience === 'sellers'; }
+    function raffleResults(event) { const raffle = ensureRaffle(event); if (!raffle) return []; return isSellerRaffle(event) ? (raffle.sellerResults || (raffle.sellerResults = [])) : raffle.results; }
     function raffleLabel(pick) { return pick.label || num(pick.series); }
     function raffleOfficialUnits(eventData) {
-      if (eventData?.isFreeRaffle) return [];
+      if (eventData?.isFreeRaffle || isSellerRaffle(eventData)) return [];
       return [...new Set(officialSoldUnits(eventData).map(Number).filter(Number.isFinite))].sort((a, b) => a - b);
     }
     function raffleExtraUnits(eventData) {
@@ -2942,6 +3059,7 @@
       });
     }
     function rafflePool(eventData) {
+      if (isSellerRaffle(eventData)) return sellerRewardsCurrent(eventData) ? eventData.sellerRewardAssignment.tickets.map(ticket => ({series:ticket.number,seller:ticket.seller,source:'Vendedores'})) : [];
       if (eventData?.isFreeRaffle) return (eventData.participants || []).map(item => ({ series: item.id, label: item.label, source: 'Sorteo libre' }));
       const official = raffleOfficialUnits(eventData).map(series => ({ series, source: 'Bingo' }));
       const officialSet = new Set(official.map(item => item.series));
@@ -2953,7 +3071,7 @@
       return [...merged.values()].sort((a, b) => a.series - b.series);
     }
     function raffleDrawnSeries(eventData) {
-      return new Set((ensureRaffle(eventData)?.results || []).flatMap(result => result.picks || []).map(pick => eventData.isFreeRaffle ? String(pick.series) : Number(pick.series)));
+      return new Set((raffleResults(eventData) || []).flatMap(result => result.picks || []).map(pick => eventData.isFreeRaffle ? String(pick.series) : Number(pick.series)));
     }
     function raffleAvailablePool(eventData) {
       const drawn = raffleDrawnSeries(eventData);
@@ -2993,7 +3111,7 @@
           <button type="button" class="raffle-event-button ${eventData.id === activeRaffleEventId ? 'active' : ''}" data-open-raffle="${escapeAttr(eventData.id)}">
             <strong>${escapeAttr(eventData.name)}</strong>
             <span>${escapeAttr(eventData.date || '')} - ${escapeAttr(eventData.town || '')}</span>
-            <span>${num(official.length)} oficiales - ${num(pool.length)} en sorteo - ${num((raffle.results || []).length)} resultados</span>
+            <span>${num(official.length)} oficiales - ${num(pool.length)} en sorteo - ${num(raffleResults(eventData).length)} resultados</span>
           </button>
         `;
       }).join('') : '<div class="empty">No hay eventos disponibles.</div>';
@@ -3001,14 +3119,18 @@
     }
     function renderRaffleDetail(eventData) {
       const hasEvent = Boolean(eventData);
+      $('raffleAudienceLabel').classList.toggle('hidden', !hasEvent || !!eventData.isFreeRaffle);
+      $('raffleAudience').value = eventData?.raffle?.audience || 'series';
+      renderSellerRewards(eventData,'sellerRewardsRaffle');
       $('freeRaffleEditor').classList.toggle('hidden', !eventData?.isFreeRaffle);
-      $('raffleAddExtra').closest('section').classList.toggle('hidden', !!eventData?.isFreeRaffle);
+      $('raffleAddExtra').closest('section').classList.toggle('hidden', !!eventData?.isFreeRaffle || isSellerRaffle(eventData));
       if (eventData?.isFreeRaffle) renderFreeRaffleParticipants(eventData);
       const raffle = hasEvent ? ensureRaffle(eventData) : null;
       const official = hasEvent ? raffleOfficialUnits(eventData) : [];
       const extras = hasEvent ? raffleExtraUnits(eventData) : [];
       const pool = hasEvent ? rafflePool(eventData) : [];
       const available = hasEvent ? raffleAvailablePool(eventData) : [];
+      const results = hasEvent ? raffleResults(eventData) : [];
       $('raffleBoard').style.setProperty('--raffle-bg', raffle?.backgroundImage ? `url("${raffle.backgroundImage}")` : 'none');
       setImage($('raffleLogoPreview'), raffle?.logoImage || '');
       setImage($('raffleIndigoPreview'), raffle?.indigoImage || '');
@@ -3016,12 +3138,12 @@
       $('raffleIndigoPreview').style.width = `${raffle?.previewIndigoSize || 120}px`;
       $('raffleBoardTitle').textContent = hasEvent ? eventData.name : 'Selecciona un evento';
       $('raffleBoardSubtitle').textContent = hasEvent
-        ? (eventData.isFreeRaffle ? `Sorteo libre · ${eventData.participantType === "names" ? "Nombres" : "Numeros"} · ${available.length} disponibles` : `${num(official.length)} series oficiales, ${num(extras.length)} extra, ${num(available.length)} disponibles`)
+        ? (isSellerRaffle(eventData) ? `Sorteo de vendedores · ${pool.length} numeros · ${available.length} disponibles` : eventData.isFreeRaffle ? `Sorteo libre · ${eventData.participantType === "names" ? "Nombres" : "Numeros"} · ${available.length} disponibles` : `${num(official.length)} series oficiales, ${num(extras.length)} extra, ${num(available.length)} disponibles`)
         : 'El sorteador usa las series confirmadas para bingo.';
       $('raffleNumberGrid').replaceChildren();
       $('raffleNumberGrid').classList.add('hidden');
       $('rafflePoolSummary').textContent = hasEvent
-        ? `${num(pool.length)} ${eventData.isFreeRaffle ? "participantes" : "series"} en sorteo - ${num(available.length)} disponibles`
+        ? `${num(pool.length)} ${eventData.isFreeRaffle || isSellerRaffle(eventData) ? "participaciones" : "series"} en sorteo - ${num(available.length)} disponibles`
         : '0 series disponibles';
       $('raffleDrawCount').value = raffle?.drawCount || 1;
       $('raffleDrawMode').value = raffle?.drawMode || 'single';
@@ -3038,12 +3160,12 @@
           </div>
         </div>
       `).join('') : '<div class="empty">Sin series extra.</div>';
-      $('raffleResultsCount').textContent = `${num(raffle?.results?.length || 0)} sorteos`;
-      $('raffleResultsList').innerHTML = raffle?.results?.length ? raffle.results.map((result, index) => `
+      $('raffleResultsCount').textContent = `${num(results.length)} sorteos`;
+      $('raffleResultsList').innerHTML = results.length ? results.map((result, index) => `
         <div class="raffle-result">
-          <strong>${num((raffle.results || []).length - index)}</strong>
+          <strong>${num(results.length - index)}</strong>
           <div>
-            <div class="raffle-pill-list">${(result.picks || []).map((pick, stopIndex) => `<span class="raffle-pill">${escapeAttr(raffleLabel(pick))} · ${stopIndex + 1}&deg;Stop</span>`).join('')}</div>
+            <div class="raffle-pill-list">${(result.picks || []).map((pick, stopIndex) => `<span class="raffle-pill">${escapeAttr(raffleLabel(pick))}${pick.seller ? ' · ' + escapeAttr(pick.seller) : ''} · ${stopIndex + 1}&deg;Stop</span>`).join('')}</div>
             <small class="muted">${formatDateTime(result.drawnAt)}</small>
             <div class="actions"><button type="button" class="danger" data-delete-raffle-result="${escapeAttr(result.id)}">Eliminar resultado</button></div>
           </div>
@@ -3057,6 +3179,7 @@
     function syncRaffleSettings(eventData = activeRaffleEvent()) {
       if (!eventData) return null;
       const raffle = ensureRaffle(eventData);
+      raffle.audience = eventData.isFreeRaffle ? 'series' : $('raffleAudience').value;
       raffle.drawCount = Math.min(Math.max(Number($('raffleDrawCount').value) || 1, 1), 20);
       raffle.drawMode = $('raffleDrawMode').value === 'simultaneous' ? 'simultaneous' : 'single';
       for (const [key, min, max, fallback] of [['boxWidth', 120, 900, 260], ['boxHeight', 80, 600, 140], ['fontSize', 24, 240, 56]]) {
@@ -3122,7 +3245,8 @@
       if (!eventData || !canUsePage('raffle')) return;
       if (!confirm('Eliminar este resultado? Sus series volveran a estar disponibles para sortear.')) return;
       const raffle = ensureRaffle(eventData);
-      raffle.results = raffle.results.filter(result => result.id !== id);
+      if (isSellerRaffle(eventData)) raffle.sellerResults = raffleResults(eventData).filter(result => result.id !== id);
+      else raffle.results = raffle.results.filter(result => result.id !== id);
       saveRaffleState();
       renderRaffle();
     }
@@ -3134,12 +3258,12 @@
       if (format === 'pdf') {
         const drawn = raffleDrawnSeries(eventData);
         const area = $('printArea');
-        area.innerHTML = `<style>@page{size:A4 portrait} #printArea table{width:100%;border-collapse:collapse} #printArea td,#printArea th{border:1px solid #aaa;padding:4px} #printArea tr{break-inside:avoid}</style><h1>${escapeAttr(eventData.name)}</h1><h2>Series del sorteador</h2><p>${pool.length} series</p>${exportTableHtml(['Serie','Origen','Estado'], pool.map(item => [eventData.isFreeRaffle ? item.label : item.series, item.source, drawn.has(item.series) ? 'Sorteada' : 'Disponible']))}`;
+        area.innerHTML = `<style>@page{size:A4 portrait} #printArea table{width:100%;border-collapse:collapse} #printArea td,#printArea th{border:1px solid #aaa;padding:4px} #printArea tr{break-inside:avoid}</style><h1>${escapeAttr(eventData.name)}</h1><h2>Series del sorteador</h2><p>${pool.length} series</p>${exportTableHtml(['Serie','Origen','Estado'], pool.map(item => [eventData.isFreeRaffle ? item.label : item.seller ? String(item.series) + ' - ' + item.seller : item.series, item.source, drawn.has(item.series) ? 'Sorteada' : 'Disponible']))}`;
         area.classList.remove('hidden');
         try { window.print(); } finally { area.classList.add('hidden'); }
         return;
       }
-      const lines = pool.map(item => eventData.isFreeRaffle ? item.label : String(item.series));
+      const lines = pool.map(item => eventData.isFreeRaffle ? item.label : item.seller ? String(item.series) + ' - ' + item.seller : String(item.series));
       const content = format === 'csv' ? '\uFEFF' + (eventData.isFreeRaffle ? 'Participante' : 'Serie') + '\r\n' + lines.map(value => { const safe = /^[=+@-]/.test(value) ? String.fromCharCode(39) + value : value; return '"' + String(safe).replace(/"/g, '""') + '"'; }).join('\r\n') : lines.join('\r\n');
       const blob = new Blob([content], { type: format === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -3208,6 +3332,7 @@
         slot.pick = available.splice(randomIndex(available.length), 1)[0];
         const element = $('raffleLiveGrid').querySelectorAll('.raffle-live-slot')[index].querySelector('.raffle-live-number');
         element.textContent = raffleLabel(slot.pick);
+        $('raffleLiveGrid').querySelectorAll('.raffle-live-slot')[index].querySelector('.raffle-live-owner').textContent = slot.pick.seller || '';
         fitLiveRaffleNumber(element);
       });
     }
@@ -3221,7 +3346,7 @@
       element.querySelector('button').textContent = 'Detenido';
       if (!liveRaffle.result) {
         liveRaffle.result = { id: crypto.randomUUID(), drawnAt: new Date().toISOString(), mode: liveRaffle.mode, picks: [] };
-        ensureRaffle(liveRaffle.eventData).results.unshift(liveRaffle.result);
+        raffleResults(liveRaffle.eventData).unshift(liveRaffle.result);
       }
       liveRaffle.result.picks = liveRaffle.slots.filter(item => item.stopped).map(item => ({ ...item.pick }));
       saveRaffleState(liveRaffle.eventData);
@@ -3249,10 +3374,11 @@
       if (!eventData) return alert('Primero elegi un evento.');
       const raffle = syncRaffleSettings(eventData);
       const selectedMode = mode || raffle.drawMode;
+      if (isSellerRaffle(eventData) && !sellerRewardsCurrent(eventData)) return alert('Actualiza la asignacion en Sorteo de vendedores antes de sortear.');
       const pool = raffleAvailablePool(eventData);
       if (pool.length < raffle.drawCount) return alert(`Quedan ${pool.length} series disponibles. Reduce la cantidad de recuadros para iniciar.`);
       liveRaffle = { eventData, pool, mode: selectedMode, result: null, slots: Array.from({ length: raffle.drawCount }, () => ({ stopped: false, pick: null })) };
-      $('raffleLiveGrid').innerHTML = liveRaffle.slots.map((slot, index) => `<div class="raffle-live-slot"><div class="raffle-live-number">--</div><button type="button" data-stop-raffle-slot="${index}">Detener ${index + 1}</button></div>`).join('');
+      $('raffleLiveGrid').innerHTML = liveRaffle.slots.map((slot, index) => `<div class="raffle-live-slot"><div class="raffle-live-number">--</div><div class="raffle-live-owner"></div><button type="button" data-stop-raffle-slot="${index}">Detener ${index + 1}</button></div>`).join('');
       $('raffleStopNext').disabled = false;
       $('raffleStopAll').disabled = false;
       applyLiveRaffleAppearance(raffle);
@@ -3294,7 +3420,7 @@
       const eventData = activeRaffleEvent();
       if (!eventData) return;
       if (!confirm('Reiniciar los resultados del sorteador para este evento?')) return;
-      ensureRaffle(eventData).results = [];
+      if (isSellerRaffle(eventData)) ensureRaffle(eventData).sellerResults = []; else ensureRaffle(eventData).results = [];
       saveRaffleState();
       renderRaffle();
     }
@@ -5395,6 +5521,7 @@
       $('eventPayments').textContent = `${money(totals.cash)} / ${money(totals.transfer)}`;
       renderEventSheets(event);
       renderSalesTable(items);
+      renderSellerRewards(event, 'sellerRewardsLoad');
     }
 
     function renderBingoClosure(event) {
@@ -6111,6 +6238,7 @@
     $('raffleSaveConfig').addEventListener('click', saveRaffleSettings);
     $('raffleResetResults').addEventListener('click', resetRaffleResults);
     $('raffleAddExtra').addEventListener('click', addRaffleExtraRange);
+    $('raffleAudience').addEventListener('change', saveRaffleSettings);
     $('raffleDrawCount').addEventListener('change', saveRaffleSettings);
     $('raffleDrawMode').addEventListener('change', saveRaffleSettings);
     Object.values(raffleAppearanceInputs).forEach(id => $(id).addEventListener('change', saveRaffleSettings));
