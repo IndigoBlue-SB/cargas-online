@@ -1652,9 +1652,9 @@ async function handleApi(req, res) {
     const rows = SellerRewards.eligibility(event.sales || [], config, sheetSize);
     if (!rows.some(row => row.ticketCount)) return sendJson(res, 400, { error: 'Ningun vendedor alcanza la condicion elegida.' });
     let assignment = event.sellerRewardAssignment;
-    if (!assignment || assignment.sourceKey !== sourceKey) {
+    if (!assignment || assignment.sourceKey !== sourceKey || body.reassign === true) {
       if ((event.raffle?.sellerResults || []).length && !body.resetResults) return sendJson(res, 409, { error: 'La nueva asignacion reinicia los resultados del sorteo de vendedores. Confirma para continuar.' });
-      assignment = { sourceKey, tickets: SellerRewards.generate(rows, max => crypto.randomInt(max)), generatedAt: new Date().toISOString(), generatedBy: session.name };
+      assignment = { sourceKey, algorithm: 'alphabetical-rounds-v1', tickets: SellerRewards.generate(rows), generatedAt: new Date().toISOString(), generatedBy: session.name };
       event.raffle = { ...(event.raffle || {}), sellerResults: [] };
     }
     event.sellerRewardSettings = config; event.sellerRewardAssignment = assignment;

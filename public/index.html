@@ -1437,6 +1437,7 @@
   <script src="/free-raffle.js"></script>
   <script src="/duplicate-sales.js"></script>
   <script src="/seller-rewards.js"></script>
+  <script src="/seller-reward-poster.js"></script>
   <script>
     const defaultFunctionPermissions = { home: [], create: [], stats: [], delete: [], events: [], bingo: [], raffle: [], virtual: [], sheets: [], balance: [], accounting: [], settings: [] };
     const functionLabels = { home: 'Inicio', create: 'Crear evento', stats: 'Estadisticas', delete: 'Papelera', events: 'Eventos', bingo: 'Bingo', raffle: 'Sorteador', virtual: 'Ventas virtuales', sheets: 'Planillas', balance: 'Balance', accounting: 'Contable', settings: 'Configuraciones' };
@@ -2951,9 +2952,9 @@
       const current = sellerRewardsCurrent(event) && JSON.stringify(config) === JSON.stringify(SellerRewards.settings(event.sellerRewardSettings));
       const tickets = current ? event.sellerRewardAssignment.tickets : [];
       container.dataset.rewardEvent = event.id;
-      const html = '<details ' + (opened ? 'open' : '') + '><summary data-reward-summary><strong>Sorteo de vendedores · ' + total + ' participaciones</strong></summary><p>Planillas completas: todas las series de una misma planilla deben pertenecer al mismo vendedor. En cantidad vendida, escribi cuantas ventas dan derecho a un numero.</p><div class="grid-2"><label>Regla<select data-reward-mode><option value="sheets" ' + (config.mode === 'sheets' ? 'selected' : '') + '>Una participacion por planilla completa</option><option value="quantity" ' + (config.mode === 'quantity' ? 'selected' : '') + '>Una participacion por cantidad vendida</option></select></label><label ' + (config.mode === 'sheets' ? 'class="hidden"' : '') + '>Series/bingos por numero<input data-reward-quantity type="number" min="1" step="1" value="' + (config.unitsPerTicket || '') + '"></label></div><p>Planillas de ' + eventSeriesPerSheet(event) + ' series. El primer numero se asigna en orden alfabetico; los adicionales se reparten variados y quedan guardados.</p><div class="actions"><button type="button" data-seller-reward-action="generate" ' + (!total ? 'disabled' : '') + '>Asignar y guardar numeros</button><button type="button" data-seller-reward-action="draw" ' + (!current ? 'disabled' : '') + '>Ir al sorteo de vendedores</button><button type="button" data-seller-reward-action="export" ' + (!current ? 'disabled' : '') + '>Exportar listado CSV</button></div><p class="muted" data-reward-status>' + (current ? 'Asignacion guardada: ' + tickets.length + ' numeros.' : 'La asignacion debe generarse o actualizarse antes de sortear.') + '</p><div class="scroll"><table><thead><tr><th>Vendedor</th><th>Series vendidas</th><th>Planillas completas</th><th>Participaciones</th><th>Primer numero</th><th>Adicionales</th></tr></thead><tbody data-reward-rows>' + rows.map(row => {
-        const own = tickets.filter(ticket => ticket.key === row.key);
-        return '<tr><td>' + escapeAttr(row.seller) + '</td><td>' + row.units + '</td><td>' + row.fullSheets + '</td><td>' + row.ticketCount + '</td><td>' + (own.find(ticket => ticket.first)?.number || '—') + '</td><td>' + own.filter(ticket => !ticket.first).map(ticket => ticket.number).join(', ') + '</td></tr>';
+      const html = '<details ' + (opened ? 'open' : '') + '><summary data-reward-summary><strong>Sorteo de vendedores · ' + total + ' participaciones</strong></summary><p>Planillas completas: todas las series de una misma planilla deben pertenecer al mismo vendedor. En cantidad vendida, escribi cuantas ventas dan derecho a un numero.</p><div class="grid-2"><label>Regla<select data-reward-mode><option value="sheets" ' + (config.mode === 'sheets' ? 'selected' : '') + '>Una participacion por planilla completa</option><option value="quantity" ' + (config.mode === 'quantity' ? 'selected' : '') + '>Una participacion por cantidad vendida</option></select></label><label ' + (config.mode === 'sheets' ? 'class="hidden"' : '') + '>Series/bingos por numero<input data-reward-quantity type="number" min="1" step="1" value="' + (config.unitsPerTicket || '') + '"></label></div><p>Planillas de ' + eventSeriesPerSheet(event) + ' series. El primer numero se asigna en orden alfabetico; los adicionales se asignan en nuevas rondas alfabeticas y quedan guardados.</p><div class="actions"><button type="button" data-seller-reward-action="generate" ' + (!total ? 'disabled' : '') + '>Asignar y guardar numeros</button><button type="button" data-seller-reward-action="draw" ' + (!current ? 'disabled' : '') + '>Ir al sorteo de vendedores</button><button type="button" data-seller-reward-action="export" ' + (!current ? 'disabled' : '') + '>Exportar listado CSV</button><button type="button" data-seller-reward-action="image" ' + (!current ? 'disabled' : '') + '>Guardar imagen PNG</button></div><p class="muted" data-reward-status>' + (current ? 'Asignacion guardada: ' + tickets.length + ' numeros.' : 'La asignacion debe generarse o actualizarse antes de sortear.') + '</p><div class="scroll"><table><thead><tr><th>N°</th><th>Vendedor/a</th><th>Números asignados</th></tr></thead><tbody data-reward-rows>' + rows.filter(row=>row.ticketCount>0).map((row,index) => {
+ const own=tickets.filter(ticket=>ticket.key===row.key);
+ return '<tr><td>'+String(index+1).padStart(2,'0')+'</td><td><strong>'+escapeAttr(row.seller)+'</strong></td><td>'+(own.length?own.map(ticket=>'<span style="display:inline-block;border:2px solid #bd201b;border-radius:10px;background:#fff;color:#a81515;font-weight:bold;padding:3px 8px;margin:3px">'+String(ticket.number).padStart(2,'0')+'</span>').join(''):row.ticketCount+' por asignar')+'</td></tr>';
       }).join('') + '</tbody></table></div></details>';
       if (container.querySelector('[data-reward-quantity]') === document.activeElement) {
         const next = document.createElement('div'); next.innerHTML = html;
@@ -2966,10 +2967,12 @@
     }
     async function generateSellerRewards(event) {
       const config = sellerRewardConfig(event), sourceKey = SellerRewards.signature(event.sales || [], config, eventSeriesPerSheet(event));
-      const resetResults = (event.raffle?.sellerResults || []).length > 0 && event.sellerRewardAssignment?.sourceKey !== sourceKey;
+      const reassign=!!event.sellerRewardAssignment && event.sellerRewardAssignment.algorithm!=='alphabetical-rounds-v1';
+      if(reassign&&!confirm('Adaptar el listado por rondas cambia los numeros ya asignados. Continuar?'))return;
+      const resetResults=(event.raffle?.sellerResults||[]).length>0&&(event.sellerRewardAssignment?.sourceKey!==sourceKey||reassign);
       if (resetResults && !confirm('Cambiar las participaciones reinicia los resultados del sorteo de vendedores. Continuar?')) return;
       const saved = await saveEvents({ background: false }); if (saved?.conflict) return;
-      const result = await api('/api/seller-rewards/generate', { method: 'POST', body: JSON.stringify({ eventId: event.id, settings: config, sourceKey, resetResults }) });
+      const result = await api('/api/seller-rewards/generate', { method: 'POST', body: JSON.stringify({ eventId: event.id, settings: config, sourceKey, resetResults, reassign }) });
       event.sellerRewardSettings = result.settings; event.sellerRewardAssignment = result.assignment;
       ensureRaffle(event).sellerResults = result.sellerResults;
       const base = eventsBaseline.find(item => item.id === event.id);
@@ -2986,6 +2989,12 @@
       const url = URL.createObjectURL(new Blob(['\uFEFF' + lines.map(row=>row.map(cell).join(';')).join('\r\n')], {type:'text/csv;charset=utf-8'}));
       const link = document.createElement('a');link.href=url;link.download='participaciones-vendedores.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     }
+    async function exportSellerRewardImage(event){
+ if(!sellerRewardsCurrent(event))throw Error('Actualiza la asignacion antes de exportar.');
+ const rows=SellerRewards.eligibility(event.sales||[],event.sellerRewardSettings,eventSeriesPerSheet(event)).filter(r=>r.ticketCount>0),logos=[];
+ for(const source of [event.eventLogoLeft||settings.mainLogo,event.eventLogoRight]){if(!source){logos.push('');continue;}if(/^data:image\//i.test(source)){logos.push(source);continue;}const response=await fetch(source);if(!response.ok)throw Error('No se pudo cargar el logo.');const blob=await response.blob();logos.push(await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(blob);}));}
+ for(let start=0;start<rows.length;start+=25){const poster=SellerRewardPoster.build(event.name,rows.slice(start,start+25),event.sellerRewardAssignment.tickets,logos,start),url=URL.createObjectURL(new Blob([poster.svg],{type:'image/svg+xml;charset=utf-8'}));try{const image=new Image();await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(Error('No se pudo generar la imagen.'));image.src=url;});const canvas=document.createElement('canvas');canvas.width=poster.width;canvas.height=poster.height;canvas.getContext('2d').drawImage(image,0,0);const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('No se pudo exportar.');const download=URL.createObjectURL(blob),link=document.createElement('a');link.href=download;link.download='sorteo-vendedores-'+String(event.name||'evento').replace(/[^a-z0-9]/gi,'-')+'-'+(Math.floor(start/25)+1)+'.png';link.click();setTimeout(()=>URL.revokeObjectURL(download),10000);}finally{URL.revokeObjectURL(url);}}
+ }
     ['sellerRewardsLoad','sellerRewardsRaffle'].forEach(id => {
       const updateRewardDraft = event => {
         if (!event.target.matches('[data-reward-mode], [data-reward-quantity]')) return;
@@ -3003,6 +3012,7 @@
           if (button.dataset.sellerRewardAction === 'generate') await generateSellerRewards(target);
           if (button.dataset.sellerRewardAction === 'draw') {activeRaffleEventId=target.id;ensureRaffle(target).audience='sellers';saveEvents();go('raffle');renderRaffle();}
           if (button.dataset.sellerRewardAction === 'export') exportSellerRewards(target);
+          if(button.dataset.sellerRewardAction==='image') await exportSellerRewardImage(target);
         } catch(error) {
           if (error.code==='DUPLICATE_SALES') {activeEventId=target.id;go('event');openDuplicateSales(error.duplicates,target.id);}
           else alert(error.message);
