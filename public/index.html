@@ -2947,12 +2947,14 @@
       const container = $(containerId); if (!container) return;
       container.classList.toggle('hidden', !event || !!event.isFreeRaffle); if (!event || event.isFreeRaffle) return;
       const opened = container.querySelector('details')?.open || false;
+      const previousDesigner=container.dataset.rewardEvent===event.id?container.querySelector('[data-reward-designer]'):null;
+      const designerOpen=previousDesigner?.querySelector('details')?.open||false,keepDesigner=previousDesigner?.contains(document.activeElement);
       const config = sellerRewardConfig(event), rows = SellerRewards.eligibility(event.sales || [], config, eventSeriesPerSheet(event));
       const total = rows.reduce((sum,row) => sum + row.ticketCount,0);
       const current = sellerRewardsCurrent(event) && JSON.stringify(config) === JSON.stringify(SellerRewards.settings(event.sellerRewardSettings));
       const tickets = current ? event.sellerRewardAssignment.tickets : [];
       container.dataset.rewardEvent = event.id;
-      const html = '<details ' + (opened ? 'open' : '') + '><summary data-reward-summary><strong>Sorteo de vendedores · ' + total + ' participaciones</strong></summary><p>Planillas completas: todas las series de una misma planilla deben pertenecer al mismo vendedor. En cantidad vendida, escribi cuantas ventas dan derecho a un numero.</p><div class="grid-2"><label>Regla<select data-reward-mode><option value="sheets" ' + (config.mode === 'sheets' ? 'selected' : '') + '>Una participacion por planilla completa</option><option value="quantity" ' + (config.mode === 'quantity' ? 'selected' : '') + '>Una participacion por cantidad vendida</option></select></label><label ' + (config.mode === 'sheets' ? 'class="hidden"' : '') + '>Series/bingos por numero<input data-reward-quantity type="number" min="1" step="1" value="' + (config.unitsPerTicket || '') + '"></label></div><p>Planillas de ' + eventSeriesPerSheet(event) + ' series. El primer numero se asigna en orden alfabetico; los adicionales se asignan en nuevas rondas alfabeticas y quedan guardados.</p><div class="actions"><button type="button" data-seller-reward-action="generate" ' + (!total ? 'disabled' : '') + '>Asignar y guardar numeros</button><button type="button" data-seller-reward-action="draw" ' + (!current ? 'disabled' : '') + '>Ir al sorteo de vendedores</button><button type="button" data-seller-reward-action="export" ' + (!current ? 'disabled' : '') + '>Exportar listado CSV</button><button type="button" data-seller-reward-action="image" ' + (!current ? 'disabled' : '') + '>Guardar imagen PNG</button></div><p class="muted" data-reward-status>' + (current ? 'Asignacion guardada: ' + tickets.length + ' numeros.' : 'La asignacion debe generarse o actualizarse antes de sortear.') + '</p><div class="scroll"><table><thead><tr><th>N°</th><th>Vendedor/a</th><th>Números asignados</th></tr></thead><tbody data-reward-rows>' + rows.filter(row=>row.ticketCount>0).map((row,index) => {
+      const html = '<details ' + (opened ? 'open' : '') + '><summary data-reward-summary><strong>Sorteo de vendedores · ' + total + ' participaciones</strong></summary><p>Planillas completas: todas las series de una misma planilla deben pertenecer al mismo vendedor. En cantidad vendida, escribi cuantas ventas dan derecho a un numero.</p><div class="grid-2"><label>Regla<select data-reward-mode><option value="sheets" ' + (config.mode === 'sheets' ? 'selected' : '') + '>Una participacion por planilla completa</option><option value="quantity" ' + (config.mode === 'quantity' ? 'selected' : '') + '>Una participacion por cantidad vendida</option></select></label><label ' + (config.mode === 'sheets' ? 'class="hidden"' : '') + '>Series/bingos por numero<input data-reward-quantity type="number" min="1" step="1" value="' + (config.unitsPerTicket || '') + '"></label></div><p>Planillas de ' + eventSeriesPerSheet(event) + ' series. El primer numero se asigna en orden alfabetico; los adicionales se asignan en nuevas rondas alfabeticas y quedan guardados.</p><div class="actions"><button type="button" data-seller-reward-action="generate" ' + (!total ? 'disabled' : '') + '>Asignar y guardar numeros</button><button type="button" data-seller-reward-action="draw" ' + (!current ? 'disabled' : '') + '>Ir al sorteo de vendedores</button><button type="button" data-seller-reward-action="export" ' + (!current ? 'disabled' : '') + '>Exportar listado CSV</button><button type="button" data-seller-reward-action="image" ' + (!current ? 'disabled' : '') + '>Descargar PNG 9:16</button></div><p class="muted" data-reward-status>' + (current ? 'Asignacion guardada: ' + tickets.length + ' numeros.' : 'La asignacion debe generarse o actualizarse antes de sortear.') + '</p><div data-reward-designer></div><div class="scroll"><table><thead><tr><th>N°</th><th>Vendedor/a</th><th>Números asignados</th></tr></thead><tbody data-reward-rows>' + rows.filter(row=>row.ticketCount>0).map((row,index) => {
  const own=tickets.filter(ticket=>ticket.key===row.key);
  return '<tr><td>'+String(index+1).padStart(2,'0')+'</td><td><strong>'+escapeAttr(row.seller)+'</strong></td><td>'+(own.length?own.map(ticket=>'<span style="display:inline-block;border:2px solid #bd201b;border-radius:10px;background:#fff;color:#a81515;font-weight:bold;padding:3px 8px;margin:3px">'+String(ticket.number).padStart(2,'0')+'</span>').join(''):row.ticketCount+' por asignar')+'</td></tr>';
       }).join('') + '</tbody></table></div></details>';
@@ -2964,6 +2966,8 @@
         }
         for (const button of container.querySelectorAll('[data-seller-reward-action]')) button.disabled = next.querySelector('[data-seller-reward-action="' + button.dataset.sellerRewardAction + '"]').disabled;
       } else container.innerHTML = html;
+      if(keepDesigner)container.querySelector('[data-reward-designer]').replaceWith(previousDesigner);
+      else {renderSellerDesigner(event,container);container.querySelector('[data-reward-designer] details').open=designerOpen;}
     }
     async function generateSellerRewards(event) {
       const config = sellerRewardConfig(event), sourceKey = SellerRewards.signature(event.sales || [], config, eventSeriesPerSheet(event));
@@ -2989,12 +2993,51 @@
       const url = URL.createObjectURL(new Blob(['\uFEFF' + lines.map(row=>row.map(cell).join(';')).join('\r\n')], {type:'text/csv;charset=utf-8'}));
       const link = document.createElement('a');link.href=url;link.download='participaciones-vendedores.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     }
+    const sellerDesignDrafts = new Map(), sellerPreviewUrls = new Map();
+    function sellerPosterDesign(event) { return SellerRewardPoster.settings(sellerDesignDrafts.get(event.id) || event.sellerRewardDesign || {}); }
+    function sellerPosterRows(event) { return SellerRewards.eligibility(event.sales || [], sellerRewardConfig(event), eventSeriesPerSheet(event)).filter(row => row.ticketCount > 0); }
+    function sellerPosterTickets(event) {
+      return sellerRewardsCurrent(event) ? event.sellerRewardAssignment.tickets : SellerRewards.generate(sellerPosterRows(event));
+    }
+    function renderSellerDesigner(event, container) {
+      const holder=container.querySelector('[data-reward-designer]');if(!holder)return;
+      const d=sellerPosterDesign(event),label=(title,key)=>'<label>'+title+'<input type="color" data-design-field="'+key+'" value="'+d[key]+'"></label>';
+      holder.innerHTML='<details><summary><strong>Diseñar imagen PNG · vertical 9:16</strong></summary><p>1080 × 1920 píxeles. Si el listado es largo, se divide en varias imágenes sin cortar nombres ni números.</p><div class="grid-2"><label>Fuente<select data-design-field="font">'+SellerRewardPoster.fonts.map(font=>'<option '+(font===d.font?'selected':'')+'>'+font+'</option>').join('')+'</select></label><label>Tamaño del texto<input type="number" min="22" max="40" data-design-field="fontSize" value="'+d.fontSize+'"></label>'+label('Texto de vendedores','textColor')+label('Título y pie','titleColor')+label('Fondo de cabecera','headerColor')+label('Texto de cabecera','headerTextColor')+label('Fondo de filas','rowColor')+label('Color de fondo','backgroundColor')+label('Texto de números','numberColor')+label('Borde de números','numberBorderColor')+label('Fondo de números','numberFillColor')+'<label>Forma de números<select data-design-field="numberShape"><option value="circle" '+(d.numberShape==='circle'?'selected':'')+'>Círculos</option><option value="rounded" '+(d.numberShape==='rounded'?'selected':'')+'>Casilleros redondeados</option><option value="none" '+(d.numberShape==='none'?'selected':'')+'>Sin contorno</option></select></label><label>Opacidad de filas (%)<input type="range" min="0" max="100" data-design-field="rowOpacity" value="'+d.rowOpacity+'"></label><label><input type="checkbox" data-design-field="showLogos" '+(d.showLogos?'checked':'')+'> Mostrar logos del evento</label><label>Imagen de fondo<input type="file" data-design-background accept="image/png,image/jpeg,image/webp"></label></div><p>El fondo se adapta para cubrir la imagen vertical; los bordes pueden recortarse.</p><div class="actions"><button type="button" data-design-action="remove-background">Quitar imagen de fondo</button><button type="button" data-design-action="save">Guardar diseño en este evento</button><button type="button" data-seller-reward-action="image" '+(!sellerRewardsCurrent(event)?'disabled':'')+'>Descargar PNG 9:16</button></div><p data-design-status role="status"></p><label>Vista previa<select data-design-page></select></label><img data-design-preview alt="Vista previa del listado de vendedores en formato vertical" style="display:block;width:100%;max-width:360px;height:auto;aspect-ratio:9/16;border:1px solid #aaa;margin:12px auto"></details>';
+      updateSellerPosterPreview(event,container);
+    }
+    function updateSellerPosterPreview(event,container) {
+      const holder=container.querySelector('[data-reward-designer]');if(!holder)return;
+      const pages=SellerRewardPoster.buildPages(event.name,sellerPosterRows(event),sellerPosterTickets(event),[event.eventLogoLeft||settings.mainLogo,event.eventLogoRight],sellerPosterDesign(event));
+      const select=holder.querySelector('[data-design-page]'),index=Math.min(Number(select.value)||0,pages.length-1);
+      select.innerHTML=pages.map((page,i)=>'<option value="'+i+'" '+(i===index?'selected':'')+'>Página '+(i+1)+' de '+pages.length+'</option>').join('');
+      const url=URL.createObjectURL(new Blob([pages[index].svg],{type:'image/svg+xml;charset=utf-8'})),previous=sellerPreviewUrls.get(container.id);
+      holder.querySelector('[data-design-preview]').src=url;sellerPreviewUrls.set(container.id,url);if(previous)URL.revokeObjectURL(previous);
+      const status=holder.querySelector('[data-design-status]');status.textContent=(sellerDesignDrafts.has(event.id)?'Diseño modificado: pulsá Guardar diseño para conservarlo. ':'')+(!sellerRewardsCurrent(event)?'Vista previa de ejemplo. Asigná y guardá los números antes de descargar.':'');
+    }
+    async function loadSellerPosterBackground(file) {
+      if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw Error('Elegí una imagen PNG, JPG o WebP.');
+      if(file.size>20*1024*1024)throw Error('La imagen debe pesar menos de 20 MB.');
+      const url=URL.createObjectURL(file);
+      try{const image=new Image();await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(Error('No se pudo abrir la imagen.'));image.src=url;});
+        const canvas=document.createElement('canvas'),scale=Math.min(1,1920/Math.max(image.naturalWidth,image.naturalHeight));canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);return canvas.toDataURL('image/png');
+      }finally{URL.revokeObjectURL(url);}
+    }
     async function exportSellerRewardImage(event){
- if(!sellerRewardsCurrent(event))throw Error('Actualiza la asignacion antes de exportar.');
- const rows=SellerRewards.eligibility(event.sales||[],event.sellerRewardSettings,eventSeriesPerSheet(event)).filter(r=>r.ticketCount>0),logos=[];
- for(const source of [event.eventLogoLeft||settings.mainLogo,event.eventLogoRight]){if(!source){logos.push('');continue;}if(/^data:image\//i.test(source)){logos.push(source);continue;}const response=await fetch(source);if(!response.ok)throw Error('No se pudo cargar el logo.');const blob=await response.blob();logos.push(await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(blob);}));}
- for(let start=0;start<rows.length;start+=25){const poster=SellerRewardPoster.build(event.name,rows.slice(start,start+25),event.sellerRewardAssignment.tickets,logos,start),url=URL.createObjectURL(new Blob([poster.svg],{type:'image/svg+xml;charset=utf-8'}));try{const image=new Image();await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(Error('No se pudo generar la imagen.'));image.src=url;});const canvas=document.createElement('canvas');canvas.width=poster.width;canvas.height=poster.height;canvas.getContext('2d').drawImage(image,0,0);const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('No se pudo exportar.');const download=URL.createObjectURL(blob),link=document.createElement('a');link.href=download;link.download='sorteo-vendedores-'+String(event.name||'evento').replace(/[^a-z0-9]/gi,'-')+'-'+(Math.floor(start/25)+1)+'.png';link.click();setTimeout(()=>URL.revokeObjectURL(download),10000);}finally{URL.revokeObjectURL(url);}}
- }
+      if(!sellerRewardsCurrent(event))throw Error('Actualizá la asignación antes de exportar.');
+      const logos=[];for(const source of [event.eventLogoLeft||settings.mainLogo,event.eventLogoRight]){
+        if(!source){logos.push('');continue;}if(/^data:image\/(png|jpeg|jpg|webp);base64,/i.test(source)){logos.push(source);continue;}
+        const response=await fetch(source);if(!response.ok)throw Error('No se pudo cargar el logo.');
+        logos.push(await loadSellerPosterBackground(new File([await response.blob()],'logo',{type:response.headers.get('content-type')?.split(';')[0]||'image/png'})));
+      }
+      const pages=SellerRewardPoster.buildPages(event.name,sellerPosterRows(event),event.sellerRewardAssignment.tickets,logos,sellerPosterDesign(event));
+      for(const poster of pages){const url=URL.createObjectURL(new Blob([poster.svg],{type:'image/svg+xml;charset=utf-8'}));try{
+        const image=new Image();await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(Error('No se pudo generar la imagen.'));image.src=url;});
+        const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=1920;canvas.getContext('2d').drawImage(image,0,0);
+        const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('No se pudo exportar.');
+        const download=URL.createObjectURL(blob),link=document.createElement('a');link.href=download;link.download='sorteo-vendedores-'+String(event.name||'evento').replace(/[^a-z0-9]/gi,'-')+'-'+poster.page+'.png';link.click();setTimeout(()=>URL.revokeObjectURL(download),10000);
+      }finally{URL.revokeObjectURL(url);}}
+    }
+
     ['sellerRewardsLoad','sellerRewardsRaffle'].forEach(id => {
       const updateRewardDraft = event => {
         if (!event.target.matches('[data-reward-mode], [data-reward-quantity]')) return;
@@ -3002,6 +3045,18 @@
         sellerRewardDrafts.set(target.id, {mode:container.querySelector('[data-reward-mode]').value,unitsPerTicket:Number(container.querySelector('[data-reward-quantity]').value)||0});
         renderSellerRewards(target,id);
       };
+      const updateDesign=event=>{if(!event.target.matches('[data-design-field]'))return;const container=$(id),target=events.find(item=>item.id===container.dataset.rewardEvent);if(!target)return;const field=event.target.dataset.designField,value=event.target.type==='checkbox'?event.target.checked:event.target.value;sellerDesignDrafts.set(target.id,SellerRewardPoster.settings({...sellerPosterDesign(target),[field]:value}));updateSellerPosterPreview(target,container);};
+      $(id).addEventListener('input',updateDesign);
+      $(id).addEventListener('change',async event=>{
+        updateDesign(event);const container=$(id),target=events.find(item=>item.id===container.dataset.rewardEvent);if(!target)return;
+        if(event.target.matches('[data-design-page]'))updateSellerPosterPreview(target,container);
+        if(event.target.matches('[data-design-background]')&&event.target.files?.[0]){const file=event.target.files[0],status=container.querySelector('[data-design-status]');status.textContent='Cargando fondo...';try{const image=await loadSellerPosterBackground(file);sellerDesignDrafts.set(target.id,{...sellerPosterDesign(target),backgroundImage:image});updateSellerPosterPreview(target,container);}catch(error){alert(error.message);status.textContent=error.message;}}
+      });
+      $(id).addEventListener('click',async event=>{
+        const button=event.target.closest('[data-design-action]');if(!button)return;const container=$(id),target=events.find(item=>item.id===container.dataset.rewardEvent);if(!target)return;
+        if(button.dataset.designAction==='remove-background'){sellerDesignDrafts.set(target.id,{...sellerPosterDesign(target),backgroundImage:''});container.querySelector('[data-design-background]').value='';updateSellerPosterPreview(target,container);return;}
+        if(button.dataset.designAction==='save'){button.disabled=true;const snapshot=sellerPosterDesign(target);target.sellerRewardDesign=snapshot;try{const result=await saveEvents({background:false});if(result?.conflict||result?.superseded)throw Error('El diseño sigue pendiente de guardar. Revisá el aviso de guardado.');if(JSON.stringify(sellerPosterDesign(target))===JSON.stringify(snapshot))sellerDesignDrafts.delete(target.id);updateSellerPosterPreview(target,container);container.querySelector('[data-design-status]').textContent='Diseño guardado en Railway para este evento.';}catch(error){container.querySelector('[data-design-status]').textContent=error.message;}finally{button.disabled=false;}}
+      });
       $(id).addEventListener('input', event => { if (event.target.matches('[data-reward-quantity]')) updateRewardDraft(event); });
       $(id).addEventListener('change', event => { if (event.target.matches('[data-reward-mode]')) updateRewardDraft(event); });
       $(id).addEventListener('click', async event => {
