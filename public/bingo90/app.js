@@ -362,6 +362,7 @@ const els = {
   stripOffsetYInput: document.querySelector("#stripOffsetYInput"),
   stripFitToPageInput: document.querySelector("#stripFitToPageInput"),
   stripFontSizeInput: document.querySelector("#stripFontSizeInput"),
+  stripCardNumberFontSizeInput: document.querySelector("#stripCardNumberFontSizeInput"),
   stripFontFamilyInput: document.querySelector("#stripFontFamilyInput"),
   stripSeriesLabelInput: document.querySelector("#stripSeriesLabelInput"),
   stripSeriesFontSizeInput: document.querySelector("#stripSeriesFontSizeInput"),
@@ -666,6 +667,7 @@ function bindEvents() {
     els.stripOffsetYInput,
     els.stripFitToPageInput,
     els.stripFontSizeInput,
+    els.stripCardNumberFontSizeInput,
     els.stripFontFamilyInput,
     els.stripSeriesLabelInput,
     els.stripSeriesFontSizeInput,
@@ -2027,6 +2029,7 @@ function fillStripDesigner() {
   els.stripOffsetYInput.value = state.stripDesign.offsetY;
   if (els.stripFitToPageInput) els.stripFitToPageInput.checked = state.stripDesign.fitToPage !== false;
   els.stripFontSizeInput.value = state.stripDesign.fontSize;
+  els.stripCardNumberFontSizeInput.value = state.stripDesign.cardNumberFontSize || 9;
   els.stripFontFamilyInput.value = state.stripDesign.fontFamily;
   els.stripSeriesLabelInput.value = state.stripDesign.seriesLabel;
   els.stripSeriesFontSizeInput.value = state.stripDesign.seriesFontSize;
@@ -2070,6 +2073,7 @@ function applyStripDesign(options = {}) {
   state.stripDesign.offsetY = clamp(Number(els.stripOffsetYInput.value) || 0, -120, 120);
   state.stripDesign.fitToPage = els.stripFitToPageInput ? els.stripFitToPageInput.checked : state.stripDesign.fitToPage !== false;
   state.stripDesign.fontSize = clamp(Number(els.stripFontSizeInput.value) || 16, 10, 200);
+  state.stripDesign.cardNumberFontSize = clamp(Number(els.stripCardNumberFontSizeInput.value) || 9, 8, 120);
   state.stripDesign.fontFamily = els.stripFontFamilyInput.value;
   state.stripDesign.seriesLabel = els.stripSeriesLabelInput.value.trim() || "Serie N°";
   state.stripDesign.seriesFontSize = clamp(Number(els.stripSeriesFontSizeInput.value) || 13, 8, 200);
@@ -2597,6 +2601,7 @@ function initializeStripCellGeometry() {
       cardScale: design.cardScale,
       seriesFontSize: design.seriesFontSize,
       headerHeight: design.headerHeight,
+      cardNumberFontSize: design.cardNumberFontSize || 9,
     };
   }
 }
@@ -2630,8 +2635,8 @@ function applyStripPreviewStyles(target) {
   target.style.setProperty("--strip-render-row-gap", `${state.stripDesign.rowGap}px`);
   target.style.setProperty("--strip-render-card-pad-y", "3px");
   target.style.setProperty("--strip-render-card-pad-x", "5px");
-  target.style.setProperty("--strip-render-card-header-height", "12px");
-  target.style.setProperty("--strip-render-card-title-font-size", "9px");
+  target.style.setProperty("--strip-render-card-header-height", `${Math.max(12, (state.stripDesign.cardNumberFontSize || 9) + 2)}px`);
+  target.style.setProperty("--strip-render-card-title-font-size", `${state.stripDesign.cardNumberFontSize || 9}px`);
   target.style.setProperty("--strip-render-small-gap", "2px");
   target.style.setProperty("--strip-cell-radius", getStripCellRadius());
   target.style.setProperty("--strip-cell-border", state.stripDesign.cellBorderColor);
@@ -2703,6 +2708,8 @@ function updateStripContentFitScale() {
     "--strip-card-width": `${reference.cardScale}%`,
     "--strip-render-series-font-size": `${reference.seriesFontSize}px`,
     "--strip-render-header-height": `${reference.headerHeight}px`,
+    "--strip-render-card-header-height": `${Math.max(12, (reference.cardNumberFontSize || 9) + 2)}px`,
+    "--strip-render-card-title-font-size": `${reference.cardNumberFontSize || 9}px`,
   };
   const previousProperties = Object.fromEntries(Object.keys(fitProperties).map(key => [key, preview.style.getPropertyValue(key)]));
   Object.entries(fitProperties).forEach(([key, value]) => preview.style.setProperty(key, value));
@@ -4036,8 +4043,8 @@ function buildStripPrintStyleAttribute() {
     `--strip-render-row-gap:${state.stripDesign.rowGap}px`,
     "--strip-render-card-pad-y:3px",
     "--strip-render-card-pad-x:5px",
-    "--strip-render-card-header-height:12px",
-    "--strip-render-card-title-font-size:9px",
+    `--strip-render-card-header-height:${Math.max(12, (state.stripDesign.cardNumberFontSize || 9) + 2)}px`,
+    `--strip-render-card-title-font-size:${state.stripDesign.cardNumberFontSize || 9}px`,
     "--strip-render-small-gap:2px",
     `--strip-cell-radius:${getStripCellRadius()}`,
     `--strip-cell-border:${state.stripDesign.cellBorderColor}`,
@@ -6501,6 +6508,7 @@ function createDefaultStripDesign() {
     accentColor: "#d1223b",
     backgroundColor: "#ffffff",
     fontSize: 16,
+    cardNumberFontSize: 9,
     fontFamily: "Arial, Helvetica, sans-serif",
     seriesLabel: "Serie N°",
     seriesFontSize: 13,

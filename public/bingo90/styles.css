@@ -2243,6 +2243,8 @@ dialog::backdrop {
 }
 
 .strip-card header {
+  contain: inline-size;
+  overflow-wrap: anywhere;
   display: flex;
   justify-content: flex-end;
   gap: 8px;

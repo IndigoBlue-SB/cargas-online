@@ -717,7 +717,7 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
   const padX = Math.max(2, Math.min(8, Number(options.padX) || 5));
   const padTop = Math.max(1, Math.min(6, Number(options.padY) || 3));
   const padBottom = Math.max(1, Math.min(8, Number(options.padBottom) || Number(options.padY) || 3));
-  const headerH = Math.max(8, Math.min(15, Number(options.headerHeight) || 12));
+  const headerH = Math.max(8, Math.min(92, Number(options.headerHeight) || 12));
   const headerMarginBottom = Math.max(0, Math.min(4, Number(options.headerMarginBottom) || 0));
   const configuredCell = Math.max(8, Math.min(150, Number(options.cellSize) || 18));
   const availableCellW = (width - padX * 2 - smallGap * 8) / 9;
@@ -736,7 +736,7 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
 
   doc.lineWidth(1.1).strokeColor(accent).roundedRect(x, y, width, height, 4.5).stroke();
   doc.font('Helvetica-Bold')
-    .fontSize(6.75)
+    .fontSize(Math.max(6, Math.min(90, Number(options.cardNumberFontSize) || 6.75)))
     .fillColor(accent)
     .text(`Carton N° ${card.cardNumber}`, x + padX, y + padTop, { width: width - (padX * 2), align: 'right', lineBreak: false });
 
@@ -780,7 +780,8 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
   const cardPadX = 5 * CSS_PX_TO_PT;
   const cardPadTop = 3 * CSS_PX_TO_PT;
   const cardPadBottom = 5 * CSS_PX_TO_PT;
-  const cardHeaderH = 12 * CSS_PX_TO_PT;
+  const cardNumberFontSize = Math.max(8, Math.min(120, Number(design.cardNumberFontSize) || 9));
+  const cardHeaderH = Math.max(12, cardNumberFontSize + 2) * CSS_PX_TO_PT;
   const cardHeaderMarginBottom = 1 * CSS_PX_TO_PT;
   const cellWidth = Math.max(8, Math.min(150, (Number(design.cellWidth) || Number(design.cellSize) || 18) * CSS_PX_TO_PT));
   const naturalCardW = (cellWidth * 9 + smallGap * 8 + cardPadX * 2) * cardScale;
@@ -828,6 +829,7 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
     const exactCardH = cardBox ? cardBox.height : cardH;
     drawBingoCardKit(doc, card, cardX, cardY, exactCardW, exactCardH, {
       fontSize,
+      cardNumberFontSize: cardNumberFontSize * CSS_PX_TO_PT,
       accentColor: design.accentColor,
       numberColor: design.numberColor,
       cellBorderColor: design.cellBorderColor,
@@ -998,7 +1000,7 @@ function getStripNaturalSize(design = {}) {
   const cardPadX = 5 * CSS_PX_TO_PT;
   const cardPadTop = 3 * CSS_PX_TO_PT;
   const cardPadBottom = 5 * CSS_PX_TO_PT;
-  const cardHeaderH = 12 * CSS_PX_TO_PT;
+  const cardHeaderH = Math.max(12, (Number(design.cardNumberFontSize) || 9) + 2) * CSS_PX_TO_PT;
   const cardHeaderMarginBottom = 1 * CSS_PX_TO_PT;
   const headerH = Math.max(0, (Number(design.headerHeight) || 0) * CSS_PX_TO_PT);
   const seriesFontSize = Math.max(6, Math.min(34, (Number(design.seriesFontSize) || 13) * CSS_PX_TO_PT));
