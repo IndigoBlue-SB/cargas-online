@@ -1041,10 +1041,12 @@
             <label>Como cobra Indigo<select id="balanceIndigoMode"><option value="result">Participacion en el resultado</option><option value="sales">Comision sobre la venta total</option></select></label>
             <label>% Noe<input id="balanceNoePercent" inputmode="decimal" autocomplete="off" value="0"></label>
             <label>% Indigo Blue (segun modalidad)<input id="balanceIndigoPercent" inputmode="decimal" autocomplete="off" value="50"></label>
-            <label>% Gise<input id="balanceGisePercent" inputmode="decimal" autocomplete="off" value="0"></label>
-            <label>% Laureano<input id="balanceLaureanoPercent" inputmode="decimal" autocomplete="off" value="0"></label>
+            <label>Integrante Indigo 1<input id="balanceGiseName" maxlength="80" value="Gise"></label>
+            <label><span id="balanceGisePercentLabel">% Gise</span><input id="balanceGisePercent" inputmode="decimal" autocomplete="off" value="0"></label>
+            <label>Integrante Indigo 2<input id="balanceLaureanoName" maxlength="80" value="Laureano"></label>
+            <label><span id="balanceLaureanoPercentLabel">% Laureano</span><input id="balanceLaureanoPercent" inputmode="decimal" autocomplete="off" value="0"></label>
           </div>
-<p class="balance-help">Compartido: se descuenta de la rendicion antes del reparto. Institucion o Indigo: se descuenta solo de su parte. Las comisiones de administradores son por serie; Gise y Laureano reparten el neto final de Indigo.</p>
+<p class="balance-help">Compartido: se descuenta de la rendicion antes del reparto. Institucion o Indigo: se descuenta solo de su parte. Las comisiones de administradores son por serie; los integrantes de Indigo reparten su neto final.</p>
           <div class="balance-grid">
             <div class="balance-accounts">
               <h3>Cuentas</h3>
@@ -3661,6 +3663,8 @@
         };
       }
       if (!eventHasNoeCommission(eventData)) eventData.balance.noePercent = 0;
+      eventData.balance.giseName = String(eventData.balance.giseName || '').trim().slice(0, 80) || 'Gise';
+      eventData.balance.laureanoName = String(eventData.balance.laureanoName || '').trim().slice(0, 80) || 'Laureano';
       eventData.balance.units = soldUnits;
       if (!Array.isArray(eventData.balance.prizesList) || !eventData.balance.prizesList.length) {
         const totalPrize = Number(eventData.balance.prizes) || 0;
@@ -4383,6 +4387,8 @@
         indigoPercent: parseAmount($('balanceIndigoPercent').value),
         gisePercent: parseAmount($('balanceGisePercent').value),
         laureanoPercent: parseAmount($('balanceLaureanoPercent').value),
+        giseName: $('balanceGiseName').value.trim() || 'Gise',
+        laureanoName: $('balanceLaureanoName').value.trim() || 'Laureano',
         admins: [...document.querySelectorAll('[data-balance-admin]')].map(row => ({
           id: row.dataset.balanceAdmin,
           name: row.querySelector('[data-admin-name]').value.trim() || 'Administrador',
@@ -4422,6 +4428,8 @@
     }
 
     function setBalanceSummary(balance) {
+      $('balanceGisePercentLabel').textContent = '% ' + (balance.giseName || 'Gise');
+      $('balanceLaureanoPercentLabel').textContent = '% ' + (balance.laureanoName || 'Laureano');
       const totals = balanceTotals(balance);
       const eventData = activeBalanceEvent();
       document.querySelector('.private-balance-fields').classList.toggle('hidden', !canSeePrivateBalance(eventData));
@@ -4450,8 +4458,8 @@
           ['Premios a cargo de institucion', money(totals.prizeCosts.institution)], ['Gastos a cargo de institucion', money(totals.expenseCosts.institution)],
           ['Neto institucion', money(totals.institutionAmount)], ['Premios a cargo de Indigo', money(totals.prizeCosts.indigo)],
           ['Gastos a cargo de Indigo', money(totals.expenseCosts.indigo)], ['Neto Indigo Blue', money(totals.indigoNetAmount)],
-          ['Gise (' + num(balance.gisePercent) + '% del neto Indigo)', money(totals.giseAmount)],
-          ['Laureano (' + num(balance.laureanoPercent) + '% del neto Indigo)', money(totals.laureanoAmount)]
+          [(balance.giseName || 'Gise') + ' (' + num(balance.gisePercent) + '% del neto Indigo)', money(totals.giseAmount)],
+          [(balance.laureanoName || 'Laureano') + ' (' + num(balance.laureanoPercent) + '% del neto Indigo)', money(totals.laureanoAmount)]
         );
       }
       return rows;
@@ -4461,7 +4469,7 @@
       const rows = balanceCalculationRows(balance, totals, canSeePrivateBalance(eventData), eventHasNoeCommission(eventData));
       $('balanceAccounts').innerHTML = rows.map(([label, value]) => `
         <div class="balance-account-row">
-          <span>${label}</span>
+          <span>${escapeAttr(label)}</span>
           <input readonly value="${String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}">
         </div>
       `).join('');
@@ -4692,6 +4700,8 @@
       $('balanceIndigoPercent').value = balance.indigoPercent === undefined || balance.indigoPercent === null ? 50 : Number(balance.indigoPercent) || 0;
       $('balanceGisePercent').value = Number(balance.gisePercent) || 0;
       $('balanceLaureanoPercent').value = Number(balance.laureanoPercent) || 0;
+      $('balanceGiseName').value = balance.giseName;
+      $('balanceLaureanoName').value = balance.laureanoName;
       const showPrivate = canSeePrivateBalance(eventData);
       ['balanceNoePercent', 'balanceIndigoPercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => {
         const label = $(id).closest('label');
@@ -7042,7 +7052,7 @@
     $('drawBingoBall')?.addEventListener('click', drawBingoBall);
     $('resetBingoGame')?.addEventListener('click', resetBingoGame);
     $('clearEventForm').addEventListener('click', resetEventForm);
-    ['balanceIndigoMode', 'balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent', 'balanceNoePercent', 'balanceIndigoPercent', 'balanceGisePercent', 'balanceLaureanoPercent'].forEach(id => $(id).addEventListener('input', () => {
+    ['balanceIndigoMode', 'balanceUnits', 'balancePrice', 'balanceSellerPercent', 'balanceAdminPercent', 'balanceNoePercent', 'balanceIndigoPercent', 'balanceGisePercent', 'balanceLaureanoPercent', 'balanceGiseName', 'balanceLaureanoName'].forEach(id => $(id).addEventListener('input', () => {
       updateBalancePreview();
       scheduleBalanceAutosave();
     }));
