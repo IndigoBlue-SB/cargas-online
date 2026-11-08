@@ -2066,7 +2066,7 @@ function applyStripDesign(options = {}) {
   state.stripDesign.columns = clamp(Number(els.stripColumnsInput.value) || 1, 1, 6);
   state.stripDesign.gap = clamp(Number(els.stripGapInput.value) || 0, 0, 1000);
   state.stripDesign.rowGap = clamp(Number(els.stripRowGapInput.value) || 0, 0, 1000);
-  state.stripDesign.offsetX = clamp(Number(els.stripOffsetXInput.value) || 0, -120, 120);
+  state.stripDesign.offsetX = clamp(Number(els.stripOffsetXInput.value) || 0, -2000, 2000);
   state.stripDesign.offsetY = clamp(Number(els.stripOffsetYInput.value) || 0, -120, 120);
   state.stripDesign.fitToPage = els.stripFitToPageInput ? els.stripFitToPageInput.checked : state.stripDesign.fitToPage !== false;
   state.stripDesign.fontSize = clamp(Number(els.stripFontSizeInput.value) || 16, 10, 200);
@@ -2685,8 +2685,12 @@ function updateStripContentFitScale() {
   const pageRect = preview.getBoundingClientRect();
   // Measure fitting against the saved geometry, not the height being edited.
   preview.style.setProperty("--strip-render-cell-size", `${state.stripDesign.fitCellHeight}px`);
+  preview.style.setProperty("--strip-offset-x", "0px");
+  preview.style.setProperty("--strip-offset-y", "0px");
   const layoutRect = layout.getBoundingClientRect();
   preview.style.setProperty("--strip-render-cell-size", `${state.stripDesign.cellSize}px`);
+  preview.style.setProperty("--strip-offset-x", `${state.stripDesign.offsetX}px`);
+  preview.style.setProperty("--strip-offset-y", `${state.stripDesign.offsetY}px`);
   if (!pageRect.width || !pageRect.height || !layoutRect.width || !layoutRect.height) return 1;
   const safeInset = 2;
   const overflowLeft = Math.max(0, pageRect.left + safeInset - layoutRect.left);
