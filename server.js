@@ -782,7 +782,8 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
   const cardPadBottom = 5 * CSS_PX_TO_PT;
   const cardHeaderH = 12 * CSS_PX_TO_PT;
   const cardHeaderMarginBottom = 1 * CSS_PX_TO_PT;
-  const naturalCardW = (cellSize * 9 + smallGap * 8 + cardPadX * 2) * cardScale;
+  const cellWidth = Math.max(8, Math.min(42, (Number(design.cellWidth) || Number(design.cellSize) || 18) * CSS_PX_TO_PT));
+  const naturalCardW = (cellWidth * 9 + smallGap * 8 + cardPadX * 2) * cardScale;
   const naturalCardH = cardPadTop + cardHeaderH + cardHeaderMarginBottom + cellSize * 3 + smallGap * 2 + cardPadBottom;
   const metaBox = layout?.meta;
   const cardBoxes = Array.isArray(layout?.cards) ? layout.cards : null;
@@ -1002,7 +1003,8 @@ function getStripNaturalSize(design = {}) {
   const headerH = Math.max(0, (Number(design.headerHeight) || 0) * CSS_PX_TO_PT);
   const seriesFontSize = Math.max(6, Math.min(34, (Number(design.seriesFontSize) || 13) * CSS_PX_TO_PT));
   const cardGap = Math.max(1, Math.min(20, (Number(design.rowGap) || 6) * cardScale * CSS_PX_TO_PT));
-  const cardW = (cellSize * 9 + smallGap * 8 + cardPadX * 2) * cardScale;
+  const cellWidth = Math.max(8, Math.min(42, (Number(design.cellWidth) || Number(design.cellSize) || 18) * CSS_PX_TO_PT));
+  const cardW = (cellWidth * 9 + smallGap * 8 + cardPadX * 2) * cardScale;
   const cardH = cardPadTop + cardHeaderH + cardHeaderMarginBottom + cellSize * 3 + smallGap * 2 + cardPadBottom;
   return {
     width: cardW,

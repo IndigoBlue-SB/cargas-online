@@ -11,7 +11,7 @@
         }
       } catch {}
     </script>
-    <link rel="stylesheet" href="styles.css?v=stable-strip-font-20261108">
+    <link rel="stylesheet" href="styles.css?v=stable-strip-cells-20261108">
   </head>
   <body>
     <main class="app-shell">
@@ -978,7 +978,7 @@
                   <input id="stripCardScaleInput" type="number" min="60" max="160" value="100">
                 </label>
                 <label>
-                  Tamano recuadro numeros
+                  Alto de recuadros
                   <input id="stripCellSizeInput" type="number" min="12" max="42" value="18">
                 </label>
               </div>
@@ -1211,7 +1211,7 @@
                 <input id="stripCardScaleInput" type="number" min="60" max="160" value="100">
               </label>
               <label>
-                Tamano recuadro numeros
+                Alto de recuadros
                 <input id="stripCellSizeInput" type="number" min="12" max="42" value="18">
               </label>
               <label>
@@ -1258,6 +1258,7 @@
           </form>
           <div id="stripPreviewShell" class="strip-preview-shell">
             <div id="stripPreview" class="strip-preview"></div>
+            <p id="stripLayoutWarning" class="strip-layout-warning hidden" role="status"></p>
           </div>
         </div>
       </section>
@@ -1343,6 +1344,6 @@
       </section>
     </dialog>
 
-    <script src="app.js?v=stable-strip-font-20261108"></script>
+    <script src="app.js?v=stable-strip-cells-20261108"></script>
   </body>
 </html>

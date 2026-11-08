@@ -2055,6 +2055,7 @@ function fillStripDesigner() {
 }
 
 function applyStripDesign(options = {}) {
+  initializeStripCellGeometry();
   state.stripDesign.headerHeight = clamp(Number(els.stripHeaderHeightInput.value) || 0, 0, 180);
   state.stripDesign.paperSize = els.stripPaperSizeInput.value;
   state.stripDesign.orientation = els.stripOrientationInput.value;
@@ -2583,7 +2584,14 @@ function applyVirtualStripEvent(event, series, sheet = {}) {
   state.prizeAmounts = { ...state.prizeAmounts, ...(panel.prizeAmounts || {}) };
 }
 
+function initializeStripCellGeometry() {
+  const design = state.stripDesign;
+  if (!Number.isFinite(design.cellWidth)) design.cellWidth = design.cellSize;
+  if (!Number.isFinite(design.fitCellHeight)) design.fitCellHeight = design.cellSize;
+}
+
 function applyStripPreviewStyles(target) {
+  initializeStripCellGeometry();
   const pageDimensions = getPrintPageDimensions();
   target.style.width = pageDimensions.width;
   target.style.height = pageDimensions.height;
@@ -2605,6 +2613,7 @@ function applyStripPreviewStyles(target) {
   target.style.setProperty("--strip-render-font-size", `${state.stripDesign.fontSize}px`);
   target.style.setProperty("--strip-render-series-font-size", `${state.stripDesign.seriesFontSize}px`);
   target.style.setProperty("--strip-render-cell-size", `${state.stripDesign.cellSize}px`);
+  target.style.setProperty("--strip-render-cell-width", `${state.stripDesign.cellWidth}px`);
   target.style.setProperty("--strip-render-header-height", `${state.stripDesign.headerHeight}px`);
   target.style.setProperty("--strip-render-column-gap", `${state.stripDesign.gap}px`);
   target.style.setProperty("--strip-render-row-gap", `${state.stripDesign.rowGap}px`);
@@ -2640,6 +2649,19 @@ function updateStripPreviewScale() {
   const naturalHeight = Math.max(1, els.stripPreview.offsetHeight);
   const scale = Math.min(availableWidth / naturalWidth, availableHeight / naturalHeight, 1);
   els.stripPreview.style.setProperty("--strip-sheet-scale", String(Math.max(0.25, scale)));
+  updateStripLayoutWarning();
+}
+
+function updateStripLayoutWarning() {
+  const warning = document.querySelector("#stripLayoutWarning");
+  if (!warning || !els.stripPreview) return;
+  const page = els.stripPreview.getBoundingClientRect();
+  const outside = [...els.stripPreview.querySelectorAll(".strip-card")].some(card => {
+    const box = card.getBoundingClientRect();
+    return box.left < page.left - 1 || box.right > page.right + 1 || box.top < page.top - 1 || box.bottom > page.bottom + 1;
+  });
+  warning.textContent = outside ? "Hay cartones fuera de la hoja. Reduce la altura o la separacion, o ajusta la posicion antes de imprimir." : "";
+  warning.classList.toggle("hidden", !outside);
 }
 
 function updateStripNumberTextScale() {
@@ -2661,7 +2683,10 @@ function updateStripContentFitScale() {
   state.stripDesign.printContentScale = 1;
   if (state.stripDesign.fitToPage === false) return 1;
   const pageRect = preview.getBoundingClientRect();
+  // Measure fitting against the saved geometry, not the height being edited.
+  preview.style.setProperty("--strip-render-cell-size", `${state.stripDesign.fitCellHeight}px`);
   const layoutRect = layout.getBoundingClientRect();
+  preview.style.setProperty("--strip-render-cell-size", `${state.stripDesign.cellSize}px`);
   if (!pageRect.width || !pageRect.height || !layoutRect.width || !layoutRect.height) return 1;
   const safeInset = 2;
   const overflowLeft = Math.max(0, pageRect.left + safeInset - layoutRect.left);
@@ -3946,6 +3971,7 @@ function getPrintableCardForUnit(unit) {
 }
 
 function buildStripPrintStyleAttribute() {
+  initializeStripCellGeometry();
   updateStripContentFitScale();
   updateStripNumberTextScale();
   const bgImage = state.stripDesign.backgroundImageData ? `url('${state.stripDesign.backgroundImageData}')` : "none";
@@ -3968,6 +3994,7 @@ function buildStripPrintStyleAttribute() {
     `--strip-number-width-scale:${els.stripPreview?.style.getPropertyValue("--strip-number-width-scale") || 1}`,
     `--strip-render-series-font-size:${state.stripDesign.seriesFontSize}px`,
     `--strip-render-cell-size:${state.stripDesign.cellSize}px`,
+    `--strip-render-cell-width:${state.stripDesign.cellWidth}px`,
     `--strip-render-header-height:${state.stripDesign.headerHeight}px`,
     `--strip-render-column-gap:${state.stripDesign.gap}px`,
     `--strip-render-row-gap:${state.stripDesign.rowGap}px`,

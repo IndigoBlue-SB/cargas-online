@@ -2080,6 +2080,7 @@ dialog::backdrop {
 }
 
 .strip-preview-shell {
+  position: relative;
   height: 100%;
   max-height: none;
   min-height: 520px;
@@ -2090,6 +2091,19 @@ dialog::backdrop {
   border-radius: 8px;
   background: rgba(15, 23, 42, 0.35);
   padding: 8px;
+}
+
+.strip-layout-warning {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  margin: 0;
+  padding: 8px;
+  background: #382b10;
+  color: #ffe09a;
+  font-size: 13px;
+  z-index: 2;
 }
 
 .strip-preview {
@@ -2258,7 +2272,7 @@ dialog::backdrop {
   overflow: hidden;
   display: grid;
   place-items: center;
-  min-width: var(--strip-render-cell-size);
+  min-width: var(--strip-render-cell-width, var(--strip-render-cell-size));
   min-height: var(--strip-render-cell-size);
   border: 1px solid var(--strip-cell-border);
   border-radius: var(--strip-cell-radius);
