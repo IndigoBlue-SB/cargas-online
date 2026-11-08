@@ -23,3 +23,10 @@ context.num=String;context.money=String;vm.runInContext(source.slice(source.inde
 context.renamed=renamed;context.totals=B.calculate(renamed);const rows=vm.runInContext('balanceCalculationRows(renamed,totals,true,false)',context);
 assert.ok(rows.some(row=>row[0]==='Ana & Equipo (30% del neto Indigo)'));assert.ok(rows.some(row=>row[0]==='Juan (70% del neto Indigo)'));assert.equal(vm.runInContext('balanceCalculationRows(renamed,totals,false,false)',context).some(row=>row[0].includes('Ana & Equipo')),false);
 console.log('PASS partner names: legacy defaults, per-event persistence, report labels, unchanged amounts and private visibility');
+renamed.accountLabels={gross:'Recaudacion del evento',income:'Disponible para repartir',indigoNet:'Neto del equipo',giseName:'No debe reemplazar un campo vinculado'};context.renamed=renamed;
+const customRows=vm.runInContext('balanceCalculationRows(renamed,totals,true,false)',context);
+assert.ok(customRows.some(row=>row[0]==='Recaudacion del evento'&&row[2]==='gross'));assert.ok(customRows.some(row=>row[0]==='Disponible para repartir'));assert.ok(customRows.some(row=>row[0]==='Neto del equipo'));assert.ok(customRows.some(row=>row[0].startsWith('Ana & Equipo (30%')));assert.equal(customRows[0][2],undefined);assert.deepEqual(B.calculate(renamed),beforeRename);
+context.canSeePrivateBalance=()=>true;context.activeBalanceEvent=()=>context.event;
+vm.runInContext(source.slice(source.indexOf('    function balanceReportRows('),source.indexOf('    function exportBalancePdf(')),context);
+const report=vm.runInContext('balanceReportRows(renamed,totals)',context);assert.ok(report.every(row=>row.length===2));assert.ok(report.some(row=>row[0]==='Recaudacion del evento'));
+console.log('PASS account labels: custom per-event labels, linked names protected, unchanged amounts and two-column reports');

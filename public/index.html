@@ -367,6 +367,7 @@
     .balance-account-row input { min-width: 0; width: 100%; background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); font-weight: 700; border-color: transparent; box-shadow: 0 5px 12px rgba(5, 17, 22, .13); }
     .balance-admin-line input, .balance-line input { background: var(--balance-box-bg, #eef2ed); color: var(--balance-box-color, #051116); border-color: transparent; box-shadow: 0 5px 12px rgba(5, 17, 22, .11); }
     .balance-account-row input, .balance-total-line span, #balanceResult, [data-admin-amount], [data-expense-amount], [data-indigo-expense-amount], [data-prize-amount] { font-size: var(--balance-amount-size, 13px) !important; }
+    .balance-account-row input[data-account-label] { font-size: var(--balance-label-size, 13px) !important; }
     .accounting-layout { display: grid; grid-template-columns: minmax(240px, 310px) minmax(0, 1fr); gap: 10px; align-items: stretch; }
     .accounting-events, .accounting-categories { display: grid; gap: 8px; }
     .accounting-toolbar { max-width: 100%; display: flex; gap: 6px; flex-wrap: wrap; align-items: end; margin-bottom: 8px; padding: 8px; }
@@ -4372,6 +4373,10 @@
     function balanceFromForm() {
       const currentBalance = activeBalanceEvent() ? eventBalance(activeBalanceEvent()) : null;
       return {
+        accountLabels: {
+          ...(currentBalance?.accountLabels || {}),
+          ...Object.fromEntries([...document.querySelectorAll('[data-account-label]')].map(input => [input.dataset.accountLabel, input.value.trim().slice(0, 100)]))
+        },
         prizesList: [...document.querySelectorAll('[data-balance-prize]')].map(row => ({
           id: row.dataset.balancePrize,
           name: row.querySelector('[data-prize-name]').value.trim() || 'Premio',
@@ -4445,31 +4450,31 @@
     function balanceCalculationRows(balance, totals, showPrivate, showNoe) {
       const rows = [
         ['Bingos vendidos', num(balance.units)], ['Valor del bingo', money(balance.price)],
-        ['Venta total', money(totals.gross)], ['Comision vendedores', money(totals.sellerCommission)],
-        ['Rendicion de vendedores', money(totals.afterSellers)], ['Administradores intermediarios', money(totals.adminsCommission)],
-        ['Premios compartidos', money(totals.prizeCosts.shared)], ['Gastos compartidos', money(totals.expenseCosts.shared)],
-        ['Fondo comun antes del reparto', money(totals.income)]
+        ['Venta total', money(totals.gross), 'gross'], ['Comision vendedores', money(totals.sellerCommission)],
+        ['Rendicion de vendedores', money(totals.afterSellers), 'afterSellers'], ['Administradores intermediarios', money(totals.adminsCommission), 'admins'],
+        ['Premios compartidos', money(totals.prizeCosts.shared), 'sharedPrizes'], ['Gastos compartidos', money(totals.expenseCosts.shared), 'sharedExpenses'],
+        ['Fondo comun antes del reparto', money(totals.income), 'income']
       ];
       if (showPrivate) {
-        if (showNoe) rows.push(['Noe (' + num(balance.noePercent) + '%)', money(totals.noeAmount)], ['Fondo luego de Noe', money(totals.afterNoe)]);
+        if (showNoe) rows.push(['Noe (' + num(balance.noePercent) + '%)', money(totals.noeAmount)], ['Fondo luego de Noe', money(totals.afterNoe), 'afterNoe']);
         rows.push(
           ['Indigo ' + num(balance.indigoPercent == null ? 50 : balance.indigoPercent) + '% ' + (totals.mode === 'sales' ? 'sobre venta total' : 'del resultado'), money(totals.indigoAmount)],
-          [totals.mode === 'sales' ? 'Saldo para la institucion' : 'Participacion institucion', money(totals.institutionGross)],
-          ['Premios a cargo de institucion', money(totals.prizeCosts.institution)], ['Gastos a cargo de institucion', money(totals.expenseCosts.institution)],
-          ['Neto institucion', money(totals.institutionAmount)], ['Premios a cargo de Indigo', money(totals.prizeCosts.indigo)],
-          ['Gastos a cargo de Indigo', money(totals.expenseCosts.indigo)], ['Neto Indigo Blue', money(totals.indigoNetAmount)],
+          [totals.mode === 'sales' ? 'Saldo para la institucion' : 'Participacion institucion', money(totals.institutionGross), 'institutionGross'],
+          ['Premios a cargo de institucion', money(totals.prizeCosts.institution), 'institutionPrizes'], ['Gastos a cargo de institucion', money(totals.expenseCosts.institution), 'institutionExpenses'],
+          ['Neto institucion', money(totals.institutionAmount), 'institutionNet'], ['Premios a cargo de Indigo', money(totals.prizeCosts.indigo), 'indigoPrizes'],
+          ['Gastos a cargo de Indigo', money(totals.expenseCosts.indigo), 'indigoExpenses'], ['Neto Indigo Blue', money(totals.indigoNetAmount), 'indigoNet'],
           [(balance.giseName || 'Gise') + ' (' + num(balance.gisePercent) + '% del neto Indigo)', money(totals.giseAmount)],
           [(balance.laureanoName || 'Laureano') + ' (' + num(balance.laureanoPercent) + '% del neto Indigo)', money(totals.laureanoAmount)]
         );
       }
-      return rows;
+      return rows.map(([label, value, key]) => [key && String(balance.accountLabels?.[key] || '').trim() || label, value, key]);
     }
     function renderBalanceAccounts(balance, totals = balanceTotals(balance)) {
       const eventData = activeBalanceEvent();
       const rows = balanceCalculationRows(balance, totals, canSeePrivateBalance(eventData), eventHasNoeCommission(eventData));
-      $('balanceAccounts').innerHTML = rows.map(([label, value]) => `
+      $('balanceAccounts').innerHTML = rows.map(([label, value, key]) => `
         <div class="balance-account-row">
-          <span>${escapeAttr(label)}</span>
+          ${key ? `<input data-account-label="${key}" maxlength="100" aria-label="Nombre de cuenta" value="${escapeAttr(label)}" ${canUsePage('balance') ? '' : 'readonly'}>` : `<span>${escapeAttr(label)}</span>`}
           <input readonly value="${String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))}">
         </div>
       `).join('');
@@ -6167,7 +6172,7 @@
     }
 
     function balanceReportRows(balance, totals) {
-      return balanceCalculationRows(balance, totals, canSeePrivateBalance(activeBalanceEvent()), eventHasNoeCommission(activeBalanceEvent()));
+      return balanceCalculationRows(balance, totals, canSeePrivateBalance(activeBalanceEvent()), eventHasNoeCommission(activeBalanceEvent())).map(([label, value]) => [label, value]);
     }
 
     function exportBalancePdf() {
@@ -7057,6 +7062,9 @@
       scheduleBalanceAutosave();
     }));
     bindAmountFormatting($('balancePrice'));
+    $('balanceAccounts').addEventListener('input', event => {
+      if (event.target.matches('[data-account-label]') && canUsePage('balance')) scheduleBalanceAutosave();
+    });
     bindAmountFormatting(fields.saleAdminFixed);
     $('openBalanceConfig').addEventListener('click', () => {
       if (!isAdmin()) return;
