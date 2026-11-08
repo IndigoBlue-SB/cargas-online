@@ -2588,6 +2588,17 @@ function initializeStripCellGeometry() {
   const design = state.stripDesign;
   if (!Number.isFinite(design.cellWidth)) design.cellWidth = design.cellSize;
   if (!Number.isFinite(design.fitCellHeight)) design.fitCellHeight = design.cellSize;
+  const pageKey = [design.paperSize, design.orientation, design.columns, design.itemsPerPage, design.contentMode].join(":");
+  if (design.fitGeometry?.pageKey !== pageKey) {
+    design.fitGeometry = {
+      pageKey,
+      gap: design.gap,
+      rowGap: design.rowGap,
+      cardScale: design.cardScale,
+      seriesFontSize: design.seriesFontSize,
+      headerHeight: design.headerHeight,
+    };
+  }
 }
 
 function applyStripPreviewStyles(target) {
@@ -2683,11 +2694,32 @@ function updateStripContentFitScale() {
   state.stripDesign.printContentScale = 1;
   if (state.stripDesign.fitToPage === false) return 1;
   const pageRect = preview.getBoundingClientRect();
-  // Measure fitting against the saved geometry, not the height being edited.
+  // Keep the initial page scale while individual design controls are edited.
+  const reference = state.stripDesign.fitGeometry;
+  const fitProperties = {
+    "--strip-render-column-gap": `${reference.gap}px`,
+    "--strip-render-row-gap": `${reference.rowGap}px`,
+    "--strip-card-scale": String(reference.cardScale / 100),
+    "--strip-card-width": `${reference.cardScale}%`,
+    "--strip-render-series-font-size": `${reference.seriesFontSize}px`,
+    "--strip-render-header-height": `${reference.headerHeight}px`,
+  };
+  const previousProperties = Object.fromEntries(Object.keys(fitProperties).map(key => [key, preview.style.getPropertyValue(key)]));
+  Object.entries(fitProperties).forEach(([key, value]) => preview.style.setProperty(key, value));
   preview.style.setProperty("--strip-render-cell-size", `${state.stripDesign.fitCellHeight}px`);
   preview.style.setProperty("--strip-offset-x", "0px");
   preview.style.setProperty("--strip-offset-y", "0px");
-  const layoutRect = layout.getBoundingClientRect();
+  const boxes = [...layout.querySelectorAll(".strip-block, .strip-card")].map(element => element.getBoundingClientRect());
+  const layoutBox = layout.getBoundingClientRect();
+  const layoutRect = boxes.length ? {
+    left: Math.min(...boxes.map(box => box.left)),
+    top: Math.min(...boxes.map(box => box.top)),
+    right: Math.max(...boxes.map(box => box.right)),
+    bottom: Math.max(...boxes.map(box => box.bottom)),
+  } : layoutBox;
+  layoutRect.width = layoutRect.right - layoutRect.left;
+  layoutRect.height = layoutRect.bottom - layoutRect.top;
+  Object.entries(previousProperties).forEach(([key, value]) => preview.style.setProperty(key, value));
   preview.style.setProperty("--strip-render-cell-size", `${state.stripDesign.cellSize}px`);
   preview.style.setProperty("--strip-offset-x", `${state.stripDesign.offsetX}px`);
   preview.style.setProperty("--strip-offset-y", `${state.stripDesign.offsetY}px`);

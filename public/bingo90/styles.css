@@ -2183,6 +2183,8 @@ dialog::backdrop {
 }
 
 .strip-page-layout {
+  min-width: 0;
+  width: 100%;
   display: grid;
   grid-template-columns: repeat(var(--strip-columns), auto);
   column-gap: var(--strip-render-column-gap);
