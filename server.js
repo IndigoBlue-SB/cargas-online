@@ -719,7 +719,7 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
   const padBottom = Math.max(1, Math.min(8, Number(options.padBottom) || Number(options.padY) || 3));
   const headerH = Math.max(8, Math.min(15, Number(options.headerHeight) || 12));
   const headerMarginBottom = Math.max(0, Math.min(4, Number(options.headerMarginBottom) || 0));
-  const configuredCell = Math.max(8, Math.min(42, Number(options.cellSize) || 18));
+  const configuredCell = Math.max(8, Math.min(150, Number(options.cellSize) || 18));
   const availableCellW = (width - padX * 2 - smallGap * 8) / 9;
   const availableCellH = (height - headerH - headerMarginBottom - padTop - padBottom - smallGap * 2) / 3;
   const cellW = Math.max(8, availableCellW);
@@ -775,14 +775,14 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
   const headerH = Math.max(0, Math.min(height * 0.32, (Number(design.headerHeight) || 0) * CSS_PX_TO_PT));
   const cardGap = Math.max(1, Math.min(20, (Number(design.rowGap) || 6) * cardScaleFromDesign(design) * CSS_PX_TO_PT));
   const smallGap = 2 * CSS_PX_TO_PT;
-  const cardScale = Math.max(0.6, Math.min(1.6, (Number(design.cardScale) || 100) / 100));
-  const cellSize = Math.max(8, Math.min(42, (Number(design.cellSize) || 18) * CSS_PX_TO_PT));
+  const cardScale = Math.max(0.6, Math.min(5, (Number(design.cardScale) || 100) / 100));
+  const cellSize = Math.max(8, Math.min(150, (Number(design.cellSize) || 18) * CSS_PX_TO_PT));
   const cardPadX = 5 * CSS_PX_TO_PT;
   const cardPadTop = 3 * CSS_PX_TO_PT;
   const cardPadBottom = 5 * CSS_PX_TO_PT;
   const cardHeaderH = 12 * CSS_PX_TO_PT;
   const cardHeaderMarginBottom = 1 * CSS_PX_TO_PT;
-  const cellWidth = Math.max(8, Math.min(42, (Number(design.cellWidth) || Number(design.cellSize) || 18) * CSS_PX_TO_PT));
+  const cellWidth = Math.max(8, Math.min(150, (Number(design.cellWidth) || Number(design.cellSize) || 18) * CSS_PX_TO_PT));
   const naturalCardW = (cellWidth * 9 + smallGap * 8 + cardPadX * 2) * cardScale;
   const naturalCardH = cardPadTop + cardHeaderH + cardHeaderMarginBottom + cellSize * 3 + smallGap * 2 + cardPadBottom;
   const metaBox = layout?.meta;
@@ -984,7 +984,7 @@ async function buildDesofTemplatePdf({ event, from, to, design, template }) {
 }
 
 function cardScaleFromDesign(design = {}) {
-  return Math.max(0.6, Math.min(1.6, (Number(design.cardScale) || 100) / 100));
+  return Math.max(0.6, Math.min(5, (Number(design.cardScale) || 100) / 100));
 }
 
 function clampNumber(value, min, max) {
@@ -994,7 +994,7 @@ function clampNumber(value, min, max) {
 function getStripNaturalSize(design = {}) {
   const cardScale = cardScaleFromDesign(design);
   const smallGap = 2 * CSS_PX_TO_PT;
-  const cellSize = Math.max(8, Math.min(42, (Number(design.cellSize) || 18) * CSS_PX_TO_PT));
+  const cellSize = Math.max(8, Math.min(150, (Number(design.cellSize) || 18) * CSS_PX_TO_PT));
   const cardPadX = 5 * CSS_PX_TO_PT;
   const cardPadTop = 3 * CSS_PX_TO_PT;
   const cardPadBottom = 5 * CSS_PX_TO_PT;
@@ -1003,7 +1003,7 @@ function getStripNaturalSize(design = {}) {
   const headerH = Math.max(0, (Number(design.headerHeight) || 0) * CSS_PX_TO_PT);
   const seriesFontSize = Math.max(6, Math.min(34, (Number(design.seriesFontSize) || 13) * CSS_PX_TO_PT));
   const cardGap = Math.max(1, Math.min(20, (Number(design.rowGap) || 6) * cardScale * CSS_PX_TO_PT));
-  const cellWidth = Math.max(8, Math.min(42, (Number(design.cellWidth) || Number(design.cellSize) || 18) * CSS_PX_TO_PT));
+  const cellWidth = Math.max(8, Math.min(150, (Number(design.cellWidth) || Number(design.cellSize) || 18) * CSS_PX_TO_PT));
   const cardW = (cellWidth * 9 + smallGap * 8 + cardPadX * 2) * cardScale;
   const cardH = cardPadTop + cardHeaderH + cardHeaderMarginBottom + cellSize * 3 + smallGap * 2 + cardPadBottom;
   return {
