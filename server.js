@@ -736,11 +736,15 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
 
   doc.lineWidth(1.1).strokeColor(accent).roundedRect(x, y, width, height, 4.5).stroke();
   doc.font('Helvetica-Bold')
-    .fontSize(Math.max(6, fontSize * 0.45))
+    .fontSize(6.75)
     .fillColor(accent)
     .text(`Carton N° ${card.cardNumber}`, x + padX, y + padTop, { width: width - (padX * 2), align: 'right', lineBreak: false });
 
   doc.lineWidth(0.45).strokeColor(cellBorder);
+  const textSize = Math.min(fontSize, cellH * 1.2);
+  doc.font('Helvetica-Bold').fontSize(textSize);
+  const textWidth = doc.widthOfString('88');
+  const horizontalScaling = Math.min(100, (cellW - 1.5) / textWidth * 100);
   card.rows.forEach((row, rowIndex) => {
     row.forEach((number, column) => {
       const cellX = gridX + column * (cellW + smallGap);
@@ -750,7 +754,6 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
       }
       doc.strokeColor(cellBorder).roundedRect(cellX, cellY, cellW, cellH, radius).stroke();
       if (number) {
-        const textSize = Math.min(fontSize, cellH * 0.82);
         doc.font('Helvetica-Bold')
           .fontSize(textSize)
           .fillColor(numberColor)
@@ -758,6 +761,7 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
             width: cellW,
             height: cellH,
             align: 'center',
+            horizontalScaling,
             lineBreak: false
           });
       }

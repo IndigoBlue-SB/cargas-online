@@ -2252,6 +2252,10 @@ dialog::backdrop {
 
 .strip-number,
 .strip-empty {
+  contain: size;
+  box-sizing: border-box;
+  height: var(--strip-render-cell-size);
+  overflow: hidden;
   display: grid;
   place-items: center;
   min-width: var(--strip-render-cell-size);
@@ -2260,9 +2264,13 @@ dialog::backdrop {
   border-radius: var(--strip-cell-radius);
   color: var(--strip-number-color);
   background: var(--strip-cell-bg);
-  font-size: var(--strip-render-font-size);
+  font-size: min(var(--strip-render-font-size), calc(var(--strip-render-cell-size) * 1.2));
   font-weight: 800;
   line-height: 1;
+}
+
+.strip-number-text {
+  transform: scaleX(var(--strip-number-width-scale, 1));
 }
 
 .strip-empty {

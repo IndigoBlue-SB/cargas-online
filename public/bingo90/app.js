@@ -2611,7 +2611,7 @@ function applyStripPreviewStyles(target) {
   target.style.setProperty("--strip-render-card-pad-y", "3px");
   target.style.setProperty("--strip-render-card-pad-x", "5px");
   target.style.setProperty("--strip-render-card-header-height", "12px");
-  target.style.setProperty("--strip-render-card-title-font-size", `${Math.max(8, state.stripDesign.fontSize * 0.72)}px`);
+  target.style.setProperty("--strip-render-card-title-font-size", "9px");
   target.style.setProperty("--strip-render-small-gap", "2px");
   target.style.setProperty("--strip-cell-radius", getStripCellRadius());
   target.style.setProperty("--strip-cell-border", state.stripDesign.cellBorderColor);
@@ -2632,6 +2632,7 @@ function updateStripPreviewScale() {
   if (!els.stripPreviewShell || !els.stripPreview) return;
   els.stripPreview.style.transform = "";
   updateStripContentFitScale();
+  updateStripNumberTextScale();
 
   const availableWidth = Math.max(1, els.stripPreviewShell.clientWidth - 18);
   const availableHeight = Math.max(1, els.stripPreviewShell.clientHeight - 18);
@@ -2639,6 +2640,17 @@ function updateStripPreviewScale() {
   const naturalHeight = Math.max(1, els.stripPreview.offsetHeight);
   const scale = Math.min(availableWidth / naturalWidth, availableHeight / naturalHeight, 1);
   els.stripPreview.style.setProperty("--strip-sheet-scale", String(Math.max(0.25, scale)));
+}
+
+function updateStripNumberTextScale() {
+  const preview = els.stripPreview;
+  const cell = preview?.querySelector(".strip-number");
+  if (!cell) return;
+  const style = getComputedStyle(cell);
+  const context = document.createElement("canvas").getContext("2d");
+  context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  const width = Math.max(...Array.from({ length: 90 }, (_, index) => context.measureText(String(index + 1)).width));
+  preview.style.setProperty("--strip-number-width-scale", String(Math.min(1, Math.max(1, cell.clientWidth - 2) / width)));
 }
 
 function updateStripContentFitScale() {
@@ -2776,7 +2788,7 @@ function buildStripCardHtml(card) {
       <div class="strip-card-grid">
         ${card.rows.map((row) => `
           <div class="strip-card-row">
-            ${row.map((number) => `<span class="${number ? "strip-number" : "strip-empty"}">${number || ""}</span>`).join("")}
+            ${row.map((number) => `<span class="${number ? "strip-number" : "strip-empty"}">${number ? `<span class="strip-number-text">${number}</span>` : ""}</span>`).join("")}
           </div>
         `).join("")}
       </div>
@@ -3935,6 +3947,7 @@ function getPrintableCardForUnit(unit) {
 
 function buildStripPrintStyleAttribute() {
   updateStripContentFitScale();
+  updateStripNumberTextScale();
   const bgImage = state.stripDesign.backgroundImageData ? `url('${state.stripDesign.backgroundImageData}')` : "none";
   const contentScale = state.stripDesign.fitToPage === false ? 1 : (state.stripDesign.printContentScale || 1);
   return [
@@ -3952,6 +3965,7 @@ function buildStripPrintStyleAttribute() {
     `--strip-card-width:${state.stripDesign.cardScale}%`,
     `--strip-cell-size:${state.stripDesign.cellSize}px`,
     `--strip-render-font-size:${state.stripDesign.fontSize}px`,
+    `--strip-number-width-scale:${els.stripPreview?.style.getPropertyValue("--strip-number-width-scale") || 1}`,
     `--strip-render-series-font-size:${state.stripDesign.seriesFontSize}px`,
     `--strip-render-cell-size:${state.stripDesign.cellSize}px`,
     `--strip-render-header-height:${state.stripDesign.headerHeight}px`,
@@ -3960,7 +3974,7 @@ function buildStripPrintStyleAttribute() {
     "--strip-render-card-pad-y:3px",
     "--strip-render-card-pad-x:5px",
     "--strip-render-card-header-height:12px",
-    `--strip-render-card-title-font-size:${Math.max(8, state.stripDesign.fontSize * 0.72)}px`,
+    "--strip-render-card-title-font-size:9px",
     "--strip-render-small-gap:2px",
     `--strip-cell-radius:${getStripCellRadius()}`,
     `--strip-cell-border:${state.stripDesign.cellBorderColor}`,
