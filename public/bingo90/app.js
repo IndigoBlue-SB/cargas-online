@@ -654,8 +654,8 @@ function bindEvents() {
   els.stripDesofTemplateInput?.addEventListener("change", handleStripDesofTemplateSelection);
   els.stripClearDesofTemplateBtn?.addEventListener("click", clearStripDesofTemplate);
   els.stripSaveDesignBtn.addEventListener("click", saveStripDesignManually);
-  document.querySelector("#stripFitNowBtn").addEventListener("click", fitStripContentToPage);
-  document.querySelector("#stripCopyParametersBtn").addEventListener("click", copyStripParameters);
+  document.querySelector("#stripFitNowBtn")?.addEventListener("click", fitStripContentToPage);
+  document.querySelector("#stripCopyParametersBtn")?.addEventListener("click", copyStripParameters);
   els.stripExportPdfBtn.addEventListener("click", exportStripPdf);
   els.stripExportZipBtn.addEventListener("click", exportStripHtmlZip);
   [

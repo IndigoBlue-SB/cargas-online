@@ -11,7 +11,7 @@
         }
       } catch {}
     </script>
-    <link rel="stylesheet" href="styles.css?v=explicit-strip-geometry-20261110">
+    <link rel="stylesheet" href="styles.css?v=designer-startup-fix-20261110">
   </head>
   <body>
     <main class="app-shell">
@@ -981,6 +981,12 @@
                   Alto de recuadros
                   <input id="stripCellSizeInput" type="number" min="12" max="200" value="18">
                 </label>
+                <label class="check-field"><input id="stripFitToPageInput" type="checkbox" checked>Aplicar escala del contenido</label>
+                <label>Escala del contenido (%)<input id="stripContentScaleInput" type="number" min="10" max="200" step="0.1" value="100"></label>
+                <label>Ancho base de casilleros<input id="stripCellWidthInput" type="number" min="12" max="200" value="18"></label>
+                <button id="stripFitNowBtn" class="ghost-button" type="button">Ajustar a la hoja</button>
+                <label class="wide-field">Copiar parametros de otro evento<select id="stripCopySourceInput"><option value="">Seleccionar evento</option></select></label>
+                <button id="stripCopyParametersBtn" class="ghost-button" type="button">Copiar parametros</button>
               </div>
             </section>
 
@@ -1165,11 +1171,6 @@
                 <input id="stripFitToPageInput" type="checkbox" checked>
                 Aplicar escala del contenido
               </label>
-              <label>Escala del contenido (%)<input id="stripContentScaleInput" type="number" min="10" max="200" step="0.1" value="100"></label>
-              <label>Ancho base de casilleros<input id="stripCellWidthInput" type="number" min="12" max="200" value="18"></label>
-              <button id="stripFitNowBtn" class="ghost-button" type="button">Ajustar a la hoja</button>
-              <label class="wide-field">Copiar parametros de otro evento<select id="stripCopySourceInput"><option value="">Seleccionar evento</option></select></label>
-              <button id="stripCopyParametersBtn" class="ghost-button" type="button">Copiar parametros</button>
               <label>
                 Tamano de fuente
                 <input id="stripFontSizeInput" type="number" min="10" max="200" value="16">
@@ -1359,6 +1360,6 @@
       </section>
     </dialog>
 
-    <script src="app.js?v=explicit-strip-geometry-20261110"></script>
+    <script src="app.js?v=designer-startup-fix-20261110"></script>
   </body>
 </html>
