@@ -707,6 +707,41 @@ function drawSeriesStrip({ eventName, eventDetail, seriesLabel, seriesNumber, ca
   return out;
 }
 
+function drawMeasuredBingoCardKit(doc, card, detail, design) {
+  const font = /Georgia|Times/i.test(design.fontFamily || '') ? 'Times-Bold' : /Courier|monospace/i.test(design.fontFamily || '') ? 'Courier-Bold' : 'Helvetica-Bold';
+  const outline = (box, style, color, fill, ellipse = false) => {
+    const border = Math.max(0, style.borderWidth || 0);
+    const inset = border / 2;
+    const width = Math.max(0.1, box.width - border), height = Math.max(0.1, box.height - border);
+    const path = () => ellipse
+      ? doc.ellipse(box.x + box.width / 2, box.y + box.height / 2, width / 2, height / 2)
+      : doc.roundedRect(box.x + inset, box.y + inset, width, height, Math.max(0, Math.min(style.radius || 0, width / 2, height / 2) - inset));
+    if (fill) path().fill(fill);
+    if (border) path().lineWidth(border).strokeColor(color).stroke();
+  };
+  doc.save().fillOpacity(0.68).roundedRect(detail.box.x, detail.box.y, detail.box.width, detail.box.height, detail.style.radius || 0).fill('#ffffff').restore();
+  outline(detail.box, detail.style, design.accentColor || '#d1223b');
+  const header = detail.header;
+  doc.font(font).fontSize(header.style.fontSize).fillColor(design.accentColor || '#d1223b');
+  const title = `Carton N° ${card.cardNumber}`;
+  doc.text(title, header.box.x + header.box.width - doc.widthOfString(title), header.box.y, { lineBreak: false });
+  const values = card.rows.flat();
+  detail.cells.forEach((cell, index) => {
+    const { box, style } = cell;
+    const number = values[index];
+    outline(box, style, design.cellBorderColor || '#111827', number && design.cellBgEnabled ? (design.cellBgColor || '#ffffff') : null, design.cellShape === 'circle');
+    if (!number) return;
+    doc.font(font).fontSize(style.fontSize).fillColor(design.numberColor || '#111827');
+    const text = String(number), width = doc.widthOfString(text);
+    const scale = Math.min(style.numberScale || 1, Math.max(0.1, box.width - style.borderWidth * 2 - 1) / Math.max(0.1, width));
+    doc.save();
+    doc.translate(box.x + box.width / 2, box.y + box.height / 2);
+    doc.scale(scale, 1);
+    doc.text(text, -width / 2, (doc._font.capHeight || 718) / 2000 * style.fontSize, { baseline: 'alphabetic', lineBreak: false });
+    doc.restore();
+  });
+}
+
 function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
   const fontSize = Math.max(6, Number(options.fontSize) || 12);
   const accent = options.accentColor || '#d1223b';
@@ -759,14 +794,12 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
         doc.font('Helvetica-Bold')
           .fontSize(textSize)
           .fillColor(numberColor)
-          .text(String(number), cellX, cellY + cellH / 2 + (doc._font.capHeight || 718) / 2000 * textSize, {
-            width: cellW,
-            height: cellH,
-            align: 'center',
-            horizontalScaling,
-            baseline: 'alphabetic',
-            lineBreak: false
-          });
+        const text = String(number), width = doc.widthOfString(text);
+        doc.save();
+        doc.translate(cellX + cellW / 2, cellY + cellH / 2);
+        doc.scale(horizontalScaling / 100, 1);
+        doc.text(text, -width / 2, (doc._font.capHeight || 718) / 2000 * textSize, { baseline: 'alphabetic', lineBreak: false });
+        doc.restore();
       }
     });
   });
@@ -803,7 +836,7 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
   const cardsStartY = cardsTop;
 
   doc.font('Helvetica-Bold')
-    .fontSize(seriesFontSize)
+    .fontSize(layout?.metaStyle?.fontSize || seriesFontSize)
     .fillColor(design.seriesColor || '#111827')
     .text(`${seriesLabel || 'Serie N°'} ${seriesNumber}`, metaX, metaY, {
       width: metaWidth,
@@ -811,7 +844,7 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
       lineBreak: false
     });
 
-  if (!hasPageBackground) {
+  if (!hasPageBackground && !layout) {
     doc.font('Helvetica-Bold')
       .fontSize(Math.max(11, fontSize + 1))
       .fillColor('#111827')
@@ -825,6 +858,11 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
   }
 
   cards.forEach((card, index) => {
+    const detail = layout?.cardDetails?.[index];
+    if (detail?.cells?.length === 27) {
+      drawMeasuredBingoCardKit(doc, card, detail, design);
+      return;
+    }
     const cardBox = cardBoxes?.[index];
     const cardX = cardBox ? cardBox.x : x + (width - cardW) / 2;
     const cardY = cardBox ? cardBox.y : cardsStartY + index * (cardH + cardGap);
@@ -1063,11 +1101,24 @@ function normalizeStripPdfLayoutMetrics(metrics, page) {
       height: Math.max(1, (Number(source.height) || 0) * scaleY),
     };
   };
+  const normalizeStyle = (style = {}) => ({
+    fontSize: Math.max(0.1, Math.min(300, Number(style.fontSize) || 12) * scaleY),
+    borderWidth: Math.max(0, Math.min(20, Number(style.borderWidth) || 0) * scaleX),
+    radius: Math.max(0, (Number(style.radius) || 0) * scaleX),
+    numberScale: Math.max(0.01, Math.min(1, Number(style.numberScale) || 1)),
+  });
   return {
     blocks: blocks.map((block) => ({
       box: normalizeRect(block?.box),
       meta: normalizeRect(block?.meta),
+      metaStyle: block?.metaStyle ? normalizeStyle(block.metaStyle) : null,
       cards: Array.isArray(block?.cards) ? block.cards.map(normalizeRect) : [],
+      cardDetails: Array.isArray(block?.cardDetails) ? block.cardDetails.slice(0, 6).map(detail => ({
+        box: normalizeRect(detail.box),
+        style: normalizeStyle(detail.style),
+        header: { box: normalizeRect(detail.header?.box), style: normalizeStyle(detail.header?.style) },
+        cells: Array.isArray(detail.cells) ? detail.cells.slice(0, 27).map(cell => ({ box: normalizeRect(cell.box), style: normalizeStyle(cell.style) })) : [],
+      })) : [],
     })),
   };
 }

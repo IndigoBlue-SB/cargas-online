@@ -2769,6 +2769,7 @@ function updateStripContentFitScale() {
 
 function captureStripPdfLayoutMetrics() {
   updateStripContentFitScale();
+  updateStripNumberTextScale();
   const preview = els.stripPreview;
   if (!preview || !preview.isConnected) return null;
   const blocks = [...preview.querySelectorAll(".strip-block")];
@@ -2788,12 +2789,29 @@ function captureStripPdfLayoutMetrics() {
       height: rect.height / scaleY,
     };
   };
+  const textStyle = (element) => {
+    const style = getComputedStyle(element);
+    const contentScale = element.getBoundingClientRect().height / Math.max(1, element.offsetHeight) / scaleY;
+    return {
+      fontSize: parseFloat(style.fontSize) * contentScale,
+      borderWidth: parseFloat(style.borderTopWidth) * contentScale || 0,
+      radius: parseFloat(style.borderTopLeftRadius) * contentScale || 0,
+      numberScale: Number(getComputedStyle(preview).getPropertyValue("--strip-number-width-scale")) || 1,
+    };
+  };
   return {
     page: { width: pageWidth, height: pageHeight },
     blocks: blocks.map((block) => ({
       box: rectToPage(block),
       meta: rectToPage(block.querySelector(".strip-meta") || block),
+      metaStyle: textStyle(block.querySelector(".strip-meta") || block),
       cards: [...block.querySelectorAll(".strip-card")].map(rectToPage),
+      cardDetails: [...block.querySelectorAll(".strip-card")].map(card => ({
+        box: rectToPage(card),
+        style: textStyle(card),
+        header: { box: rectToPage(card.querySelector("header")), style: textStyle(card.querySelector("header")) },
+        cells: [...card.querySelectorAll(".strip-number, .strip-empty")].map(cell => ({ box: rectToPage(cell), style: textStyle(cell) })),
+      })),
     })),
   };
 }
