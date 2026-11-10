@@ -1145,7 +1145,9 @@ async function buildSeriesPdf({ event, from, to, stripDesignOverride = null }) {
   const pageContentWidth = Math.max(1, page.width - pageInset * 2);
   const layoutWidth = (columns * stripSize.width) + ((columns - 1) * columnGap);
   const horizontalFootprint = layoutWidth + Math.abs(offsetX) * 2;
-  const contentScale = Math.min(1, pageContentWidth / Math.max(1, horizontalFootprint));
+  const contentScale = design.fitToPage === false ? 1 : Number.isFinite(design.contentScalePercent)
+    ? clampNumber(design.contentScalePercent, 10, 200) / 100
+    : Math.min(1, pageContentWidth / Math.max(1, horizontalFootprint));
   const scaledLayoutWidth = layoutWidth * contentScale;
   const centeredX = pageInset + ((pageContentWidth - scaledLayoutWidth) / 2) + offsetX;
   const startX = clampNumber(centeredX, 0, Math.max(0, page.width - scaledLayoutWidth));

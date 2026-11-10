@@ -387,6 +387,9 @@ const els = {
   stripDesofTemplateStatus: document.querySelector("#stripDesofTemplateStatus"),
   stripClearDesofTemplateBtn: document.querySelector("#stripClearDesofTemplateBtn"),
   stripSaveDesignBtn: document.querySelector("#stripSaveDesignBtn"),
+  stripContentScaleInput: document.querySelector("#stripContentScaleInput"),
+  stripCellWidthInput: document.querySelector("#stripCellWidthInput"),
+  stripCopySourceInput: document.querySelector("#stripCopySourceInput"),
   stripExportPdfBtn: document.querySelector("#stripExportPdfBtn"),
   stripExportZipBtn: document.querySelector("#stripExportZipBtn"),
   stripPreviewShell: document.querySelector("#stripPreviewShell"),
@@ -651,6 +654,8 @@ function bindEvents() {
   els.stripDesofTemplateInput?.addEventListener("change", handleStripDesofTemplateSelection);
   els.stripClearDesofTemplateBtn?.addEventListener("click", clearStripDesofTemplate);
   els.stripSaveDesignBtn.addEventListener("click", saveStripDesignManually);
+  document.querySelector("#stripFitNowBtn").addEventListener("click", fitStripContentToPage);
+  document.querySelector("#stripCopyParametersBtn").addEventListener("click", copyStripParameters);
   els.stripExportPdfBtn.addEventListener("click", exportStripPdf);
   els.stripExportZipBtn.addEventListener("click", exportStripHtmlZip);
   [
@@ -669,6 +674,8 @@ function bindEvents() {
     els.stripOffsetYInput,
     els.stripFitToPageInput,
     els.stripFontSizeInput,
+    els.stripContentScaleInput,
+    els.stripCellWidthInput,
     els.stripCardNumberFontSizeInput,
     els.stripFontFamilyInput,
     els.stripSeriesLabelInput,
@@ -2008,6 +2015,10 @@ function openStripDesigner() {
 }
 
 function fillStripDesigner() {
+  initializeStripCellGeometry();
+  els.stripContentScaleInput.value = state.stripDesign.contentScalePercent;
+  els.stripCellWidthInput.value = state.stripDesign.cellWidth;
+  els.stripCopySourceInput.innerHTML = '<option value="">Seleccionar evento</option>' + loadSavedEvents().filter(event => event.id !== state.eventId && event.stripDesign).map(event => `<option value="${escapeHtml(event.id)}">${escapeHtml(event.name || 'Evento')}</option>`).join('');
   els.stripHeaderHeightInput.value = state.stripDesign.headerHeight;
   const rangeStart = state.rangeStart || 1;
   const rangeEnd = state.rangeEnd || rangeStart;
@@ -2065,6 +2076,8 @@ function fillStripDesigner() {
 
 function applyStripDesign(options = {}) {
   initializeStripCellGeometry();
+  state.stripDesign.contentScalePercent = clamp(Number(els.stripContentScaleInput.value) || 100, 10, 200);
+  state.stripDesign.cellWidth = clamp(Number(els.stripCellWidthInput.value) || 18, 12, 200);
   state.stripDesign.headerHeight = clamp(Number(els.stripHeaderHeightInput.value) || 0, 0, 180);
   state.stripDesign.paperSize = els.stripPaperSizeInput.value;
   state.stripDesign.orientation = els.stripOrientationInput.value;
@@ -2598,22 +2611,12 @@ function applyVirtualStripEvent(event, series, sheet = {}) {
 
 function initializeStripCellGeometry() {
   const design = state.stripDesign;
-  if (!Number.isFinite(design.cellWidth)) design.cellWidth = design.cellSize;
-  if (!Number.isFinite(design.fitCellHeight)) design.fitCellHeight = design.cellSize;
-  const pageKey = [design.paperSize, design.orientation, design.columns, design.itemsPerPage, design.contentMode].join(":");
-  if (design.fitGeometry?.pageKey !== pageKey) {
-    design.fitGeometry = {
-      pageKey,
-      gap: design.gap,
-      rowGap: design.rowGap,
-      cardScale: design.cardScale,
-      seriesFontSize: design.seriesFontSize,
-      headerHeight: design.headerHeight,
-      cardNumberFontSize: design.cardNumberFontSize || 9,
-      cellBorderWidth: design.cellBorderWidth ?? 1,
-      cardBorderWidth: design.cardBorderWidth ?? 2,
-    };
+  if (!Number.isFinite(design.cellWidth)) design.cellWidth = 18;
+  if (!Number.isFinite(design.contentScalePercent)) {
+    design.contentScalePercent = Math.round(clamp((Number(design.printContentScale) || 1) * 100, 10, 200) * 10000) / 10000;
   }
+  delete design.fitCellHeight;
+  delete design.fitGeometry;
 }
 
 function applyStripPreviewStyles(target) {
@@ -2709,62 +2712,49 @@ function updateStripNumberTextScale() {
 
 function updateStripContentFitScale() {
   const preview = els.stripPreview;
-  const layout = preview?.querySelector(".strip-page-layout");
-  if (!preview || !layout) return 1;
+  if (!preview) return 1;
+  initializeStripCellGeometry();
+  const scale = state.stripDesign.fitToPage === false ? 1 : state.stripDesign.contentScalePercent / 100;
+  preview.style.setProperty("--strip-content-scale", String(scale));
+  state.stripDesign.printContentScale = scale;
+  return scale;
+}
+
+function fitStripContentToPage() {
+  applyStripDesign({ skipPersist: true });
+  const preview = els.stripPreview;
   preview.style.setProperty("--strip-content-scale", "1");
-  state.stripDesign.printContentScale = 1;
-  if (state.stripDesign.fitToPage === false) return 1;
-  const pageRect = preview.getBoundingClientRect();
-  // Keep the initial page scale while individual design controls are edited.
-  const reference = state.stripDesign.fitGeometry;
-  const fitProperties = {
-    "--strip-render-column-gap": `${reference.gap}px`,
-    "--strip-render-row-gap": `${reference.rowGap}px`,
-    "--strip-card-scale": String(reference.cardScale / 100),
-    "--strip-card-width": `${reference.cardScale}%`,
-    "--strip-render-series-font-size": `${reference.seriesFontSize}px`,
-    "--strip-render-header-height": `${reference.headerHeight}px`,
-    "--strip-render-card-header-height": `${Math.max(12, (reference.cardNumberFontSize || 9) + 2)}px`,
-    "--strip-render-card-title-font-size": `${reference.cardNumberFontSize || 9}px`,
-    "--strip-cell-border-width": `${reference.cellBorderWidth ?? 1}px`,
-    "--strip-card-border-width": `${reference.cardBorderWidth ?? 2}px`,
+  const page = preview.getBoundingClientRect();
+  const layout = preview.querySelector(".strip-page-layout").getBoundingClientRect();
+  const boxes = [...preview.querySelectorAll(".strip-card, .strip-meta")].map(element => element.getBoundingClientRect());
+  if (!page.width || !page.height || !boxes.length) return;
+  const originX = layout.left + layout.width / 2;
+  const originY = layout.top;
+  const horizontal = Math.max(...boxes.flatMap(box => [Math.abs(box.left - originX), Math.abs(box.right - originX)]));
+  const vertical = Math.max(...boxes.map(box => box.bottom - originY));
+  const safeWidth = Math.min(originX - page.left, page.right - originX) - 4;
+  const safeHeight = page.bottom - originY - 4;
+  const scale = clamp(Math.min(1, safeWidth / Math.max(1, horizontal), safeHeight / Math.max(1, vertical)), 0.1, 2);
+  state.stripDesign.fitToPage = true;
+  state.stripDesign.contentScalePercent = Math.floor(scale * 1000) / 10;
+  els.stripFitToPageInput.checked = true;
+  els.stripContentScaleInput.value = state.stripDesign.contentScalePercent;
+  renderStripPreview();
+  persistEventDesign();
+}
+
+function copyStripParameters() {
+  const source = loadSavedEvents().find(event => event.id === els.stripCopySourceInput.value);
+  if (!source?.stripDesign) return window.alert("Selecciona el evento del que queres copiar los parametros.");
+  const background = {
+    backgroundImageData: state.stripDesign.backgroundImageData,
+    backgroundImageName: state.stripDesign.backgroundImageName,
   };
-  const previousProperties = Object.fromEntries(Object.keys(fitProperties).map(key => [key, preview.style.getPropertyValue(key)]));
-  Object.entries(fitProperties).forEach(([key, value]) => preview.style.setProperty(key, value));
-  preview.style.setProperty("--strip-render-cell-size", `${state.stripDesign.fitCellHeight}px`);
-  preview.style.setProperty("--strip-offset-x", "0px");
-  preview.style.setProperty("--strip-offset-y", "0px");
-  const boxes = [...layout.querySelectorAll(".strip-block, .strip-card")].map(element => element.getBoundingClientRect());
-  const layoutBox = layout.getBoundingClientRect();
-  const layoutRect = boxes.length ? {
-    left: Math.min(...boxes.map(box => box.left)),
-    top: Math.min(...boxes.map(box => box.top)),
-    right: Math.max(...boxes.map(box => box.right)),
-    bottom: Math.max(...boxes.map(box => box.bottom)),
-  } : layoutBox;
-  layoutRect.width = layoutRect.right - layoutRect.left;
-  layoutRect.height = layoutRect.bottom - layoutRect.top;
-  Object.entries(previousProperties).forEach(([key, value]) => preview.style.setProperty(key, value));
-  preview.style.setProperty("--strip-render-cell-size", `${state.stripDesign.cellSize}px`);
-  preview.style.setProperty("--strip-offset-x", `${state.stripDesign.offsetX}px`);
-  preview.style.setProperty("--strip-offset-y", `${state.stripDesign.offsetY}px`);
-  if (!pageRect.width || !pageRect.height || !layoutRect.width || !layoutRect.height) return 1;
-  const safeInset = 2;
-  const overflowLeft = Math.max(0, pageRect.left + safeInset - layoutRect.left);
-  const overflowTop = Math.max(0, pageRect.top + safeInset - layoutRect.top);
-  const overflowRight = Math.max(0, layoutRect.right - pageRect.right + safeInset);
-  const overflowBottom = Math.max(0, layoutRect.bottom - pageRect.bottom + safeInset);
-  const neededWidth = layoutRect.width + overflowLeft + overflowRight;
-  const neededHeight = layoutRect.height + overflowTop + overflowBottom;
-  const scale = Math.min(
-    1,
-    (pageRect.width - safeInset * 2) / Math.max(1, neededWidth),
-    (pageRect.height - safeInset * 2) / Math.max(1, neededHeight)
-  );
-  const safeScale = Math.max(0.2, scale);
-  preview.style.setProperty("--strip-content-scale", String(safeScale));
-  state.stripDesign.printContentScale = safeScale;
-  return safeScale;
+  state.stripDesign = { ...createDefaultStripDesign(), ...clonePlain(source.stripDesign), ...background };
+  initializeStripCellGeometry();
+  fillStripDesigner();
+  renderStripPreview();
+  persistEventDesign();
 }
 
 function captureStripPdfLayoutMetrics() {
