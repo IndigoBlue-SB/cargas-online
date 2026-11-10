@@ -375,6 +375,8 @@ const els = {
   stripCellSizeInput: document.querySelector("#stripCellSizeInput"),
   stripCellShapeInput: document.querySelector("#stripCellShapeInput"),
   stripCellBorderColorInput: document.querySelector("#stripCellBorderColorInput"),
+  stripCellBorderWidthInput: document.querySelector("#stripCellBorderWidthInput"),
+  stripCardBorderWidthInput: document.querySelector("#stripCardBorderWidthInput"),
   stripCellBgEnabledInput: document.querySelector("#stripCellBgEnabledInput"),
   stripCellBgColorInput: document.querySelector("#stripCellBgColorInput"),
   stripAccentInput: document.querySelector("#stripAccentInput"),
@@ -680,6 +682,8 @@ function bindEvents() {
     els.stripCellSizeInput,
     els.stripCellShapeInput,
     els.stripCellBorderColorInput,
+    els.stripCellBorderWidthInput,
+    els.stripCardBorderWidthInput,
     els.stripCellBgEnabledInput,
     els.stripCellBgColorInput,
     els.stripAccentInput,
@@ -2042,6 +2046,8 @@ function fillStripDesigner() {
   els.stripCellSizeInput.value = state.stripDesign.cellSize;
   els.stripCellShapeInput.value = state.stripDesign.cellShape;
   els.stripCellBorderColorInput.value = state.stripDesign.cellBorderColor;
+  els.stripCellBorderWidthInput.value = state.stripDesign.cellBorderWidth ?? 1;
+  els.stripCardBorderWidthInput.value = state.stripDesign.cardBorderWidth ?? 2;
   els.stripCellBgEnabledInput.checked = state.stripDesign.cellBgEnabled;
   els.stripCellBgColorInput.value = state.stripDesign.cellBgColor;
   els.stripAccentInput.value = state.stripDesign.accentColor;
@@ -2086,6 +2092,8 @@ function applyStripDesign(options = {}) {
   state.stripDesign.cellSize = clamp(Number(els.stripCellSizeInput.value) || 18, 12, 200);
   state.stripDesign.cellShape = els.stripCellShapeInput.value;
   state.stripDesign.cellBorderColor = els.stripCellBorderColorInput.value;
+  state.stripDesign.cellBorderWidth = clamp(Number(els.stripCellBorderWidthInput.value), 0, 10);
+  state.stripDesign.cardBorderWidth = clamp(Number(els.stripCardBorderWidthInput.value), 0, 10);
   state.stripDesign.cellBgEnabled = els.stripCellBgEnabledInput.checked;
   state.stripDesign.cellBgColor = els.stripCellBgColorInput.value;
   state.stripDesign.accentColor = els.stripAccentInput.value;
@@ -2602,6 +2610,8 @@ function initializeStripCellGeometry() {
       seriesFontSize: design.seriesFontSize,
       headerHeight: design.headerHeight,
       cardNumberFontSize: design.cardNumberFontSize || 9,
+      cellBorderWidth: design.cellBorderWidth ?? 1,
+      cardBorderWidth: design.cardBorderWidth ?? 2,
     };
   }
 }
@@ -2640,6 +2650,8 @@ function applyStripPreviewStyles(target) {
   target.style.setProperty("--strip-render-small-gap", "2px");
   target.style.setProperty("--strip-cell-radius", getStripCellRadius());
   target.style.setProperty("--strip-cell-border", state.stripDesign.cellBorderColor);
+  target.style.setProperty("--strip-cell-border-width", `${state.stripDesign.cellBorderWidth ?? 1}px`);
+  target.style.setProperty("--strip-card-border-width", `${state.stripDesign.cardBorderWidth ?? 2}px`);
   target.style.setProperty("--strip-cell-bg", state.stripDesign.cellBgEnabled ? state.stripDesign.cellBgColor : "transparent");
   target.style.setProperty("--strip-header-height", `${state.stripDesign.headerHeight}px`);
   target.style.setProperty("--strip-gap", `${state.stripDesign.gap}px`);
@@ -2687,6 +2699,10 @@ function updateStripNumberTextScale() {
   const style = getComputedStyle(cell);
   const context = document.createElement("canvas").getContext("2d");
   context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  const metrics = context.measureText("0123456789");
+  const fontSize = parseFloat(style.fontSize);
+  const verticalOffset = (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent - (metrics.fontBoundingBoxAscent ?? fontSize * 0.8) + (metrics.fontBoundingBoxDescent ?? fontSize * 0.2)) / 2;
+  preview.style.setProperty("--strip-number-offset-y", `${verticalOffset}px`);
   const width = Math.max(...Array.from({ length: 90 }, (_, index) => context.measureText(String(index + 1)).width));
   preview.style.setProperty("--strip-number-width-scale", String(Math.min(1, Math.max(1, cell.clientWidth - 2) / width)));
 }
@@ -2710,6 +2726,8 @@ function updateStripContentFitScale() {
     "--strip-render-header-height": `${reference.headerHeight}px`,
     "--strip-render-card-header-height": `${Math.max(12, (reference.cardNumberFontSize || 9) + 2)}px`,
     "--strip-render-card-title-font-size": `${reference.cardNumberFontSize || 9}px`,
+    "--strip-cell-border-width": `${reference.cellBorderWidth ?? 1}px`,
+    "--strip-card-border-width": `${reference.cardBorderWidth ?? 2}px`,
   };
   const previousProperties = Object.fromEntries(Object.keys(fitProperties).map(key => [key, preview.style.getPropertyValue(key)]));
   Object.entries(fitProperties).forEach(([key, value]) => preview.style.setProperty(key, value));
@@ -4048,6 +4066,9 @@ function buildStripPrintStyleAttribute() {
     "--strip-render-small-gap:2px",
     `--strip-cell-radius:${getStripCellRadius()}`,
     `--strip-cell-border:${state.stripDesign.cellBorderColor}`,
+    `--strip-cell-border-width:${state.stripDesign.cellBorderWidth ?? 1}px`,
+    `--strip-card-border-width:${state.stripDesign.cardBorderWidth ?? 2}px`,
+    `--strip-number-offset-y:${els.stripPreview?.style.getPropertyValue("--strip-number-offset-y") || '0px'}`,
     `--strip-cell-bg:${state.stripDesign.cellBgEnabled ? state.stripDesign.cellBgColor : "transparent"}`,
     `--strip-header-height:${state.stripDesign.headerHeight}px`,
     `--strip-gap:${state.stripDesign.gap}px`,
@@ -6521,6 +6542,8 @@ function createDefaultStripDesign() {
     cellSize: 18,
     cellShape: "square",
     cellBorderColor: "#111827",
+    cellBorderWidth: 1,
+    cardBorderWidth: 2,
     cellBgEnabled: false,
     cellBgColor: "#ffffff",
     backgroundImageData: "",

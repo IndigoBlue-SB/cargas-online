@@ -11,7 +11,7 @@
         }
       } catch {}
     </script>
-    <link rel="stylesheet" href="styles.css?v=carton-number-size-20261108">
+    <link rel="stylesheet" href="styles.css?v=strip-borders-centered-20261110">
   </head>
   <body>
     <main class="app-shell">
@@ -1023,6 +1023,8 @@
                   Color de borde
                   <input id="stripCellBorderColorInput" type="color" value="#111827">
                 </label>
+                <label>Grosor borde de casilleros<input id="stripCellBorderWidthInput" type="number" min="0" max="10" step="0.25" value="1"></label>
+                <label>Grosor borde del carton<input id="stripCardBorderWidthInput" type="number" min="0" max="10" step="0.25" value="2"></label>
                 <label class="check-field">
                   <input id="stripCellBgEnabledInput" type="checkbox">
                   Fondo en numeros
@@ -1232,6 +1234,8 @@
                 Color de borde
                 <input id="stripCellBorderColorInput" type="color" value="#111827">
               </label>
+              <label>Grosor borde de casilleros<input id="stripCellBorderWidthInput" type="number" min="0" max="10" step="0.25" value="1"></label>
+              <label>Grosor borde del carton<input id="stripCardBorderWidthInput" type="number" min="0" max="10" step="0.25" value="2"></label>
               <label class="check-field">
                 <input id="stripCellBgEnabledInput" type="checkbox">
                 Fondo en numeros
@@ -1350,6 +1354,6 @@
       </section>
     </dialog>
 
-    <script src="app.js?v=carton-number-size-20261108"></script>
+    <script src="app.js?v=strip-borders-centered-20261110"></script>
   </body>
 </html>

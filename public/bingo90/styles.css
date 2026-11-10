@@ -2233,7 +2233,7 @@ dialog::backdrop {
 }
 
 .strip-card {
-  border: 2px solid var(--strip-accent);
+  border: var(--strip-card-border-width, 2px) solid var(--strip-accent);
   border-radius: 6px;
   padding: var(--strip-render-card-pad-y) var(--strip-render-card-pad-x) var(--strip-render-card-pad-x);
   background: rgba(255, 255, 255, 0.68);
@@ -2278,7 +2278,7 @@ dialog::backdrop {
   place-items: center;
   min-width: var(--strip-render-cell-width, var(--strip-render-cell-size));
   min-height: var(--strip-render-cell-size);
-  border: 1px solid var(--strip-cell-border);
+  border: var(--strip-cell-border-width, 1px) solid var(--strip-cell-border);
   border-radius: var(--strip-cell-radius);
   color: var(--strip-number-color);
   background: var(--strip-cell-bg);
@@ -2288,7 +2288,7 @@ dialog::backdrop {
 }
 
 .strip-number-text {
-  transform: scaleX(var(--strip-number-width-scale, 1));
+  transform: translateY(var(--strip-number-offset-y, 0px)) scaleX(var(--strip-number-width-scale, 1));
 }
 
 .strip-empty {

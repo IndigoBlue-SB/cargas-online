@@ -712,6 +712,8 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
   const accent = options.accentColor || '#d1223b';
   const numberColor = options.numberColor || '#111827';
   const cellBorder = options.cellBorderColor || '#111827';
+  const cellBorderWidth = clampNumber(Number(options.cellBorderWidth ?? 0.75), 0, 7.5);
+  const cardBorderWidth = clampNumber(Number(options.cardBorderWidth ?? 1.5), 0, 7.5);
   const cellBg = options.cellBgEnabled ? (options.cellBgColor || '#ffffff') : null;
   const smallGap = Math.max(1, Math.min(5, Number(options.smallGap) || 2));
   const padX = Math.max(2, Math.min(8, Number(options.padX) || 5));
@@ -734,13 +736,13 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
       ? Math.min(6, Math.min(cellW, cellH) / 3)
       : 0;
 
-  doc.lineWidth(1.1).strokeColor(accent).roundedRect(x, y, width, height, 4.5).stroke();
+  if (cardBorderWidth > 0) doc.lineWidth(cardBorderWidth).strokeColor(accent).roundedRect(x, y, width, height, 4.5).stroke();
   doc.font('Helvetica-Bold')
     .fontSize(Math.max(6, Math.min(90, Number(options.cardNumberFontSize) || 6.75)))
     .fillColor(accent)
     .text(`Carton N° ${card.cardNumber}`, x + padX, y + padTop, { width: width - (padX * 2), align: 'right', lineBreak: false });
 
-  doc.lineWidth(0.45).strokeColor(cellBorder);
+  doc.lineWidth(cellBorderWidth || 0.75).strokeColor(cellBorder);
   const textSize = Math.min(fontSize, cellH * 1.2);
   doc.font('Helvetica-Bold').fontSize(textSize);
   const textWidth = doc.widthOfString('88');
@@ -752,16 +754,17 @@ function drawBingoCardKit(doc, card, x, y, width, height, options = {}) {
       if (cellBg) {
         doc.fillColor(cellBg).roundedRect(cellX, cellY, cellW, cellH, radius).fill();
       }
-      doc.strokeColor(cellBorder).roundedRect(cellX, cellY, cellW, cellH, radius).stroke();
+      if (cellBorderWidth > 0) doc.strokeColor(cellBorder).roundedRect(cellX, cellY, cellW, cellH, radius).stroke();
       if (number) {
         doc.font('Helvetica-Bold')
           .fontSize(textSize)
           .fillColor(numberColor)
-          .text(String(number), cellX, cellY + (cellH - textSize) * 0.42, {
+          .text(String(number), cellX, cellY + cellH / 2 + (doc._font.capHeight || 718) / 2000 * textSize, {
             width: cellW,
             height: cellH,
             align: 'center',
             horizontalScaling,
+            baseline: 'alphabetic',
             lineBreak: false
           });
       }
@@ -833,6 +836,8 @@ function drawSeriesStripKit(doc, { eventName, eventDetail, seriesLabel, seriesNu
       accentColor: design.accentColor,
       numberColor: design.numberColor,
       cellBorderColor: design.cellBorderColor,
+      cellBorderWidth: (design.cellBorderWidth ?? 1) * CSS_PX_TO_PT,
+      cardBorderWidth: (design.cardBorderWidth ?? 2) * CSS_PX_TO_PT,
       cellBgEnabled: design.cellBgEnabled,
       cellBgColor: design.cellBgColor,
       cellSize,
