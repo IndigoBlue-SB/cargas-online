@@ -854,7 +854,7 @@
                 <span id="rafflePoolSummary" class="muted">0 series disponibles</span>
               </div>
               <div class="raffle-config-grid">
-                <label id="raffleAudienceLabel">Sortear<select id="raffleAudience"><option value="series">Series del bingo</option><option value="sellers">Numeros de vendedores</option></select></label>
+                <label id="raffleAudienceLabel">Sortear<select id="raffleAudience"><option value="series">Series vendidas del bingo</option><option value="sellers">Participaciones del sorteo de vendedores</option></select><small id="raffleAudienceHelp"></small></label>
                 <label>Cantidad de sorteos<input id="raffleDrawCount" type="number" min="1" max="20" step="1" value="1"></label>
                 <label>Modo
                   <select id="raffleDrawMode">
@@ -3068,7 +3068,7 @@
         button.disabled = true;
         try {
           if (button.dataset.sellerRewardAction === 'generate') await generateSellerRewards(target);
-          if (button.dataset.sellerRewardAction === 'draw') {activeRaffleEventId=target.id;ensureRaffle(target).audience='sellers';saveEvents();go('raffle');renderRaffle();}
+          if (button.dataset.sellerRewardAction === 'draw') {openRaffleEvent(target.id,'sellers');go('raffle');renderRaffle();}
           if (button.dataset.sellerRewardAction === 'export') exportSellerRewards(target);
           if(button.dataset.sellerRewardAction==='image') await exportSellerRewardImage(target);
         } catch(error) {
@@ -3109,11 +3109,13 @@
       eventData.raffle.results = Array.isArray(eventData.raffle.results) ? eventData.raffle.results : [];
       return eventData.raffle;
     }
-    function isSellerRaffle(event) { return !event?.isFreeRaffle && event?.raffle?.audience === 'sellers'; }
+    const raffleAudienceSelections = new Map();
+    function openRaffleEvent(id, audience = 'series') { activeRaffleEventId = id; raffleAudienceSelections.set(id, audience === 'sellers' ? 'sellers' : 'series'); }
+    function isSellerRaffle(event) { return !event?.isFreeRaffle && raffleAudienceSelections.get(event?.id) === 'sellers'; }
     function raffleResults(event) { const raffle = ensureRaffle(event); if (!raffle) return []; return isSellerRaffle(event) ? (raffle.sellerResults || (raffle.sellerResults = [])) : raffle.results; }
     function raffleLabel(pick) { return pick.label || num(pick.series); }
     function raffleOfficialUnits(eventData) {
-      if (eventData?.isFreeRaffle || isSellerRaffle(eventData)) return [];
+      if (eventData?.isFreeRaffle) return [];
       return [...new Set(officialSoldUnits(eventData).map(Number).filter(Number.isFinite))].sort((a, b) => a - b);
     }
     function raffleExtraUnits(eventData) {
@@ -3129,6 +3131,9 @@
     function rafflePool(eventData) {
       if (isSellerRaffle(eventData)) return sellerRewardsCurrent(eventData) ? eventData.sellerRewardAssignment.tickets.map(ticket => ({series:ticket.number,seller:ticket.seller,source:'Vendedores'})) : [];
       if (eventData?.isFreeRaffle) return (eventData.participants || []).map(item => ({ series: item.id, label: item.label, source: 'Sorteo libre' }));
+      return raffleSeriesPool(eventData);
+    }
+    function raffleSeriesPool(eventData) {
       const official = raffleOfficialUnits(eventData).map(series => ({ series, source: 'Bingo' }));
       const officialSet = new Set(official.map(item => item.series));
       const extras = raffleExtraUnits(eventData).filter(item => !officialSet.has(item.series));
@@ -3174,12 +3179,12 @@
       $('raffleEventsList').innerHTML = availableEvents.length ? availableEvents.map(eventData => {
         const raffle = ensureRaffle(eventData);
         const official = raffleOfficialUnits(eventData);
-        const pool = rafflePool(eventData);
+        const pool = raffleSeriesPool(eventData);
         return `
           <button type="button" class="raffle-event-button ${eventData.id === activeRaffleEventId ? 'active' : ''}" data-open-raffle="${escapeAttr(eventData.id)}">
             <strong>${escapeAttr(eventData.name)}</strong>
             <span>${escapeAttr(eventData.date || '')} - ${escapeAttr(eventData.town || '')}</span>
-            <span>${num(official.length)} oficiales - ${num(pool.length)} en sorteo - ${num(raffleResults(eventData).length)} resultados</span>
+            <span>${num(official.length)} series vendidas - ${num(pool.length)} en sorteo de series - ${num(raffle.results.length)} resultados</span>
           </button>
         `;
       }).join('') : '<div class="empty">No hay eventos disponibles.</div>';
@@ -3188,7 +3193,8 @@
     function renderRaffleDetail(eventData) {
       const hasEvent = Boolean(eventData);
       $('raffleAudienceLabel').classList.toggle('hidden', !hasEvent || !!eventData.isFreeRaffle);
-      $('raffleAudience').value = eventData?.raffle?.audience || 'series';
+      $('raffleAudience').value = isSellerRaffle(eventData) ? 'sellers' : 'series';
+      $('raffleAudienceHelp').textContent = isSellerRaffle(eventData) ? 'Este modo sortea los números asignados a vendedores, no las series vendidas del bingo.' : 'Este modo sortea las series vendidas de la carga del bingo.';
       renderSellerRewards(eventData,'sellerRewardsRaffle');
       $('freeRaffleEditor').classList.toggle('hidden', !eventData?.isFreeRaffle);
       $('raffleAddExtra').closest('section').classList.toggle('hidden', !!eventData?.isFreeRaffle || isSellerRaffle(eventData));
@@ -3247,7 +3253,7 @@
     function syncRaffleSettings(eventData = activeRaffleEvent()) {
       if (!eventData) return null;
       const raffle = ensureRaffle(eventData);
-      raffle.audience = eventData.isFreeRaffle ? 'series' : $('raffleAudience').value;
+      raffleAudienceSelections.set(eventData.id, !eventData.isFreeRaffle && $('raffleAudience').value === 'sellers' ? 'sellers' : 'series');
       raffle.drawCount = Math.min(Math.max(Number($('raffleDrawCount').value) || 1, 1), 20);
       raffle.drawMode = $('raffleDrawMode').value === 'simultaneous' ? 'simultaneous' : 'single';
       for (const [key, min, max, fallback] of [['boxWidth', 120, 900, 260], ['boxHeight', 80, 600, 140], ['fontSize', 24, 240, 56]]) {
@@ -6478,7 +6484,7 @@
       const openBingo = event.target.closest('[data-open-bingo]');
       if (openBingo) { activeBingoEventId = openBingo.dataset.openBingo; renderBingo(); }
       const openRaffle = event.target.closest('[data-open-raffle]');
-      if (openRaffle) { activeRaffleEventId = openRaffle.dataset.openRaffle; renderRaffle(); }
+      if (openRaffle) { openRaffleEvent(openRaffle.dataset.openRaffle); renderRaffle(); }
       const deleteRaffleExtraButton = event.target.closest('[data-delete-raffle-extra]');
       if (deleteRaffleExtraButton) deleteRaffleExtra(deleteRaffleExtraButton.dataset.deleteRaffleExtra);
       const openStats = event.target.closest('[data-open-stats]');
